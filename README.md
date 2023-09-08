@@ -37,16 +37,16 @@ Follow the steps in this README to run the codebase of this project.
 ---------------- 
 1) Create virtual environment using the poetry.lock file (if .lock files does not exist then pyproject.toml will be used).
    * Navigate to project root folder in your terminal 
-   * Run "poetry install"
+```bash 
+poetry install
+ ```
 2) (Optional) Modify project packages to suit your needs. **Use poetry for this** and not pip
       * "poetry add <package_name>" 
         * Note that this command replaces the "pip install <>". The command install the package, and adds it to the pyproject.toml file.
       * For documentation on how to use poetry: https://python-poetry.org/docs/basic-usage/
-------------------------------------------
 
-3) Add pre-commit hooks
-----------------------
-
+4 Add pre-commit hooks
+----------------
 We are using pre-commit to apply basic quality checks and autoformatting on the code.
    
 ```bash
@@ -56,26 +56,41 @@ pre-commit autoupdate
 
 On success, you should get a message like: ``pre-commit installed at .git/hooks/pre-commit``.
 
-4) Ensure tests can run
+5 Ensure tests can run
 ----------------------
 
 The repository uses [pytest](https://docs.pytest.org/en/latest/) to run the tests.
 
 In order to check that everything works as expected, run the tests from the root of the repo by first opening the poetry shell with:
-* "poetry shell"
-* "poetry run pytest".
+```bash
+poetry shell
+poetry run pytest
+ ```
 
 
-5) Autoformat code with black
+6 Autoformat code with black
+----------------------
 * poetry run black X  (X can either be a filename to be formatted or a . which formats the whole project)
+```bash
+poetry shell
+poetry run black .
+ ```
 
-
-6) Run ruff for auto-format suggestions.
+7 Run ruff for auto-format suggestions.
+----------------------
 * poetry run ruff X  (X can either be a filename to be formatted or a . which formats the whole project)
 * Fix problems automatically: poetry run ruff . --fix option
+
+```bash
+poetry shell
+poetry run ruff . --fix
+ ```
+
 
 8 Check that pre-commit work as intended. 
 -----------------------------
 execute "pre-commit run --all-files" after environment has been setup
-
+```bash
+pre-commit run --all-files
+ ```
 Happy Coding!
