@@ -1,5 +1,3 @@
-Copyright © 2022 by Halfspace. All rights reserved
-
 Getting started
 ============
 Follow the steps in this README to run the codebase of this project.
