@@ -1,7 +1,13 @@
 /graph_package/scratch/scratch.py
+<<<<<<< HEAD
 /data/bronze
 /data/silver
 /data/gold
 .idea/
 .vscode/
-
+poetry.lock 
+.DS_Store
+data/**
+*.pyc
+*.egg-info
+/graph_package/logs/**
