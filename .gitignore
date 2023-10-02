@@ -1,1 +1,7 @@
 /graph_package/scratch/scratch.py
+poetry.lock 
+.DS_Store
+data/**
+*.pyc
+*.egg-info
+/graph_package/logs/**
