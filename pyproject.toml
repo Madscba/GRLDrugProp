@@ -18,6 +18,8 @@ seaborn = "^0.12.2"
 colorlog = "^6.7.0"
 AutoUpdate = "^0.0.4"
 requests = "^2.29.0"
+torch = "^2.0.1"
+torch-geometric = "^2.3.1"
 
 [tool.poetry.dev-dependencies]
 

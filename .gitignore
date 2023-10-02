@@ -1,4 +1,7 @@
 /graph_package/scratch/scratch.py
-/data/bronze
-/data/silver
-/data/gold
+poetry.lock 
+.DS_Store
+data/**
+*.pyc
+*.egg-info
+/graph_package/logs/**
