@@ -22,6 +22,25 @@ def load_data(model_type: str = ""):
     """
     if model_type == "triplet":
         # Load triplet data with function from src/data_processing
+
+        # df = pd.read_csv(csv_file_path)
+        # unique_drug_names = df['drug_row'].unique()
+        # unique_relation_names = df['drug_row'].unique()
+
+        # entity_vocab = {index: value for index, value in enumerate(unique_drug_names)}
+        # inv_entity_vocab = {value: index for index, value in enumerate(unique_drug_names)}
+        # relation_vocab = {index: value for index, value in enumerate(unique_relation_names)}
+        # inv_relation_vocab = {value: index for index, value in enumerate(unique_relation_names)}
+
+        # triplets =
+        # edge_weight =
+        # graph = data.Graph(edge_list=triplets, edge_weight=None, num_node=None, num_relation=None, node_feature=None,edge_feature=None)
+
+        # print(graph)
+        # print(graph.adjacency)
+        # print(graph.visualize())
+        # plt.show()
+
         pass
     elif model_type == "DDI,DPI,PPI":
         # Load drug-drug, drug-protein, protein-protein interaction data with function from src/data_processing
