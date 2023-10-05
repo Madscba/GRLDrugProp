@@ -10,7 +10,8 @@ class RESCALSynergy(nn.Module):
 		self.dim = dim
 	
 		self.ent_embeddings = nn.Embedding(self.ent_tot, self.dim)
-		self.rel_matrices = nn.Parameter(torch.Tensor(self.dim, self.dim)) # Adjusted for cont relations
+		self.rel_matrices = nn.Embedding(self.ent_tot, self.dim)
+		# self.rel_matrices = nn.Parameter(torch.Tensor(self.dim, self.dim)) # Adjusted for cont relations
 
 		nn.init.xavier_uniform_(self.ent_embeddings.weight.data)
 		nn.init.xavier_uniform_(self.rel_matrices.weight.data)
@@ -20,7 +21,6 @@ class RESCALSynergy(nn.Module):
 		r = r.view(-1, self.dim, self.dim)
 		tr = torch.matmul(r, t)
 		tr = tr.view(-1, self.dim)
-		tr = 1
 		return -torch.sum(h * tr, -1)
 	
 	def get_hrt(self, data):
@@ -44,5 +44,5 @@ class RESCALSynergy(nn.Module):
 		return regul
 
 	def predict(self, data):
-		score = self.forward(data)
+		score = -self.forward(data)
 		return score.cpu().data.numpy()
