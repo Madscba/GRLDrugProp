@@ -32,4 +32,5 @@ def make_triplets_oneil():
     df.to_csv(save_path, index=False)
 
 if __name__ == "__main__":
+    print("hello")
     make_triplets_oneil()
