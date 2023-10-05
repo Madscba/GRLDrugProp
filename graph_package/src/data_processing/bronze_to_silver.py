@@ -93,7 +93,6 @@ def generate_oneil_dataset():
 
     
 if __name__ == "__main__":
-    print("hej")
     generate_oneil_dataset() 
 
 
