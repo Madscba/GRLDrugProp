@@ -10,3 +10,5 @@ data/**
 *.pyc
 *.egg-info
 /graph_package/logs/**
+myenv
+.env

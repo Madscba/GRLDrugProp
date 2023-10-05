@@ -26,7 +26,9 @@ def generate_oneil_dataset():
 
 
 if __name__ == "__main__":
-    generate_oneil_dataset()
+    #generate_oneil_dataset()
+    data = pd.read_csv("data/silver/oneil/oneil.csv")
+    data.describe()
     
 
     

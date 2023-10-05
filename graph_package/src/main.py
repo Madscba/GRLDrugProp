@@ -2,16 +2,17 @@
 
 import torch
 from torchdrug import core, datasets, tasks, models
+from model import RESCALSynergy
 
 # https://torchdrug.ai/docs/quick_start.html
 
 # Make a train_fig for each type of model we want to train. Then we will save and load this
 train_config = {
-    "model": "GIN",
-    "data_type": "triple",
+    "model": "RESCAL",
+    "data_type": "triplet",
     "train_device": "cpu",
     "split_method": "naive",
-}  # "logger": "local"
+} # "logger": "local"
 
 
 def load_data(model_type: str = ""):
@@ -40,8 +41,10 @@ def load_data(model_type: str = ""):
         # print(graph.adjacency)
         # print(graph.visualize())
         # plt.show()
+        import ssl
+        ssl._create_default_https_context = ssl._create_unverified_context
+        dataset = datasets.Hetionet("/Users/johannesreiche/Library/Mobile Documents/com~apple~CloudDocs/DTU/MMC/Thesis/Code/GRLDrugProp/data/gold")
 
-        pass
     elif model_type == "DDI,DPI,PPI":
         # Load drug-drug, drug-protein, protein-protein interaction data with function from src/data_processing
         pass
@@ -59,6 +62,8 @@ def split_dataset(
     if split_method == "standard":
         # Use defined split_method to make a more intelligent split
         pass
+    elif split_method == "built-in":
+        splits = dataset.split()
     else:
         lengths = [int(0.8 * len(dataset)), int(0.1 * len(dataset))]
         lengths += [len(dataset) - sum(lengths)]
@@ -69,7 +74,11 @@ def split_dataset(
 def load_model(model: str = "GIN"):
     if model == "RESCAL":
         # LOAD RESCAL MODEL
-        pass
+        model = RESCALSynergy(
+            ent_tot=45158,
+            rel_tot=31,
+            dim=64
+        )
     elif model == "DeepDDS":
         # LOAD DeepDDS MODEL
         pass
@@ -99,6 +108,10 @@ if __name__ == "__main__":
     # 4. Define task, criterion and metrics
     if train_config["model"] == "GIN":
         task = tasks.PropertyPrediction(
+            model, task=dataset.tasks, criterion="bce", metric=("auprc", "auroc")
+        )
+    elif train_config["model"] == "RESCAL":
+        task = tasks.KnowledgeGraphCompletion(
             model, task=dataset.tasks, criterion="bce", metric=("auprc", "auroc")
         )
 
