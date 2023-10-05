@@ -18,9 +18,8 @@ def make_triplets_oneil():
     columns_to_keep = ["drug_row_cid", "drug_col_cid", "cell_line_name", "synergy_loewe"]
     df = df[columns_to_keep]
     df = df.groupby(["drug_row_cid", "drug_col_cid", "cell_line_name"]).mean().reset_index()
-    lambda x: 0 if x < -10 else (1 if x > 10 else pd.NA)
     df["synergy_loewe"] = df["synergy_loewe"].apply(
-        lambda x: 0 if x < -10 else (1 if x > 10 else pd.NA)
+        lambda x: 0 if x < 0 else (1 if x > 10 else pd.NA)
     )
     df.dropna(subset=["synergy_loewe"], inplace=True)
     rename_dict = {

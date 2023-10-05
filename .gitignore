@@ -1,4 +1,9 @@
 /graph_package/scratch/scratch.py
+/data/bronze
+/data/silver
+/data/gold
+.idea/
+.vscode/
 poetry.lock 
 .DS_Store
 data/**

@@ -3,47 +3,29 @@ Getting started
 Follow the steps in this README to run the codebase of this project.
 
 
-1 Install Poetry
---------------------------
-1) Install poetry (https://python-poetry.org/docs/#installation)
-   * Linux, macOS, Windows (WSL)
-      * "curl -sSL https://install.python-poetry.org | python3 -"
-   * Update to latest version: "poetry self update"
-   * (Recommended) If you prefer poetry to save your virtual environment configurations in the project folder, then run "poetry config virtualenvs.in-project true"
-2) Verify that the command "poetry --version" is recognized.
-
-
-* Poetry basic commands
-  * "poetry install" - Initialize poetry environment from pyproject.toml.
-  * "poetry shell" - The easiest way to activate the virtual environment is to create a nested shell.     
-  * "exit" - To deactivate the virtual environment and exit this new shell type.
-  * "deactivate" - To deactivate the virtual environment without leaving the shell use.
-  * "poetry add <package_name>" - Add package to dependencies. 
-  * "poetry remove <package_name>" - Remove package from dependencies. 
-  * "poetry update" - Update poetry dependencies. 
-
---------------
 
 
 
-2 Clone repo 
+1 Clone repo 
 ----------------
 1) Clone repository to your machine.
 
 
-3 Create virtual environment
+2 Create virtual environment
 ---------------- 
-1) Create virtual environment using the poetry.lock file (if .lock files does not exist then pyproject.toml will be used).
-   * Navigate to project root folder in your terminal 
-```bash 
-poetry install
- ```
-2) (Optional) Modify project packages to suit your needs. **Use poetry for this** and not pip
-      * "poetry add <package_name>" 
-        * Note that this command replaces the "pip install <>". The command install the package, and adds it to the pyproject.toml file.
-      * For documentation on how to use poetry: https://python-poetry.org/docs/basic-usage/
+Prerequisites: Python 3.7.16, C++ Compiler (Instruction for how to install this can be found beneath), 
+1) Windows:
+   2) Windows environment setup:
+    * conda create -n <myenv> python=3.7.16
+    * conda activate <myenv>
+    * conda install pytorch==1.10.0 -c pytorch
+    * conda install pytorch-scatter -c pyg
+    * conda install pytorch-cluster -c pyg
+    * conda install torchdrug -c milagraph
+    * pip install torchdrug==0.1.3.post1
 
-4 Add pre-commit hooks
+
+3 Add pre-commit hooks
 ----------------
 We are using pre-commit to apply basic quality checks and autoformatting on the code.
    
@@ -54,7 +36,7 @@ pre-commit autoupdate
 
 On success, you should get a message like: ``pre-commit installed at .git/hooks/pre-commit``.
 
-5 Ensure tests can run
+4 Ensure tests can run
 ----------------------
 
 The repository uses [pytest](https://docs.pytest.org/en/latest/) to run the tests.
@@ -66,7 +48,7 @@ poetry run pytest
  ```
 
 
-6 Autoformat code with black
+5 Autoformat code with black
 ----------------------
 * poetry run black X  (X can either be a filename to be formatted or a . which formats the whole project)
 ```bash
@@ -74,7 +56,7 @@ poetry shell
 poetry run black .
  ```
 
-7 Run ruff for auto-format suggestions.
+6 Run ruff for auto-format suggestions.
 ----------------------
 * poetry run ruff X  (X can either be a filename to be formatted or a . which formats the whole project)
 * Fix problems automatically: poetry run ruff . --fix option
@@ -85,10 +67,30 @@ poetry run ruff . --fix
  ```
 
 
-8 Check that pre-commit work as intended. 
+7 Check that pre-commit work as intended. 
 -----------------------------
 execute "pre-commit run --all-files" after environment has been setup
 ```bash
 pre-commit run --all-files
  ```
-Happy Coding!
+
+
+8 Install C++ Compiler via Visual Studio Installer (Prerequisite)
+--------------------
+Install C++ compiler:
+1. Go to VS Installer
+2. Click on modify
+3. Select Desktop development with C++.
+
+Select subcategories:
+* MSVC v143 - VS 2022 C++x64/x86 build tools
+* C++ ATL for latest v143 build tools
+* C++ profiling tools
+* C++ Cmake tools for Windows
+* Windows 11 SDK (10.0.22621.0)
+* vcpkg package manager
+
+Open "Developer Command Prompt for VS2022" and type "where cl".
+
+Add path the path of the cl.exe to environment variable "PATH"
+(ex of path: C:\VS2022\VC\Tools\MSVC\14.10.25017\bin\HostX64\x64).
