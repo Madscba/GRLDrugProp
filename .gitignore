@@ -5,3 +5,4 @@ data/**
 *.pyc
 *.egg-info
 /graph_package/logs/**
+debug
