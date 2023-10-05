@@ -1,12 +1,22 @@
-from chemicalx.data.datasetloader import DatasetLoader
+from chemicalx.data.datasetloader import DatasetLoader, RemoteDatasetLoader, LabeledTriples, DrugFeatureSet, ContextFeatureSet
 from configs.directories import Directories
+import pandas as pd
 
-class DrugCombFull(DatasetLoader):
+import csv
+import io
+import json
+import urllib.request
+from abc import ABC, abstractmethod
+from functools import lru_cache
+from itertools import chain
+from pathlib import Path
+from textwrap import dedent
+from typing import ClassVar, Dict, Mapping, Optional, Sequence, Tuple, cast
 
-    data_path = Directories.DATA_PATH / "summary_v_1_5.csv"
+class ONEIL(DatasetLoader):
+    data_path = Directories.DATA_PATH / "oneil" / "oneil.csv"
 
     def __init__(self) -> None:
-        = pd.read_csv(self.data_path)
         super().__init__()
     
     def get_generator(
@@ -69,6 +79,8 @@ class DrugCombFull(DatasetLoader):
     @abstractmethod
     def get_labeled_triples(self) -> LabeledTriples:
         """Get the labeled triples file from the storage."""
+        df = pd.read_csv(self.data_path)
+        return LabeledTriples(df)
 
     @property
     def num_labeled_triples(self) -> int:
