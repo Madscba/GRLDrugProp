@@ -64,9 +64,6 @@ def load_drug_info_drugcomb():
         drug_dict = json.load(f)
     return drug_dict
 
-
-
-
 def get_CIDs(df: pd.DataFrame, dataset: str = "oneil"):
     """
     Get CIDs and smile strings for drugs.
