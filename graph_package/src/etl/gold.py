@@ -1,3 +1,5 @@
+#import sys
+#sys.path.insert(0,'/Users/johannesreiche/Library/Mobile Documents/com~apple~CloudDocs/DTU/MMC/Thesis/Code/GRLDrugProp')
 from graph_package.configs.directories import Directories
 import pandas as pd
 import numpy as np
@@ -27,6 +29,20 @@ def get_CIDs(df: pd.DataFrame, dataset: str = "oneil"):
     df["drug_col_cid"] = df["drug_col"].apply(lambda x: drug_dict[x]["cid"])
     return df
 
+def create_vocab(df: pd.DataFrame, subset: list, save_path: str = ''):
+    """
+    Create json file with CID / cell-line name to entity / relation ID 
+    """
+    sub_df = df.drop_duplicates(subset=subset)
+    values = sub_df.loc[:,subset[0]].to_list()
+    ids = sub_df.loc[:,subset[1]].to_list()
+
+    vocab = {index: value for index, value in zip(ids,values)}
+    
+    # Save the vocab to a JSON file
+    with open(save_path, 'w') as json_file:
+        json.dump(vocab, json_file)
+
 
 def make_triplets_oneil_chemicalx():
     save_path = Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" / "oneil.csv"
@@ -49,5 +65,30 @@ def make_triplets_oneil_chemicalx():
     df.rename(columns=rename_dict, inplace=True)
     df.to_csv(save_path, index=False)
 
+def make_triplets_oneil_torchdrug():
+    save_path = Directories.DATA_PATH / "gold" / "torchdrug" / "oneil" / "oneil.csv"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    entity_vocab_path = Directories.DATA_PATH / "gold" / "torchdrug" / "oneil" / "entity_vocab.json"
+    relation_vocab_path = Directories.DATA_PATH / "gold" / "torchdrug" / "oneil" / "relation_vocab.json"
+    load_path = Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" / "oneil.csv"
+    df = pd.read_csv(load_path)
+
+    # Create unique cell-line ID's based on context and label
+    df['context_id'] = df.groupby(['context', 'label']).ngroup()
+        
+    # Factorize drug_1, and drug_2 columns to ID's
+    df['drug_1_id'] = df['drug_1'].factorize()[0]
+    df['drug_2_id'] = df['drug_2'].factorize()[0]
+
+    # Create vocab json files
+    create_vocab(df=df, subset=['drug_1','drug_1_id'], save_path=entity_vocab_path)
+    create_vocab(df=df, subset=['context','context_id'], save_path=relation_vocab_path)
+
+    # Filter dataframe
+    columns_to_keep = ["drug_1_id", "drug_2_id", "context_id"]
+    df = df[columns_to_keep]
+    df.to_csv(save_path, index=False)
+
 if __name__ == "__main__":
     make_triplets_oneil_chemicalx()
+    make_triplets_oneil_torchdrug()
