@@ -2,3 +2,4 @@
 -e .
 
 torchdrug==0.1.3.post1
+chemicalx
