@@ -23,7 +23,7 @@ Prerequisites: C++ Compiler (Instruction for how to install this can be found be
     * CONDA_SUBDIR=osx-64 conda env create --file environment.yml
     * conda activate grap_pgk_env
 
-**PLEASE FIRST CHECK IF NEW PACKAGES ARE AVAILABLE THROUGH CONDA CHANNELS AND ADD THEM TO ```environment.yml```. USE ```pip``` as last resort and add to ```requirements.txt```**
+**PLEASE FIRST CHECK IF NEW PACKAGES ARE AVAILABLE THROUGH CONDA CHANNELS AND ADD THEM TO ```environment.yml```. USE ```pip``` AS LAST RESORT AND ADD TO ```requirements.txt```**
 
 
 3 Add pre-commit hooks
