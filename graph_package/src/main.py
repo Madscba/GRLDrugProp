@@ -1,8 +1,12 @@
 """main module."""
 
 import torch
-from torchdrug import core, datasets, tasks, models
+import json
+import pandas as pd
+from torchdrug import data, core, datasets, tasks, models
+from torchdrug.core import Registry as R
 from model import RESCALSynergy
+from ONEIL import ONEIL
 
 # https://torchdrug.ai/docs/quick_start.html
 
@@ -11,7 +15,7 @@ train_config = {
     "model": "RESCAL",
     "data_type": "triplet",
     "train_device": "cpu",
-    "split_method": "naive",
+    "split_method": "built-in",
 } # "logger": "local"
 
 
@@ -41,9 +45,15 @@ def load_data(model_type: str = ""):
         # print(graph.adjacency)
         # print(graph.visualize())
         # plt.show()
-        import ssl
-        ssl._create_default_https_context = ssl._create_unverified_context
-        dataset = datasets.Hetionet("/Users/johannesreiche/Library/Mobile Documents/com~apple~CloudDocs/DTU/MMC/Thesis/Code/GRLDrugProp/data/gold")
+
+        raw = pd.read_csv("data/gold/torchdrug/oneil/oneil.csv")
+        with open("data/gold/torchdrug/oneil/entity_vocab.json", 'r') as json_file:
+            entity_vocab = json.load(json_file)
+        with open("data/gold/torchdrug/oneil/entity_vocab.json", 'r') as json_file:
+            entity_vocab = json.load(json_file)
+        dataset = ONEIL(raw)
+
+        return dataset
 
     elif model_type == "DDI,DPI,PPI":
         # Load drug-drug, drug-protein, protein-protein interaction data with function from src/data_processing
@@ -63,7 +73,7 @@ def split_dataset(
         # Use defined split_method to make a more intelligent split
         pass
     elif split_method == "built-in":
-        splits = dataset.split()
+        train_set, valid_set, test_set = dataset.split()
     else:
         lengths = [int(0.8 * len(dataset)), int(0.1 * len(dataset))]
         lengths += [len(dataset) - sum(lengths)]
@@ -112,7 +122,7 @@ if __name__ == "__main__":
         )
     elif train_config["model"] == "RESCAL":
         task = tasks.KnowledgeGraphCompletion(
-            model, task=dataset.tasks, criterion="bce", metric=("auprc", "auroc")
+            model, criterion="bce", metric=("auprc", "auroc")
         )
 
     # 4. Define optimize
@@ -141,7 +151,7 @@ if __name__ == "__main__":
             valid_set,
             test_set,
             optimizer,
-            batch_size=1024,
+            batch_size=16,
             gpus=[0],
             **logger_kwargs
         )

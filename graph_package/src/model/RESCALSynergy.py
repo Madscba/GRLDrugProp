@@ -1,14 +1,15 @@
 import torch
 import torch.nn as nn
+from torchdrug import core
 
-class RESCALSynergy(nn.Module):
-
-	def __init__(self, ent_tot, rel_tot, dim = 100):
+class RESCALSynergy(nn.Module, core.Configurable):
+	def __init__(self, ent_tot, rel_tot, dim = 100, reg = 0):
 		super(RESCALSynergy, self).__init__()
 		self.ent_tot = ent_tot
 		self.rel_tot = rel_tot
 		self.dim = dim
-	
+		self.reg = reg
+
 		self.ent_embeddings = nn.Embedding(self.ent_tot, self.dim)
 		self.rel_matrices = nn.Embedding(self.ent_tot, self.dim)
 		# self.rel_matrices = nn.Parameter(torch.Tensor(self.dim, self.dim)) # Adjusted for cont relations
@@ -23,18 +24,15 @@ class RESCALSynergy(nn.Module):
 		tr = tr.view(-1, self.dim)
 		return -torch.sum(h * tr, -1)
 	
-	def get_hrt(self, data):
+	def get_hrt(self, h_index, t_index, r_index):
 		# Transform data to expected batch tensor format
-		batch_h = data['batch_h']
-		batch_t = data['batch_t']
-		batch_r = data['batch_r']
-		h = self.ent_embeddings(batch_h)
-		t = self.ent_embeddings(batch_t)
-		r = self.rel_matrices(batch_r)
+		h = self.ent_embeddings(h_index)
+		t = self.ent_embeddings(t_index)
+		r = self.rel_matrices(r_index)
 		return h,r,t
 	
-	def forward(self, data):
-		h, r, t = self.get_hrt(data)
+	def forward(self, graph, h_index, t_index, r_index, all_loss=None, metric=None):
+		h, r, t = self.get_hrt(h_index, t_index, r_index)
 		score = self._calc(h ,t, r)
 		return score
 

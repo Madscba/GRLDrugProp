@@ -33,11 +33,11 @@ def create_vocab(df: pd.DataFrame, subset: list, save_path: str = ''):
     """
     Create json file with CID / cell-line name to entity / relation ID 
     """
-    sub_df = df.drop_duplicates(subset=subset)
-    values = sub_df.loc[:,subset[0]].to_list()
+    sub_df = df.drop_duplicates(subset=subset,keep='first')
+    keys = sub_df.loc[:,subset[0]].to_list()
     ids = sub_df.loc[:,subset[1]].to_list()
 
-    vocab = {index: value for index, value in zip(ids,values)}
+    vocab = {key: id for key, id in zip(keys,ids)}
     
     # Save the vocab to a JSON file
     with open(save_path, 'w') as json_file:
@@ -76,12 +76,19 @@ def make_triplets_oneil_torchdrug():
     # Create unique cell-line ID's based on context and label
     df['context_id'] = df.groupby(['context', 'label']).ngroup()
         
-    # Factorize drug_1, and drug_2 columns to ID's
-    df['drug_1_id'] = df['drug_1'].factorize()[0]
-    df['drug_2_id'] = df['drug_2'].factorize()[0]
+    # Create unique drug ID's
+    unique_drugs = set(df['drug_1'].unique()).union(df['drug_2'].unique())
+    drug_id_mapping = {str(drug): idx for idx, drug in enumerate(unique_drugs)}
 
-    # Create vocab json files
-    create_vocab(df=df, subset=['drug_1','drug_1_id'], save_path=entity_vocab_path)
+    # Save the vocab to a JSON file
+    with open(entity_vocab_path, 'w') as json_file:
+        json.dump(drug_id_mapping, json_file)
+
+    drug_id_mapping = {drug: idx for idx, drug in enumerate(unique_drugs)}
+    df['drug_1_id'] = df['drug_1'].map(drug_id_mapping)
+    df['drug_2_id'] = df['drug_2'].map(drug_id_mapping)
+
+    # Create context vocab json file
     create_vocab(df=df, subset=['context','context_id'], save_path=relation_vocab_path)
 
     # Filter dataframe
@@ -90,5 +97,5 @@ def make_triplets_oneil_torchdrug():
     df.to_csv(save_path, index=False)
 
 if __name__ == "__main__":
-    make_triplets_oneil_chemicalx()
+    #make_triplets_oneil_chemicalx()
     make_triplets_oneil_torchdrug()
