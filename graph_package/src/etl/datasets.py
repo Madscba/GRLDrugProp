@@ -22,7 +22,7 @@ class ONEIL(RemoteDatasetLoader):
     
     def get_labeled_triples(self) -> LabeledTriples:
         """Get the labeled triples file from the storage."""
-        path = Directories.DATA_PATH / "gold" /"oneil" / "oneil.csv"
+        path = Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" / "oneil.csv"
         dtype = {"drug_1": str, "drug_2": str, "context": str, "label": float}
         df = pd.read_csv(path,dtype=dtype)
         return LabeledTriples(df)
