@@ -2,12 +2,12 @@
 from chemicalx import pipeline
 from chemicalx.models import DeepSynergy, DeepDDS
 from chemicalx.data import DrugCombDB
-from graph_package.src.etl.datasets import ONEIL
+from .dataloaders import OneilCX
 
 model = DeepDDS(context_channels=288)
 
 
-dataset = ONEIL()
+dataset = OneilCX()
 
 
 results = pipeline(dataset=dataset,
