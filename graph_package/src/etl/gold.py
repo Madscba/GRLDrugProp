@@ -65,11 +65,11 @@ def create_vocab(df: pd.DataFrame, subset: list, save_path: str = ''):
     """
     Create json file with CID / cell-line name to entity / relation ID 
     """
-    sub_df = df.drop_duplicates(subset=subset)
-    values = sub_df.loc[:,subset[0]].to_list()
+    sub_df = df.drop_duplicates(subset=subset,keep='first')
+    keys = sub_df.loc[:,subset[0]].to_list()
     ids = sub_df.loc[:,subset[1]].to_list()
 
-    vocab = {index: value for index, value in zip(ids,values)}
+    vocab = {key: id for key, id in zip(keys,ids)}
     
     # Save the vocab to a JSON file
     with open(save_path, 'w') as json_file:
@@ -108,15 +108,30 @@ def make_triplets_oneil_torchdrug():
     # Create unique cell-line ID's based on context and label
     df['context_id'] = df.groupby(['context', 'label']).ngroup()
         
-    # Factorize drug_1, and drug_2 columns to ID's
-    df['drug_1_id'] = df['drug_1'].factorize()[0]
-    df['drug_2_id'] = df['drug_2'].factorize()[0]
+    # Create unique drug ID's
+    unique_drugs = set(df['drug_1'].unique()).union(df['drug_2'].unique())
+    drug_dict = load_drug_info_drugcomb()
+    drug_id_mapping = {drug: idx for idx, drug in enumerate(unique_drugs)}
+    df['drug_1_id'] = df['drug_1'].map(drug_id_mapping)
+    df['drug_2_id'] = df['drug_2'].map(drug_id_mapping)
+    
+    # Create vocab to map drug name identifier to graph drug ID
+    drug_cid_mapping = {name: drug_dict[name]['cid'] for name in drug_dict if drug_dict[name]['cid'] in list(unique_drugs)}
+    drug_name_mapping = {name: drug_id_mapping[cid] for name, cid in drug_cid_mapping.items()}
+    
+    # Save the vocab to a JSON file
+    with open(entity_vocab_path, 'w') as json_file:
+        json.dump(drug_name_mapping, json_file)
 
-    # Create vocab json files
-    create_vocab(df=df, subset=['drug_1','drug_1_id'], save_path=entity_vocab_path)
-    create_vocab(df=df, subset=['context','context_id'], save_path=relation_vocab_path)
+    # Create vocab to map cell line name to graph cell line ID
+    sub_df = df.drop_duplicates(subset=['context','context_id'],keep='first')
+    cell_line_mapping = {name+'_'+str(label): idx for name, label, idx in sub_df.loc[:,['context','label','context_id']].values}
+    
+    # Save the vocab to a JSON file
+    with open(relation_vocab_path, 'w') as json_file:
+        json.dump(cell_line_mapping, json_file)
 
-    # Filter dataframe
+    # Filter dataframe to match torchdrug 
     columns_to_keep = ["drug_1_id", "drug_2_id", "context_id"]
     df = df[columns_to_keep]
     df.to_csv(save_path, index=False)
