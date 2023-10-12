@@ -12,3 +12,4 @@ data/**
 /graph_package/logs/**
 debug
 .idea
+graph_package/src/main_copy.py

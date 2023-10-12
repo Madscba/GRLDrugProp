@@ -51,7 +51,7 @@ def load_data(model_type: str = ""):
             entity_vocab = json.load(json_file)
         with open("data/gold/torchdrug/oneil/entity_vocab.json", 'r') as json_file:
             entity_vocab = json.load(json_file)
-        dataset = ONEIL(raw)
+        dataset = OneilTD(raw)
 
         return dataset
 
