@@ -13,9 +13,6 @@ from torch.utils.data import random_split, Subset
 from models import DeepDDS, RESCAL
 
 
-# https://torchdrug.ai/docs/quick_start.html
-
-
 def load_data(model: str = "deepdds", dataset: str = "oneil"):
     """Fetch formatted data depending on modelling task"""
     dataset_key = model.lower() + "_" + dataset.lower()
@@ -48,7 +45,6 @@ def split_dataset(dataset, split_method: str = "random", split_idx: Tuple[List[i
 
 
 def main(model_name: str = 'deepdds', dataset_name: str = 'oneil', kwargs: dict = {}):
-    
     dataset = load_data(model=model_name, dataset=dataset_name)
     train_set, valid_set, test_set = split_dataset(dataset, split_method="random")
     model = load_model(model=model_name, model_kwargs=kwargs["model"])
