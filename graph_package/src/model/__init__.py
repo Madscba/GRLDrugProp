@@ -1,5 +1,5 @@
-from model.RESCALSynergy import RESCALSynergy
+from graph_package.src.model.RESCAL import RESCAL
 
 __all__ = [
-    'RESCALSynergy'
+    'RESCAL'
 ]
