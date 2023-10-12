@@ -83,6 +83,13 @@ def create_vocab(df: pd.DataFrame, subset: list, save_path: str = ""):
     with open(save_path, "w") as json_file:
         json.dump(vocab, json_file)
 
+def create_inverse_triplets(df: pd.DataFrame):
+    """ Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
+    df_inv = df.copy()
+    df_inv['drug_1'], df_inv['drug_2'] = df['drug_2'], df['drug_1']
+    df_inv['drug_1_id'], df_inv['drug_2_id'] = df['drug_2_id'], df['drug_1_id']
+    df_combined = pd.concat([df,df_inv], ignore_index=True)
+    return df_combined
 
 def make_triplets_oneil_chemicalx():
     save_path = Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" / "oneil.csv"
@@ -112,9 +119,6 @@ def make_triplets_oneil_torchdrug():
     load_path =  Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" /  "oneil.csv"
     df = pd.read_csv(load_path)
 
-    # Create unique cell-line ID's based on context and label
-    df["context_id"] = df.groupby(["context", "label"]).ngroup()
-
     # Create unique drug ID's
     unique_drugs = set(df["drug_1"]).union(set(df["drug_2"]))
     drug_dict = load_drug_info_drugcomb()
@@ -136,18 +140,22 @@ def make_triplets_oneil_torchdrug():
     with open(save_path / "entity_vocab.json", "w") as json_file:
         json.dump(drug_name_mapping, json_file)
 
+    # Create unique cell-line ID's based on context and label
+    df = df[df["label"]==1]
+    df['context_id'] = df.groupby(['context', 'label']).ngroup()
+    sub_df = df.drop_duplicates(subset=['context','context_id'],keep='first')
     # Create vocab to map cell line name to graph cell line ID
-    sub_df = df.drop_duplicates(subset=["context", "context_id"], keep="first")
-    cell_line_mapping = {
-        name + "_" + str(label): idx
-        for name, label, idx in sub_df.loc[:, ["context", "label", "context_id"]].values
-    }
+    cell_line_mapping = {name: idx for name, idx in sub_df.loc[:,['context', 'context_id']].values}
+    
 
     # Save the vocab to a JSON file
     with open(save_path / "relation_vocab.json", "w") as json_file:
         json.dump(cell_line_mapping, json_file)
 
-    # Filter dataframe to match torchdrug
+
+    # Create inverse triplets
+    df = create_inverse_triplets(df)
+
     columns_to_keep = ["drug_1_id", "drug_2_id", "context_id"]
     df = df[columns_to_keep]
     df.to_csv(save_path / "oneil.csv", index=False)
