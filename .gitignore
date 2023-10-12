@@ -13,3 +13,4 @@ data/**
 debug
 .idea
 graph_package/src/main_copy.py
+graph_package/src/etl/pipeline_test.py

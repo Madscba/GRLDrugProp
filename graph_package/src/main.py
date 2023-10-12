@@ -5,7 +5,7 @@ import json
 import pandas as pd
 from torchdrug import data, core, datasets, tasks, models
 from torchdrug.core import Registry as R
-from model import RESCALSynergy
+from models import RESCAL
 from .etl.dataloaders import OneilTD
 
 # https://torchdrug.ai/docs/quick_start.html

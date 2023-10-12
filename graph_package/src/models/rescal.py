@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torchdrug import core
 
-class RESCALSynergy(nn.Module, core.Configurable):
+class RESCAL(nn.Module, core.Configurable):
 	def __init__(self, ent_tot, rel_tot, dim = 100, reg = 0):
 		super(RESCALSynergy, self).__init__()
 		self.ent_tot = ent_tot
