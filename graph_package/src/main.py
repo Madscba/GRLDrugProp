@@ -1,175 +1,74 @@
 """main module."""
 
 import torch
+from typing import List, Tuple, Union
 import json
 import pandas as pd
 from torchdrug import data, core, datasets, tasks, models
 from torchdrug.core import Registry as R
-from models import RESCAL
-from .etl.dataloaders import OneilTD
+from .models import RESCAL
+from .etl.dataloaders import ONEIL_RESCAL, ONIEL_DeepDDS
+from configs.definitions import Directories, model_dict, dataset_dict, task_dict
+from torch.utils.data import random_split, Subset
+from models import DeepDDS, RESCAL
+
 
 # https://torchdrug.ai/docs/quick_start.html
 
-# Make a train_fig for each type of model we want to train. Then we will save and load this
-train_config = {
-    "model": "RESCAL",
-    "data_type": "triplet",
-    "train_device": "cpu",
-    "split_method": "built-in",
-} # "logger": "local"
 
-
-def load_data(model_type: str = ""):
-    """Fetch formatted data depending on modelling task
-
-    data_type: str: [triplets, DDI,DPI,PPI, SMILE]
-    data should be saved in as a torch.data.dataset, that can be inserted into torch.data.dataloader()
-    """
-    if model_type == "triplet":
-        # Load triplet data with function from src/data_processing
-
-        # df = pd.read_csv(csv_file_path)
-        # unique_drug_names = df['drug_row'].unique()
-        # unique_relation_names = df['drug_row'].unique()
-
-        # entity_vocab = {index: value for index, value in enumerate(unique_drug_names)}
-        # inv_entity_vocab = {value: index for index, value in enumerate(unique_drug_names)}
-        # relation_vocab = {index: value for index, value in enumerate(unique_relation_names)}
-        # inv_relation_vocab = {value: index for index, value in enumerate(unique_relation_names)}
-
-        # triplets =
-        # edge_weight =
-        # graph = data.Graph(edge_list=triplets, edge_weight=None, num_node=None, num_relation=None, node_feature=None,edge_feature=None)
-
-        # print(graph)
-        # print(graph.adjacency)
-        # print(graph.visualize())
-        # plt.show()
-
-        raw = pd.read_csv("data/gold/torchdrug/oneil/oneil.csv")
-        with open("data/gold/torchdrug/oneil/entity_vocab.json", 'r') as json_file:
-            entity_vocab = json.load(json_file)
-        with open("data/gold/torchdrug/oneil/entity_vocab.json", 'r') as json_file:
-            entity_vocab = json.load(json_file)
-        dataset = OneilTD(raw)
-
-        return dataset
-
-    elif model_type == "DDI,DPI,PPI":
-        # Load drug-drug, drug-protein, protein-protein interaction data with function from src/data_processing
-        pass
-    elif model_type == "SMILE":
-        # Load SMILE data with function from src/data_processing
-        pass
-    else:  # Take the dataset from the torch drug demo
-        dataset = datasets.ClinTox("~/molecule-datasets/")
+def load_data(model: str = "deepdds", dataset: str = "oneil"):
+    """Fetch formatted data depending on modelling task"""
+    dataset_key = model.lower() + "_" + dataset.lower()
+    dataset = dataset_dict[dataset_key]()
     return dataset
 
+def wrap_model_in_task(model: Union[DeepDDS,RESCAL]):
+    """Wrap model in task"""
+    task = task_dict[model.__name__.lower()](model=model)
+    return task
 
-def split_dataset(
-    dataset, split_pct: dict = {"train": 0.8, "test": 0.2}, split_method: str = "naive"
-):
-    if split_method == "standard":
-        # Use defined split_method to make a more intelligent split
-        pass
-    elif split_method == "built-in":
-        train_set, valid_set, test_set = dataset.split()
-    else:
-        lengths = [int(0.8 * len(dataset)), int(0.1 * len(dataset))]
-        lengths += [len(dataset) - sum(lengths)]
-        train_set, valid_set, test_set = torch.utils.data.random_split(dataset, lengths)
-    return train_set, valid_set, test_set
-
-
-def load_model(model: str = "GIN"):
-    if model == "RESCAL":
-        # LOAD RESCAL MODEL
-        model = RESCALSynergy(
-            ent_tot=45158,
-            rel_tot=31,
-            dim=64
-        )
-    elif model == "DeepDDS":
-        # LOAD DeepDDS MODEL
-        pass
-    else:
-        model = models.GIN(
-            input_dim=dataset.node_feature_dim,
-            hidden_dims=[256, 256, 256, 256],
-            short_cut=True,
-            batch_norm=True,
-            concat_hidden=True,
-        )
+def load_model(model: str = "deepdds", model_kwargs: dict = {}):
+    """Load model from registry"""
+    model = model_dict[model.lower()](**model_kwargs)
     return model
 
 
-if __name__ == "__main__":
-    # 1. Load dataset
-    dataset = load_data(train_config["data_type"])
+def split_dataset(dataset, split_method: str = "random", split_idx: Tuple[List[int], List[int], List[int]] = None
+):
+    if split_method == "random":
+        split_fracs = [0.8, 0.1, 0.1]
+        train_set, valid_set, test_set = random_split(
+            dataset,
+            split_fracs)
+    else:
+        train_set = Subset(dataset, split_idx[0])
+        valid_set = Subset(dataset, split_idx[1])
+        test_set = Subset(dataset, split_idx[2])
+    return train_set, valid_set, test_set
 
-    # 2. Split dataset
-    train_set, valid_set, test_set = split_dataset(
-        dataset, split_method=train_config["split_method"]
-    )
 
-    # 3. Model definition
-    model = load_model(train_config["model"])
+def main(model_name: str = 'deepdds', dataset_name: str = 'oneil', kwargs: dict = {}):
+    
+    dataset = load_data(model=model_name, dataset=dataset_name)
+    train_set, valid_set, test_set = split_dataset(dataset, split_method="random")
+    model = load_model(model=model_name, model_kwargs=kwargs["model"])
+    task = wrap_model_in_task(model)
 
-    # 4. Define task, criterion and metrics
-    if train_config["model"] == "GIN":
-        task = tasks.PropertyPrediction(
-            model, task=dataset.tasks, criterion="bce", metric=("auprc", "auroc")
-        )
-    elif train_config["model"] == "RESCAL":
-        task = tasks.KnowledgeGraphCompletion(
-            model, criterion="bce", metric=("auprc", "auroc")
-        )
-
-    # 4. Define optimize
     optimizer = torch.optim.Adam(task.parameters(), lr=1e-3)
-
-    # 5. Setup train and test loop.
-    if False:
-        logger_kwargs = {logger: "wandb"}
-    else:
-        logger_kwargs = {}
-
-    if True:  # train using GPU or not. WANDB or not
-        solver = core.Engine(
+    
+    solver = core.Engine(
             task,
             train_set,
             valid_set,
             test_set,
             optimizer,
-            batch_size=1024,
-            **logger_kwargs
+            **kwargs["engine"]
         )
-    else:
-        solver = core.Engine(
-            task,
-            train_set,
-            valid_set,
-            test_set,
-            optimizer,
-            batch_size=16,
-            gpus=[0],
-            **logger_kwargs
-        )
+    
+    solver.train(**kwargs["train"])
+    solver.evaluate(**kwargs["evaluate"])
 
-    # 6. Train model
-    solver.train(num_epoch=1)
 
-    # 7. Evaluate model
-    # solver.evaluate("valid")
-    # batch = data.graph_collate(valid_set[:8])
-    # pred = task.predict(batch)
 
-    # 8. Save or load model
-    if False:
-        with open("clintox_gin.json", "w") as fout:  # Save model
-            json.dump(solver.config_dict(), fout)
-            solver.save("clintox_gin.pth")
-
-        with open("clintox_gin.json", "r") as fin:  # load model
-            solver = core.Configurable.load_config_dict(json.load(fin))
-            solver.load("clintox_gin.pth")
+if __name__ == "__main__":
+    main()

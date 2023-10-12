@@ -44,3 +44,6 @@ class RESCAL(nn.Module, core.Configurable):
 	def predict(self, data):
 		score = -self.forward(data)
 		return score.cpu().data.numpy()
+	
+	def __name__(self):
+		return "RESCAL"

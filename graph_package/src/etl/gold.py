@@ -1,6 +1,6 @@
 # import sys
 # sys.path.insert(0,'/Users/johannesreiche/Library/Mobile Documents/com~apple~CloudDocs/DTU/MMC/Thesis/Code/GRLDrugProp')
-from graph_package.configs.directories import Directories
+from graph_package.configs.definitions import Directories
 import pandas as pd
 import numpy as np
 from graph_package.utils.helpers import init_logger
@@ -107,11 +107,9 @@ def make_triplets_oneil_chemicalx():
 
 def make_triplets_oneil_torchdrug():
     save_path = Directories.DATA_PATH / "gold" / "torchdrug" / "oneil"
-    save_path.parent.mkdir(parents=True, exist_ok=True)
-    entity_vocab_path = save_path / "entity_vocab.json"
-    relation_vocab_path = save_path / "relation_vocab.json"
+    save_path.mkdir(parents=True, exist_ok=True)
     
-    load_path = save_path /  "oneil.csv"
+    load_path =  Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" /  "oneil.csv"
     df = pd.read_csv(load_path)
 
     # Create unique cell-line ID's based on context and label
@@ -135,7 +133,7 @@ def make_triplets_oneil_torchdrug():
     }
 
     # Save the vocab to a JSON file
-    with open(entity_vocab_path, "w") as json_file:
+    with open(save_path / "entity_vocab.json", "w") as json_file:
         json.dump(drug_name_mapping, json_file)
 
     # Create vocab to map cell line name to graph cell line ID
@@ -146,15 +144,15 @@ def make_triplets_oneil_torchdrug():
     }
 
     # Save the vocab to a JSON file
-    with open(relation_vocab_path, "w") as json_file:
+    with open(save_path / "relation_vocab.json", "w") as json_file:
         json.dump(cell_line_mapping, json_file)
 
     # Filter dataframe to match torchdrug
     columns_to_keep = ["drug_1_id", "drug_2_id", "context_id"]
     df = df[columns_to_keep]
-    df.to_csv(save_path, index=False)
+    df.to_csv(save_path / "oneil.csv", index=False)
 
 
 if __name__ == "__main__":
-    make_triplets_oneil_chemicalx()
+    #make_triplets_oneil_chemicalx()
     make_triplets_oneil_torchdrug()

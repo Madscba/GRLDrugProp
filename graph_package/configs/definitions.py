@@ -1,9 +1,10 @@
-"""Holds class with different paths."""
-
 from dataclasses import dataclass
 from pathlib import Path
-
+from graph_package.src.models import DeepDDS, RESCAL
+from graph_package.src.tasks import SynergyPrediction, KnowledgeGraphCompletion
+from graph_package.src.etl.dataloaders import ONEIL_DeepDDS, ONEIL_RESCAL
 import graph_package
+
 
 
 @dataclass
@@ -17,3 +18,10 @@ class Directories:
     TESTS_DATA = TESTS / "data"
     LOGGING_FOLDER = REPO_PATH / "logs"
     
+
+
+model_dict = {"deepdds": DeepDDS, "rescal": RESCAL} 
+
+dataset_dict = {"oneil_deepdds": ONEIL_DeepDDS, "oneil_rescal": ONEIL_RESCAL}
+
+task_dict = {"deepdds": SynergyPrediction, "rescal": KnowledgeGraphCompletion}

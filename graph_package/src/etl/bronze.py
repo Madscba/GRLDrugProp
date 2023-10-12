@@ -1,4 +1,4 @@
-from graph_package.configs.directories import Directories
+from graph_package.configs.definitions import Directories
 import pandas as pd
 import numpy as np
 from graph_package.utils.helpers import init_logger

@@ -50,7 +50,6 @@ class SynergyPrediction(tasks.Task, core.Configurable):
         loss = self.loss_func(pred, target)
         name = tasks._get_criterion_name("bce")
         metric[name] = loss
-
         return loss, metric 
 
     def predict(self, batch, all_loss=None, metric=None):

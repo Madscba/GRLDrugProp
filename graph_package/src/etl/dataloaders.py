@@ -1,4 +1,4 @@
-from graph_package.configs.directories import Directories
+from graph_package.configs.definitions import Directories
 import pandas as pd
 from chemicalx.data import dataset_resolver
 from torchdrug import data
@@ -7,13 +7,12 @@ from torch.utils.data import Dataset
 from torchdrug.core import Registry as R
 from chemicalx.data.datasetloader import RemoteDatasetLoader, LabeledTriples
 from chemicalx.data import BatchGenerator
-from graph_package.configs.directories import Directories
 from torchdrug.core import Registry as R
 import torch.utils.data
 
 
 
-class ONIEL_DeepDDS_CX(RemoteDatasetLoader):
+class ONEIL_DeepDDS_CX(RemoteDatasetLoader):
     data_path = Directories.DATA_PATH / "oneil" / "oneil.csv"
 
     def __init__(self) -> None:
@@ -27,7 +26,7 @@ class ONIEL_DeepDDS_CX(RemoteDatasetLoader):
         return LabeledTriples(df)
     
 
-class ONIEL_DeepDDS(RemoteDatasetLoader, BatchGenerator, Dataset):
+class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, Dataset):
     def __init__(self) -> None:
         RemoteDatasetLoader.__init__(self, dataset_name="drugcomb")
 
@@ -89,7 +88,6 @@ class ONIEL_DeepDDS(RemoteDatasetLoader, BatchGenerator, Dataset):
 
 
 
-@R.register("datasets.ONEIL")
 class ONEIL_RESCAL(data.KnowledgeGraphDataset):
     def __init__(self, data):
         super().__init__()

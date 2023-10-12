@@ -7,7 +7,7 @@ class DeepDDS(DeepDDS_cx):
     def __init__(
         self,
         *,
-        context_channels: int,
+        context_channels: int = 288,
         context_hidden_dims: List[int] = None,
         drug_channels: int = TORCHDRUG_NODE_FEATURES,
         drug_gcn_hidden_dims: List[int] = None,
@@ -26,3 +26,5 @@ class DeepDDS(DeepDDS_cx):
             fc_hidden_dims=fc_hidden_dims,
             dropout=dropout,
         )
+    def __name__(self) -> str:
+        return "DeepDDS"
