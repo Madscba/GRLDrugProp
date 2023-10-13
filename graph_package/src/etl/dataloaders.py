@@ -1,4 +1,4 @@
-from graph_package.configs.definitions import Directories
+from graph_package.configs.directories import Directories
 import pandas as pd
 from chemicalx.data import dataset_resolver
 from torchdrug import data
@@ -106,7 +106,7 @@ class ONEIL_RESCAL(data.KnowledgeGraphDataset):
             offset += num_sample
         return splits
 
-    def _create_inverse_triplets(df: pd.DataFrame):
+    def _create_inverse_triplets(self,df: pd.DataFrame):
         """ Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
         df_inv = df.copy()
         df_inv['drug_1'], df_inv['drug_2'] = df['drug_2'], df['drug_1']
