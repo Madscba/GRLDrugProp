@@ -1,7 +1,7 @@
 import logging
 import colorlog
 from pathlib import Path
-from graph_package.configs.definitions import Directories
+from graph_package.configs.directories import Directories
 import sys
 
 def init_logger():
