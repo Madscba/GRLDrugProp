@@ -105,7 +105,7 @@ def make_triplets_oneil():
     df = remove_drugs_not_in_cx(df)
     df, drug_vocab = create_drug_id_vocabs(df)
     df = agg_loewe_and_make_binary(df)
-    print("Done")
+
     rename_dict = {
         "drug_row_cid": "drug_1",
         "drug_col_cid": "drug_2",
