@@ -1,12 +1,12 @@
-name: graph_pkg_env
+name: graph_pkg_env_new
 channels:
   - conda-forge
   - pytorch
   - pyg
   - anaconda
 dependencies:
-  - python==3.7.16
-  - pytorch==1.10.0
+  - python==3.8
+  - pytorch
   - aiohttp
   - colorlog
   - pytorch-scatter
@@ -17,5 +17,8 @@ dependencies:
   - tqdm
   - wandb
   - python-dotenv
+  - torchmetrics
+  - pytorch-lightning
+  - hydra-core
   - pip:
     - -r requirements.txt

@@ -2,18 +2,29 @@ defaults:
   - model: deepdds # override model by writing model=rescal as command line argument to main.py
 
 run_name: 'NO_NAME'
-wandb: True
+wandb: False
 lr: 0.001
 dataset: 'oneil'
+batch_size: 1024
+n_splits: 5
+seed: 43
 
-engine:
-  batch_size: 1024
+
+checkpoint_callback:
+  monitor: 'val_auroc'
+  mode: 'max'
+  filename: '{epoch:02d}-{val_auroc:.4f}'
+  save_top_k: 1
 
 trainer:
-  num_epoch: 100
+  check_val_every_n_epoch: 1
+  max_epochs: 1
+  enable_checkpointing: True
+  enable_progress_bar: True
+  limit_test_batches: 1000
+  fast_dev_run: False 
 
-evaluate: 
-  split: 'test'
+
 
 
 

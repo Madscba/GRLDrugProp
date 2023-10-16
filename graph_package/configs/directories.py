@@ -10,6 +10,7 @@ class Directories:
 
     REPO_PATH = Path(graph_package.__file__).parent.parent
     MODULE_PATH = Path(graph_package.__file__).parent
+    CHECKPOINT_PATH = REPO_PATH / "checkpoints" 
     CONFIG_PATH = MODULE_PATH / "configs"
     DATA_PATH = REPO_PATH / "data"
     TESTS = REPO_PATH / "tests"
