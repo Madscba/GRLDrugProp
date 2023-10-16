@@ -1,12 +1,14 @@
-from graph_package.configs.definitions import Directories
+from graph_package.configs.directories import Directories
 from graph_package.utils.helpers import init_logger
 import pandas as pd
 
 logger = init_logger()
 
+
 def load_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
     return pd.read_csv(data_path)
+
 
 def generate_oneil_dataset():
     """

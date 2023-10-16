@@ -1,4 +1,4 @@
-from graph_package.configs.definitions import Directories
+from graph_package.configs.directories import Directories
 import pandas as pd
 import numpy as np
 from graph_package.utils.helpers import init_logger
@@ -90,11 +90,11 @@ def download_drug_info_drugcomb():
         )
 
 
-
 def get_drugcomb():
     download_drugcomb()
     download_drug_info_drugcomb()
     download_cell_line_info_drugcomb()
+
 
 if __name__ == "__main__":
     get_drugcomb()
