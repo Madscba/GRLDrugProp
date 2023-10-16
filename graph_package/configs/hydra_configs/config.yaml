@@ -8,6 +8,7 @@ dataset: 'oneil'
 batch_size: 1024
 n_splits: 5
 seed: 43
+remove_old_checkpoints: True
 
 
 checkpoint_callback:
