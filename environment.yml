@@ -1,4 +1,4 @@
-name: graph_pkg_env_new
+name: graph_pkg_env
 channels:
   - conda-forge
   - pytorch
@@ -20,5 +20,6 @@ dependencies:
   - torchmetrics
   - pytorch-lightning
   - hydra-core
+  - torchvision
   - pip:
     - -r requirements.txt
