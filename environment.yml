@@ -15,5 +15,7 @@ dependencies:
   - pip
   - pandas
   - tqdm
+  - wandb
+  - python-dotenv
   - pip:
     - -r requirements.txt

@@ -1,0 +1,26 @@
+defaults:
+  - model: deepdds # override model by writing model=rescal as command line argument to main.py
+
+run_name: 'NO_NAME'
+wandb: True
+lr: 0.001
+dataset: 'oneil'
+
+engine:
+  batch_size: 1024
+
+trainer:
+  num_epoch: 100
+
+evaluate: 
+  split: 'test'
+
+
+
+
+
+
+
+
+
+

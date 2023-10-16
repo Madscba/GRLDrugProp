@@ -76,7 +76,7 @@ class SynergyPrediction(tasks.Task, core.Configurable):
                 score = functional.masked_mean(score, labeled, dim=0).sqrt()
             elif _metric == "auroc":
                 score = []
-                for _pred, _target, _labeled in zip(pred.t(), target.t(), labeled.t()):
+                for _pred, _target,   in zip(pred.t(), target.t(), labeled.t()):
                     _score = metrics.area_under_roc(_pred[_labeled], _target[_labeled])
                     score.append(_score)
                 score = torch.stack(score)

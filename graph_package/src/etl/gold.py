@@ -162,5 +162,5 @@ def make_triplets_oneil_torchdrug():
 
 
 if __name__ == "__main__":
-    #make_triplets_oneil_chemicalx()
+    make_triplets_oneil_chemicalx()
     make_triplets_oneil_torchdrug()

@@ -1,4 +1,4 @@
-from graph_package.configs.definitions import Directories
+from graph_package.configs.directories import Directories
 import pandas as pd
 from chemicalx.data import dataset_resolver
 from torchdrug import data
