@@ -2,22 +2,28 @@
 
 from typing import List, Tuple, Union
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import WandbLogger
 from models import RESCAL
+from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.configs.directories import Directories
 from torch.utils.data import random_split, Subset
 from models import DeepDDS, RESCAL
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import hydra
 from dotenv import load_dotenv
 from sklearn.model_selection import KFold, train_test_split as train_val_split
+from sklearn.model_selection import KFold, train_test_split as train_val_split
 from graph_package.utils.meter import WandbMeter
+from torchdrug.data import DataLoader
 from torchdrug.data import DataLoader
 import os
 from pytorch_lightning import Trainer
 import sys
 import wandb 
 import shutil
+
 
 def reset_wandb_env():
     exclude = {
@@ -59,6 +65,17 @@ def get_dataloaders(datasets: List[DataLoader], batch_size: int):
         dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=0)
         dataloaders.append(dataloader)
     return dataloaders
+def get_checkpoint_path(model_name: str,k: int):
+    checkpoint_path = Directories.CHECKPOINT_PATH / model_name / f"fold_{k}"
+    checkpoint_path.mkdir(parents=True, exist_ok=True)
+    return str(checkpoint_path)
+
+def get_dataloaders(datasets: List[DataLoader], batch_size: int):
+    dataloaders = []
+    for dataset in datasets:
+        dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=0)
+        dataloaders.append(dataloader)
+    return dataloaders
 
 def split_dataset(
     dataset,
@@ -74,6 +91,7 @@ def split_dataset(
 
 @hydra.main(config_path=str(Directories.CONFIG_PATH / "hydra_configs"),config_name='config.yaml')
 def main(config):
+
 
     if config.wandb:
         wandb.login()
