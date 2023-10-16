@@ -91,8 +91,9 @@ class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, Dataset):
 class ONEIL_RESCAL(data.KnowledgeGraphDataset):
     def __init__(self, data):
         super().__init__()
+        df = self._create_inverse_triplets(data)
         # Convert relevant columns to a NumPy array and load it into the dataset
-        self.load_triplet(data.loc[:, ['drug1_id', 'drug2_id', 'context_id']].to_numpy())
+        self.load_triplet(df.loc[:, ['drug_1_id', 'drug_2_id', 'context_id']].to_numpy())
         n_samples = self.num_triplet.tolist()
         self.num_samples = [int(n_samples*.8),int(n_samples*.1),int(n_samples*.1)]
 
@@ -105,6 +106,10 @@ class ONEIL_RESCAL(data.KnowledgeGraphDataset):
             offset += num_sample
         return splits
 
-
-
-
+    def _create_inverse_triplets(self,df: pd.DataFrame):
+        """ Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
+        df_inv = df.copy()
+        df_inv['drug_1'], df_inv['drug_2'] = df['drug_2'], df['drug_1']
+        df_inv['drug_1_id'], df_inv['drug_2_id'] = df['drug_2_id'], df['drug_1_id']
+        df_combined = pd.concat([df,df_inv], ignore_index=True)
+        return df_combined

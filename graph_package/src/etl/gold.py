@@ -1,10 +1,7 @@
-# import sys
-# sys.path.insert(0,'/Users/johannesreiche/Library/Mobile Documents/com~apple~CloudDocs/DTU/MMC/Thesis/Code/GRLDrugProp')
-from graph_package.configs.definitions import Directories
+from graph_package.configs.directories import Directories
 import pandas as pd
 import numpy as np
 from graph_package.utils.helpers import init_logger
-from collections import defaultdict
 import json
 import urllib.request
 
@@ -24,11 +21,10 @@ def load_drug_info_drugcomb():
     return drug_dict
 
 
-def get_CIDs(df: pd.DataFrame, dataset: str = "oneil"):
+def get_CIDs(df: pd.DataFrame):
     """
     Get CIDs and smile strings for drugs.
     """
-    data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "drug_dict.json"
     drug_dict = load_drug_info_drugcomb()
     df["drug_row_cid"] = df["drug_row"].apply(lambda x: drug_dict[x]["cid"]).astype(str)
     df["drug_col_cid"] = df["drug_col"].apply(lambda x: drug_dict[x]["cid"]).astype(str)
@@ -36,17 +32,17 @@ def get_CIDs(df: pd.DataFrame, dataset: str = "oneil"):
 
 
 def agg_loewe_and_make_binary(df: pd.DataFrame):
-    df = (
+    sub_df = (
         df.groupby(["drug_row_cid", "drug_col_cid", "cell_line_name"])
         .mean()
         .reset_index()
     )
-    df["synergy_loewe"] = df["synergy_loewe"].apply(
+    sub_df["synergy_loewe"] = sub_df["synergy_loewe"].apply(
         lambda x: 0 if x < 0 else (1 if x > 10 else pd.NA)
     )
-    df.dropna(subset=["synergy_loewe"], inplace=True)
-
-    return df
+    #sub_df["drug_row"], sub_df["drug_col"]  = df["drug_row"].reset_index(), df["drug_col"].reset_index()
+    sub_df.dropna(subset=["synergy_loewe"], inplace=True)
+    return sub_df
 
 
 def remove_drugs_not_in_cx(df: pd.DataFrame):
@@ -68,36 +64,46 @@ def remove_drugs_not_in_cx(df: pd.DataFrame):
     )
     return df
 
+def create_drug_id_vocabs(df: pd.DataFrame):
+    # Create unique drug ID's
+    unique_drugs = set(df["drug_row_cid"]).union(set(df["drug_col_cid"]))
+    drug_dict = load_drug_info_drugcomb()
+    drug_id_mapping = {drug: idx for idx, drug in enumerate(unique_drugs)}
+    df["drug_row_id"] = df["drug_row_cid"].map(drug_id_mapping)
+    df["drug_col_id"] = df["drug_col_cid"].map(drug_id_mapping)
 
-def create_vocab(df: pd.DataFrame, subset: list, save_path: str = ""):
-    """
-    Create json file with CID / cell-line name to entity / relation ID
-    """
-    sub_df = df.drop_duplicates(subset=subset, keep="first")
-    keys = sub_df.loc[:, subset[0]].to_list()
-    ids = sub_df.loc[:, subset[1]].to_list()
+    # Create vocab to map drug name identifier to graph drug ID
+    drug_cid_mapping = {
+        name: drug_dict[name]["cid"]
+        for name in drug_dict
+        if str(drug_dict[name]["cid"]) in list(unique_drugs)
+    }
+    drug_name_mapping = {
+        name: drug_id_mapping[str(cid)] for name, cid in drug_cid_mapping.items()
+    }
+    return df, drug_name_mapping
 
-    vocab = {key: id for key, id in zip(keys, ids)}
+def create_cell_line_id_vocabs(df: pd.DataFrame):
+    # Create unique cell-line ID's based on context and label
+    sub_df = df.loc[df["label"]==1]
+    sub_df["context_id"] = sub_df.groupby(['context', 'label']).ngroup()
+    sub_df.drop_duplicates(subset=['context','context_id'],keep='first',inplace=True)
 
-    # Save the vocab to a JSON file
-    with open(save_path, "w") as json_file:
-        json.dump(vocab, json_file)
+    # Create vocab to map cell line name to graph cell line ID
+    cell_line_mapping = {name: idx for name, idx in sub_df.loc[:,['context', 'context_id']].values}
+    cell_line_name_mapping = {idx: name for name, idx in sub_df.loc[:,['context', 'context_id']].values}
+    df["context_id"] = df["context"].map(cell_line_mapping)
+    
+    return df, cell_line_name_mapping
 
-def create_inverse_triplets(df: pd.DataFrame):
-    """ Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
-    df_inv = df.copy()
-    df_inv['drug_1'], df_inv['drug_2'] = df['drug_2'], df['drug_1']
-    df_inv['drug_1_id'], df_inv['drug_2_id'] = df['drug_2_id'], df['drug_1_id']
-    df_combined = pd.concat([df,df_inv], ignore_index=True)
-    return df_combined
-
-def make_triplets_oneil_chemicalx():
-    save_path = Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" / "oneil.csv"
-    save_path.parent.mkdir(parents=True, exist_ok=True)
+def make_triplets_oneil():
+    save_path = Directories.DATA_PATH / "gold" / "oneil"
+    save_path.mkdir(parents=True, exist_ok=True)
 
     df = load_oneil()
     df = get_CIDs(df)
     df = remove_drugs_not_in_cx(df)
+    df, drug_vocab = create_drug_id_vocabs(df)
     df = agg_loewe_and_make_binary(df)
 
     rename_dict = {
@@ -105,62 +111,22 @@ def make_triplets_oneil_chemicalx():
         "drug_col_cid": "drug_2",
         "synergy_loewe": "label",
         "cell_line_name": "context",
+        "drug_row_id": "drug_1_id",
+        "drug_col_id": "drug_2_id",
     }
     df.rename(columns=rename_dict, inplace=True)
     df = df[rename_dict.values()]
 
-    df.to_csv(save_path, index=False)
+    df, cell_line_vocab = create_cell_line_id_vocabs(df)
 
+    # Save the vocabs to a JSON file
+    for vocab, name in zip((drug_vocab,cell_line_vocab),["entity_vocab.json","relation_vocab.json"]):
+        with open(save_path / name, "w") as json_file:
+            json.dump(vocab, json_file)
 
-def make_triplets_oneil_torchdrug():
-    save_path = Directories.DATA_PATH / "gold" / "torchdrug" / "oneil"
-    save_path.mkdir(parents=True, exist_ok=True)
-    
-    load_path =  Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" /  "oneil.csv"
-    df = pd.read_csv(load_path)
-
-    # Create unique drug ID's
-    unique_drugs = set(df["drug_1"]).union(set(df["drug_2"]))
-    drug_dict = load_drug_info_drugcomb()
-    drug_id_mapping = {drug: idx for idx, drug in enumerate(unique_drugs)}
-    df["drug_1_id"] = df["drug_1"].map(drug_id_mapping)
-    df["drug_2_id"] = df["drug_2"].map(drug_id_mapping)
-
-    # Create vocab to map drug name identifier to graph drug ID
-    drug_cid_mapping = {
-        name: drug_dict[name]["cid"]
-        for name in drug_dict
-        if drug_dict[name]["cid"] in list(unique_drugs)
-    }
-    drug_name_mapping = {
-        name: drug_id_mapping[cid] for name, cid in drug_cid_mapping.items()
-    }
-
-    # Save the vocab to a JSON file
-    with open(save_path / "entity_vocab.json", "w") as json_file:
-        json.dump(drug_name_mapping, json_file)
-
-    # Create unique cell-line ID's based on context and label
-    df = df[df["label"]==1]
-    df['context_id'] = df.groupby(['context', 'label']).ngroup()
-    sub_df = df.drop_duplicates(subset=['context','context_id'],keep='first')
-    # Create vocab to map cell line name to graph cell line ID
-    cell_line_mapping = {name: idx for name, idx in sub_df.loc[:,['context', 'context_id']].values}
-    
-
-    # Save the vocab to a JSON file
-    with open(save_path / "relation_vocab.json", "w") as json_file:
-        json.dump(cell_line_mapping, json_file)
-
-
-    # Create inverse triplets
-    df = create_inverse_triplets(df)
-
-    columns_to_keep = ["drug_1_id", "drug_2_id", "context_id"]
-    df = df[columns_to_keep]
     df.to_csv(save_path / "oneil.csv", index=False)
 
 
 if __name__ == "__main__":
-    make_triplets_oneil_chemicalx()
-    make_triplets_oneil_torchdrug()
+    make_triplets_oneil()
+

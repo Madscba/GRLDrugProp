@@ -3,7 +3,6 @@ from pathlib import Path
 import graph_package
 
 
-
 @dataclass
 class Directories:
     """Class with all paths used in the repository."""
