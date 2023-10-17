@@ -13,12 +13,12 @@ from dotenv import load_dotenv
 from graph_package.utils.meter import WandbMeter
 import os
 import sys
-import wandb 
+import wandb
 
 
 def load_data(model: str = "deepdds", dataset: str = "oneil"):
     """Fetch formatted data depending on modelling task"""
-    dataset_key =dataset.lower()+ "_" + model.lower() 
+    dataset_key = dataset.lower() + "_" + model.lower()
     dataset = dataset_dict[dataset_key]()
     return dataset
 
@@ -34,11 +34,15 @@ def load_model(model: str = "deepdds", model_kwargs: dict = {}):
     model = model_dict[model.lower()](**model_kwargs)
     return model
 
+
 def get_model_name(config: dict, sys_args: List[str]):
     for arg in sys_args:
         if arg.startswith("model="):
             return arg.split("=")[1]
-    return "deepdds"
+    if "model" in config.keys():
+        return config["model"]
+    else:
+        return "deepdds"
 
 
 def split_dataset(
@@ -48,7 +52,11 @@ def split_dataset(
 ):
     if split_method == "random":
         split_fracs = [0.8, 0.1, 0.1]
-        train_set, valid_set, test_set = random_split(dataset, split_fracs)
+        n_datapoints = len(dataset)
+        split_lengths = [int(frac * len(dataset)) for frac in split_fracs]
+        train_set, valid_set, test_set = random_split(
+            dataset, split_lengths, generator=torch.Generator().manual_seed(42)
+        )
     else:
         train_set = Subset(dataset, split_idx[0])
         valid_set = Subset(dataset, split_idx[1])
@@ -56,17 +64,19 @@ def split_dataset(
     return train_set, valid_set, test_set
 
 
-@hydra.main(config_path=str(Directories.CONFIG_PATH / "hydra_configs"),config_name='config.yaml')
+@hydra.main(
+    config_path=str(Directories.CONFIG_PATH / "hydra_configs"),
+    config_name="config.yaml",
+)
 def main(config):
     if config.wandb:
         api_key = os.getenv("WANDB_API_KEY")
         project = os.getenv("WANDB_PROJECT")
         entity = os.getenv("WANDB_ENTITY")
         wandb.login(key=api_key)
-        wandb.init(config=config,project=project,entity=entity)
+        wandb.init(config=config, project=project, entity=entity)
 
-
-    model_name = get_model_name(config, sys_args = sys.argv)
+    model_name = get_model_name(config, sys_args=sys.argv)
     dataset = load_data(model=model_name, dataset=config.dataset)
     train_set, valid_set, test_set = split_dataset(dataset, split_method="random")
     model = load_model(model=model_name, model_kwargs=config.model)
