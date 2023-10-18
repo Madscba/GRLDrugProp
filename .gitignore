@@ -18,3 +18,4 @@ graph_package/src/etl/pipeline_test.py
 .env
 /checkpoints/deepdds/*
 /checkpoints/rescal/*
+/graph_package/src/main_playground.py

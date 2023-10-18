@@ -48,7 +48,7 @@ def get_model_name(config: dict, sys_args: List[str]):
         if arg.startswith("model="):
             return arg.split("=")[1]
     if "model" in config.keys():
-        return config["model"]
+        return config.model.name
     else:
         return "deepdds"
 
@@ -100,6 +100,13 @@ def split_dataset(
     return train_set, val_set
 
 
+def get_model_kwargs(model_name, dataset, config):
+    if model_name == "deepdds":
+        return config.model.kwargs
+    else:
+        return {"ent_tot": dataset.num_entity, "rel_tot": dataset.num_relation}
+
+
 @hydra.main(
     config_path=str(Directories.CONFIG_PATH / "hydra_configs"),
     config_name="config.yaml",
@@ -109,11 +116,18 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
+    print("loading dataset")
     dataset = load_data(model=model_name, dataset=config.dataset)
+    print("fetching model_kwargs")
+    model_kwargs = get_model_kwargs(model_name, dataset, config)
+    print("Kfold config")
     kfold = KFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
+    print("fetching model_kwargs")
     if config.remove_old_checkpoints:
-        shutil.rmtree(Directories.CHECKPOINT_PATH / model_name)
+        check_point_path = Directories.CHECKPOINT_PATH / model_name
+        if os.path.isdir(check_point_path):
+            shutil.rmtree(check_point_path)
 
     for k, (train_idx, test_idx) in enumerate(kfold.split(dataset)):
         loggers = []
@@ -123,6 +137,7 @@ def main(config):
             loggers.append(WandbLogger())
         call_backs = []
 
+        print("splitting datasets stage")
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
         )
@@ -138,15 +153,15 @@ def main(config):
         )
 
         call_backs.append(checkpoint_callback)
-
-        model = init_model(model=model_name, model_kwargs=config.model)
+        print("init model stage")
+        model = init_model(model=model_name, model_kwargs=model_kwargs)
 
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-
+        print("fitting stage")
         trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
         trainer.test(
             model,

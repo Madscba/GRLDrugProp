@@ -1,16 +1,16 @@
 from pytorch_lightning import LightningModule
-from graph_package.src.models import DeepDDS
+from graph_package.src.models import RESCAL
 from torch.optim import Adam
 from torch.nn import BCELoss, ModuleDict
 from torchmetrics import AUROC, AveragePrecision
 import torch
 
 
-class DeepDDS_PL(LightningModule):
-    def __init__(self, lr: float = 0.001):
+class Rescal_PL(LightningModule):
+    def __init__(self, ent_tot, rel_tot, lr: float = 1e-4):
         super().__init__()
         self.lr = lr
-        self.model = DeepDDS()
+        self.model = RESCAL(ent_tot, rel_tot)
         self.loss_func = BCELoss()
         self.val_metrics = self.build_metrics(type="val")
         self.test_metrics = self.build_metrics(type="test")
@@ -20,9 +20,9 @@ class DeepDDS_PL(LightningModule):
 
     def _step(self, batch):
         inputs = (
-            batch["context_features"],
-            batch["drug_molecules_left"],
-            batch["drug_molecules_right"],
+            batch["drug_1_id"],
+            batch["drug_2_id"],
+            batch["context_id"],
         )
         target = batch["label"]
         preds = self(inputs)
