@@ -4,7 +4,7 @@ defaults:
 run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
-dataset: wn18rr #'oneil'
+dataset:  'oneil' #wn18rr
 batch_size: 128
 n_splits: 5
 seed: 43
