@@ -33,7 +33,11 @@ def reset_wandb_env():
 def load_data(model: str = "deepdds", dataset: str = "oneil"):
     """Fetch formatted data depending on modelling task"""
     dataset_key = dataset.lower() + "_" + model.lower()
-    dataset = dataset_dict[dataset_key]()
+    if dataset_key != "wn18rr_rescal":
+        dataset = dataset_dict[dataset_key]()
+    else:
+        dataset = dataset_dict[dataset_key]("data")
+
     return dataset
 
 

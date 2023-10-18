@@ -96,8 +96,8 @@ class ONEIL_RESCAL(data.KnowledgeGraphDataset):
 
         df = self._create_inverse_triplets(self.data)
         # Convert relevant columns to a NumPy array and load it into the dataset
-        self.load_triplet(
-            df.loc[:, ["drug_1_id", "drug_2_id", "context_id"]].to_numpy()
+        self.load_triplet_and_label(
+            df.loc[:, ["drug_1_id", "drug_2_id", "context_id", "label"]].to_numpy()
         )
         n_samples = self.num_triplet.tolist()
         self.num_samples = [
@@ -105,6 +105,18 @@ class ONEIL_RESCAL(data.KnowledgeGraphDataset):
             int(n_samples * 0.1),
             int(n_samples * 0.1),
         ]
+
+    def load_triplet_and_label(
+        self,
+        triplets,
+        entity_vocab=None,
+        relation_vocab=None,
+        inv_entity_vocab=None,
+        inv_relation_vocab=None,
+    ):
+        super().load_triplet(
+            triplets, entity_vocab, relation_vocab, inv_entity_vocab, inv_relation_vocab
+        )
 
     def split(self):
         offset = 0

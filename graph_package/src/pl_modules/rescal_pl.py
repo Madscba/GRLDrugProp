@@ -16,15 +16,17 @@ class Rescal_PL(LightningModule):
         self.test_metrics = self.build_metrics(type="test")
 
     def forward(self, inputs):
-        return self.model(*inputs)
+        h_index, t_index, r_index = inputs[:, 0], inputs[:, 1], inputs[:, 2]
+        return self.model(h_index, t_index, r_index)
 
     def _step(self, batch):
-        inputs = (
-            batch["drug_1_id"],
-            batch["drug_2_id"],
-            batch["context_id"],
-        )
-        target = batch["label"]
+        # inputs = (
+        #     batch["drug_1_id"],
+        #     batch["drug_2_id"],
+        #     batch["context_id"],
+        # )
+        inputs = batch[:, :3]
+        target = batch[:, 3]
         preds = self(inputs)
         preds = preds.view(-1)
         loss = self.loss_func(preds, target)
