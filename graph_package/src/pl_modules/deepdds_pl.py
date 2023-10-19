@@ -73,6 +73,6 @@ class DeepDDS_PL(LightningModule):
     def build_metrics(self,type):
         kwargs = {"task": "binary"}
         module_dict = ModuleDict(
-            {f"{type}_auprc": AUROC(**kwargs), f"{type}_auroc": AveragePrecision(**kwargs)}
+            {f"{type}_auroc": AUROC(**kwargs), f"{type}_auroc": AveragePrecision(**kwargs)}
         )
         return module_dict
