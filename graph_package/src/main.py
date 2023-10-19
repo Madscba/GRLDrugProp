@@ -105,11 +105,10 @@ def split_dataset(
 
 
 def get_model_kwargs(model_name, dataset, config):
-    if model_name == "deepdds":
-        return config.model.kwargs
-    else:
-        return {"ent_tot": dataset.num_entity, "rel_tot": dataset.num_relation}
-
+    if model_name == "rescal":
+        update_dict = {"ent_tot": int(dataset.num_entity.numpy()), "rel_tot": int(dataset.num_relation.numpy())}
+        config["model"].update(update_dict)
+    return config.model
 
 @hydra.main(
     config_path=str(Directories.CONFIG_PATH / "hydra_configs"),
@@ -120,14 +119,10 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    print("loading dataset")
     dataset = load_data(model=model_name, dataset=config.dataset)
-    print("fetching model_kwargs")
     model_kwargs = get_model_kwargs(model_name, dataset, config)
-    print("Kfold config")
     kfold = KFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
-    print("fetching model_kwargs")
     if config.remove_old_checkpoints:
         check_point_path = Directories.CHECKPOINT_PATH / model_name
         if os.path.isdir(check_point_path):
@@ -141,7 +136,6 @@ def main(config):
             loggers.append(WandbLogger())
         call_backs = []
 
-        print("splitting datasets stage")
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
         )
@@ -157,7 +151,6 @@ def main(config):
         )
 
         call_backs.append(checkpoint_callback)
-        print("init model stage")
         model = init_model(model=model_name, model_kwargs=model_kwargs)
 
         trainer = Trainer(
@@ -165,7 +158,6 @@ def main(config):
             callbacks=call_backs,
             **config.trainer,
         )
-        print("fitting stage")
         trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
         trainer.test(
             model,

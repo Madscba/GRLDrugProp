@@ -7,10 +7,10 @@ import torch
 
 
 class Rescal_PL(LightningModule):
-    def __init__(self, ent_tot, rel_tot, lr: float = 1e-4):
+    def __init__(self, ent_tot, rel_tot, dim=100, lr: float = 1e-4):
         super().__init__()
         self.lr = lr
-        self.model = RESCAL(ent_tot, rel_tot)
+        self.model = RESCAL(ent_tot, rel_tot, dim)
         self.loss_func = BCEWithLogitsLoss()  # BCELoss()
         self.val_metrics = self.build_metrics(type="val")
         self.test_metrics = self.build_metrics(type="test")
@@ -24,11 +24,6 @@ class Rescal_PL(LightningModule):
         return self.model(h_index, t_index, r_index)
 
     def _step(self, batch):
-        # inputs = (
-        #     batch["drug_1_id"],
-        #     batch["drug_2_id"],
-        #     batch["context_id"],
-        # )
         inputs = batch[:, :3]
         target = batch[:, 3].to(dtype=torch.float32)  # needs to be float 32
         preds = self(inputs)
@@ -79,8 +74,8 @@ class Rescal_PL(LightningModule):
         kwargs = {"task": "binary"}
         module_dict = ModuleDict(
             {
-                f"{type}_auprc": AUROC(**kwargs),
-                f"{type}_auroc": AveragePrecision(**kwargs),
+                f"{type}_auprc": AveragePrecision(**kwargs),
+                f"{type}_auroc": AUROC(**kwargs),
             }
         )
         return module_dict
