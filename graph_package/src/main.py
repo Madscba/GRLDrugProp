@@ -1,5 +1,5 @@
 """main module."""
-
+import torch
 from typing import List, Tuple
 from pytorch_lightning.loggers import WandbLogger
 from models import RESCAL
@@ -8,6 +8,7 @@ from graph_package.configs.directories import Directories
 from torch.utils.data import Subset
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import hydra
+from torch.utils.data import random_split, Subset
 from dotenv import load_dotenv
 from sklearn.model_selection import KFold, train_test_split as train_val_split
 from torchdrug.data import DataLoader
@@ -46,7 +47,10 @@ def get_model_name(config: dict, sys_args: List[str]):
     for arg in sys_args:
         if arg.startswith("model="):
             return arg.split("=")[1]
-    return "deepdds"
+    if "model" in config.keys():
+        return config["model"]
+    else:
+        return "deepdds"
 
 
 def get_checkpoint_path(model_name: str, k: int):
@@ -82,7 +86,14 @@ def split_dataset(
     split_method: str = "custom",
     split_idx: Tuple[List[int], List[int]] = None,
 ):
-    if split_method == "custom":
+    if split_method == "random":
+        split_fracs = [0.8, 0.1, 0.1]
+        n_datapoints = len(dataset)
+        split_lengths = [int(frac * len(dataset)) for frac in split_fracs]
+        train_set, valid_set, test_set = random_split(
+            dataset, split_lengths, generator=torch.Generator().manual_seed(42)
+        )
+    elif split_method == "custom":
         train_set = Subset(dataset, split_idx[0])
         val_set = Subset(dataset, split_idx[1])
 
@@ -94,10 +105,9 @@ def split_dataset(
     config_name="config.yaml",
 )
 def main(config):
-    
     if config.wandb:
         wandb.login()
-    
+
     model_name = get_model_name(config, sys_args=sys.argv)
     dataset = load_data(model=model_name, dataset=config.dataset)
     kfold = KFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
