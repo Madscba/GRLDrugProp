@@ -103,8 +103,8 @@ def main(config):
     kfold = KFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
     if config.remove_old_checkpoints:
-        shutil.rmtree(Directories.CHECKPOINT_PATH / model_name)
-
+        if (Directories.CHECKPOINT_PATH / model_name).exists():
+            shutil.rmtree(Directories.CHECKPOINT_PATH / model_name)
     for k, (train_idx, test_idx) in enumerate(kfold.split(dataset)):
         loggers = []
         if config.wandb:

@@ -26,7 +26,7 @@ class ONEIL_DeepDDS_CX(RemoteDatasetLoader):
         return LabeledTriples(df)
     
 
-class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, Dataset):
+class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator):
     def __init__(self) -> None:
         RemoteDatasetLoader.__init__(self, dataset_name="drugcomb")
 
