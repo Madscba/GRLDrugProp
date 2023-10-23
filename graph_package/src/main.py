@@ -100,12 +100,6 @@ def split_dataset(
     return train_set, val_set
 
 
-def get_model_kwargs(model_name, dataset, config):
-    if model_name == "rescal":
-        update_dict = {"ent_tot": int(dataset.num_entity.numpy()), "rel_tot": int(dataset.num_relation.numpy())}
-        config["model"].update(update_dict)
-    return config.model
-
 @hydra.main(
     config_path=str(Directories.CONFIG_PATH / "hydra_configs"),
     config_name="config.yaml",
@@ -123,7 +117,11 @@ def main(config):
         check_point_path = Directories.CHECKPOINT_PATH / model_name
         if os.path.isdir(check_point_path):
             shutil.rmtree(check_point_path)
-
+    
+    if model_name == "rescal":
+        update_dict = {"ent_tot": int(dataset.num_entity.numpy()), "rel_tot": int(dataset.num_relation.numpy())}
+        config["model"].update(update_dict)
+    
     for k, (train_idx, test_idx) in enumerate(kfold.split(dataset)):
         loggers = []
         if config.wandb:
