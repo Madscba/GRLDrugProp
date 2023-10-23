@@ -48,7 +48,7 @@ def get_model_name(config: dict, sys_args: List[str]):
         if arg.startswith("model="):
             return arg.split("=")[1]
     if "model" in config.keys():
-        return config["model"]
+        return config.model.name
     else:
         return "deepdds"
 
@@ -113,8 +113,14 @@ def main(config):
     kfold = KFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
     if config.remove_old_checkpoints:
-        if (Directories.CHECKPOINT_PATH / model_name).exists():
-            shutil.rmtree(Directories.CHECKPOINT_PATH / model_name)
+        check_point_path = Directories.CHECKPOINT_PATH / model_name
+        if os.path.isdir(check_point_path):
+            shutil.rmtree(check_point_path)
+    
+    if model_name == "rescal":
+        update_dict = {"ent_tot": int(dataset.num_entity.numpy()), "rel_tot": int(dataset.num_relation.numpy())}
+        config["model"].update(update_dict)
+    
     for k, (train_idx, test_idx) in enumerate(kfold.split(dataset)):
         loggers = []
         if config.wandb:
@@ -138,15 +144,13 @@ def main(config):
         )
 
         call_backs.append(checkpoint_callback)
-
-        model = init_model(model=model_name, model_kwargs=config.model)
+        model = init_model(model=model_name, model_kwargs=model_kwargs)
 
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-
         trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
         trainer.test(
             model,
