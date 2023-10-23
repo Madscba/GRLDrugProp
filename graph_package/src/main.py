@@ -109,6 +109,7 @@ def main(config):
     dataset = load_data(model=model_name, dataset=config.dataset)
     kfold = StratifiedKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
+
     if config.remove_old_checkpoints:
         check_point_path = Directories.CHECKPOINT_PATH / model_name
         if os.path.isdir(check_point_path):
@@ -116,7 +117,7 @@ def main(config):
     
     if model_name == "rescal":
         update_dict = {"ent_tot": int(dataset.num_entity.numpy()), "rel_tot": int(dataset.num_relation.numpy())}
-        config["model"].update(update_dict)
+        config.model.update(update_dict)
     
     for k, (train_idx, test_idx) in enumerate(kfold.split(dataset, dataset.get_labels(dataset.indices))):
         loggers = []
