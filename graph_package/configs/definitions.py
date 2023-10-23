@@ -8,5 +8,4 @@ model_dict = {"deepdds": DeepDDS_PL, "rescal": Rescal_PL}
 dataset_dict = {
     "oneil_deepdds": ONEIL_DeepDDS,
     "oneil_rescal": ONEIL_RESCAL,
-    "wn18rr_rescal": WN18RR,
 }
