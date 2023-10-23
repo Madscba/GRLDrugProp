@@ -40,7 +40,7 @@ def agg_loewe_and_make_binary(df: pd.DataFrame):
     sub_df["synergy_loewe"] = sub_df["synergy_loewe"].apply(
         lambda x: 0 if x < 0 else (1 if x > 10 else pd.NA)
     )
-    #sub_df["drug_row"], sub_df["drug_col"]  = df["drug_row"].reset_index(), df["drug_col"].reset_index()
+    # sub_df["drug_row"], sub_df["drug_col"]  = df["drug_row"].reset_index(), df["drug_col"].reset_index()
     sub_df.dropna(subset=["synergy_loewe"], inplace=True)
     return sub_df
 
@@ -64,6 +64,7 @@ def remove_drugs_not_in_cx(df: pd.DataFrame):
     )
     return df
 
+
 def create_drug_id_vocabs(df: pd.DataFrame):
     # Create unique drug ID's
     unique_drugs = set(df["drug_row_cid"]).union(set(df["drug_col_cid"]))
@@ -83,18 +84,24 @@ def create_drug_id_vocabs(df: pd.DataFrame):
     }
     return df, drug_name_mapping
 
+
 def create_cell_line_id_vocabs(df: pd.DataFrame):
     # Create unique cell-line ID's based on context and label
-    sub_df = df.loc[df["label"]==1]
-    sub_df["context_id"] = sub_df.groupby(['context', 'label']).ngroup()
-    sub_df.drop_duplicates(subset=['context','context_id'],keep='first',inplace=True)
+    sub_df = df.loc[df["label"] == 1]
+    sub_df["context_id"] = sub_df.groupby(["context", "label"]).ngroup()
+    sub_df.drop_duplicates(subset=["context", "context_id"], keep="first", inplace=True)
 
     # Create vocab to map cell line name to graph cell line ID
-    cell_line_mapping = {name: idx for name, idx in sub_df.loc[:,['context', 'context_id']].values}
-    cell_line_name_mapping = {idx: name for name, idx in sub_df.loc[:,['context', 'context_id']].values}
+    cell_line_mapping = {
+        name: idx for name, idx in sub_df.loc[:, ["context", "context_id"]].values
+    }
+    cell_line_name_mapping = {
+        idx: name for name, idx in sub_df.loc[:, ["context", "context_id"]].values
+    }
     df["context_id"] = df["context"].map(cell_line_mapping)
-    
+
     return df, cell_line_name_mapping
+
 
 def make_triplets_oneil():
     save_path = Directories.DATA_PATH / "gold" / "oneil"
@@ -120,7 +127,9 @@ def make_triplets_oneil():
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
 
     # Save the vocabs to a JSON file
-    for vocab, name in zip((drug_vocab,cell_line_vocab),["entity_vocab.json","relation_vocab.json"]):
+    for vocab, name in zip(
+        (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
+    ):
         with open(save_path / name, "w") as json_file:
             json.dump(vocab, json_file)
 
@@ -129,4 +138,3 @@ def make_triplets_oneil():
 
 if __name__ == "__main__":
     make_triplets_oneil()
-

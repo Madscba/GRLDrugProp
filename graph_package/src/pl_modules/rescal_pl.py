@@ -1,30 +1,31 @@
 from pytorch_lightning import LightningModule
-from graph_package.src.models import DeepDDS
+from graph_package.src.models import RESCAL
 from torch.optim import Adam
-from torch.nn import BCELoss, ModuleDict
+from torch.nn import BCELoss, BCEWithLogitsLoss, ModuleDict
 from torchmetrics import AUROC, AveragePrecision
 import torch
 
 
-class DeepDDS_PL(LightningModule):
-    def __init__(self, lr: float = 0.001):
+class Rescal_PL(LightningModule):
+    def __init__(self, ent_tot, rel_tot, dim=100, lr: float = 1e-4):
         super().__init__()
         self.lr = lr
-        self.model = DeepDDS()
-        self.loss_func = BCELoss()
+        self.model = RESCAL(ent_tot, rel_tot, dim)
+        self.loss_func = BCEWithLogitsLoss()  # BCELoss()
         self.val_metrics = self.build_metrics(type="val")
         self.test_metrics = self.build_metrics(type="test")
 
     def forward(self, inputs):
-        return self.model(*inputs)
+        h_index, t_index, r_index = (
+            inputs[:, 0].reshape(1, -1),
+            inputs[:, 1].reshape(1, -1),
+            inputs[:, 2].reshape(1, -1),
+        )
+        return self.model(h_index, t_index, r_index)
 
     def _step(self, batch):
-        inputs = (
-            batch["context_features"],
-            batch["drug_molecules_left"],
-            batch["drug_molecules_right"],
-        )
-        target = batch["label"]
+        inputs = batch[:, :3]
+        target = batch[:, 3].to(dtype=torch.float32)  # needs to be float 32
         preds = self(inputs)
         preds = preds.view(-1)
         loss = self.loss_func(preds, target)
@@ -73,8 +74,8 @@ class DeepDDS_PL(LightningModule):
         kwargs = {"task": "binary"}
         module_dict = ModuleDict(
             {
-                f"{type}_auprc": AUROC(**kwargs),
-                f"{type}_auroc": AveragePrecision(**kwargs),
+                f"{type}_auprc": AveragePrecision(**kwargs),
+                f"{type}_auroc": AUROC(**kwargs),
             }
         )
         return module_dict

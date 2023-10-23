@@ -2,10 +2,10 @@ defaults:
   - model: deepdds # override model by writing model=rescal as command line argument to main.py
 
 run_name: 'NO_NAME'
-wandb: True
+wandb: False
 lr: 0.001
-dataset: 'oneil'
-batch_size: 1024
+dataset:  'oneil'
+batch_size: 128
 n_splits: 5
 seed: 43
 remove_old_checkpoints: True
@@ -19,20 +19,8 @@ checkpoint_callback:
 
 trainer:
   check_val_every_n_epoch: 1
-  max_epochs: 30
+  max_epochs: 2
   enable_checkpointing: True
   enable_progress_bar: False
-  limit_test_batches: 1000
-  fast_dev_run: False 
-
-
-
-
-
-
-
-
-
-
-
-
+  limit_test_batches: 128
+  fast_dev_run: False
