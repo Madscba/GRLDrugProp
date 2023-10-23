@@ -119,7 +119,7 @@ def main(config):
     
     if model_name == "rescal":
         update_dict = {"ent_tot": int(dataset.num_entity.numpy()), "rel_tot": int(dataset.num_relation.numpy())}
-        config["model"].update(update_dict)
+        config.model.update(update_dict)
     
     for k, (train_idx, test_idx) in enumerate(kfold.split(dataset)):
         loggers = []
@@ -144,7 +144,7 @@ def main(config):
         )
 
         call_backs.append(checkpoint_callback)
-        model = init_model(model=model_name, model_kwargs=model_kwargs)
+        model = init_model(model=model_name, model_kwargs=config.model)
 
         trainer = Trainer(
             logger=loggers,
