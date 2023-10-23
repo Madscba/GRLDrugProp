@@ -110,7 +110,6 @@ def main(config):
 
     model_name = get_model_name(config, sys_args=sys.argv)
     dataset = load_data(model=model_name, dataset=config.dataset)
-    model_kwargs = get_model_kwargs(model_name, dataset, config)
     kfold = KFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
     if config.remove_old_checkpoints:
