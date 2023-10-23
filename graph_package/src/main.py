@@ -1,6 +1,6 @@
 """main module."""
 import torch
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from pytorch_lightning.loggers import WandbLogger
 from models import RESCAL
 from graph_package.configs.definitions import model_dict, dataset_dict
@@ -10,7 +10,7 @@ from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import hydra
 from torch.utils.data import random_split, Subset
 from dotenv import load_dotenv
-from sklearn.model_selection import KFold, train_test_split as train_val_split
+from sklearn.model_selection import StratifiedKFold, train_test_split as train_val_split
 from torchdrug.data import DataLoader
 import os
 from pytorch_lightning import Trainer
@@ -47,8 +47,6 @@ def get_model_name(config: dict, sys_args: List[str]):
     for arg in sys_args:
         if arg.startswith("model="):
             return arg.split("=")[1]
-    if "model" in config.keys():
-        return config.model.name
     else:
         return "deepdds"
 
@@ -59,9 +57,9 @@ def get_checkpoint_path(model_name: str, k: int):
     return str(checkpoint_path)
 
 
-def get_dataloaders(datasets: List[DataLoader], batch_size: int):
+def get_dataloaders(datasets: List[DataLoader], batch_size: Dict):
     dataloaders = []
-    for dataset in datasets:
+    for dataset in zip(datasets, batch_size):
         dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=0)
         dataloaders.append(dataloader)
     return dataloaders
@@ -73,11 +71,10 @@ def get_checkpoint_path(model_name: str, k: int):
     return str(checkpoint_path)
 
 
-def get_dataloaders(datasets: List[DataLoader], batch_size: int):
-    dataloaders = []
-    for dataset in datasets:
-        dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=0)
-        dataloaders.append(dataloader)
+def get_dataloaders(datasets: List[DataLoader], batch_sizes: Dict[str, int]):
+    dataloaders = {}
+    for dataset, (key,val) in zip(datasets, batch_sizes.items()):
+        dataloaders[key] = DataLoader(dataset, batch_size=val, num_workers=0)
     return dataloaders
 
 
@@ -110,7 +107,7 @@ def main(config):
 
     model_name = get_model_name(config, sys_args=sys.argv)
     dataset = load_data(model=model_name, dataset=config.dataset)
-    kfold = KFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
+    kfold = StratifiedKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
     if config.remove_old_checkpoints:
         check_point_path = Directories.CHECKPOINT_PATH / model_name
@@ -121,7 +118,7 @@ def main(config):
         update_dict = {"ent_tot": int(dataset.num_entity.numpy()), "rel_tot": int(dataset.num_relation.numpy())}
         config["model"].update(update_dict)
     
-    for k, (train_idx, test_idx) in enumerate(kfold.split(dataset)):
+    for k, (train_idx, test_idx) in enumerate(kfold.split(dataset, dataset.get_labels(dataset.indices))):
         loggers = []
         if config.wandb:
             reset_wandb_env()
@@ -133,10 +130,10 @@ def main(config):
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
         )
         train_set, val_set = train_val_split(
-            train_set, test_size=0.1, random_state=config.seed
+            train_set, test_size=0.1, random_state=config.seed, stratify=dataset.get_labels(train_set.indices)
         )
-        train_loader, val_loader, test_loader = get_dataloaders(
-            [train_set, val_set, test_set], batch_size=config.batch_size
+        data_loaders = get_dataloaders(
+            [train_set, val_set, test_set], batch_sizes=config.batch_sizes
         )
 
         checkpoint_callback = ModelCheckpoint(
@@ -144,17 +141,17 @@ def main(config):
         )
 
         call_backs.append(checkpoint_callback)
-        model = init_model(model=model_name, model_kwargs=model_kwargs)
+        model = init_model(model=model_name, model_kwargs=config.model)
 
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-        trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+        trainer.fit(model, train_dataloaders=data_loaders['train'], val_dataloaders=data_loaders['val'])
         trainer.test(
             model,
-            dataloaders=test_loader,
+            dataloaders=data_loaders['test'],
             ckpt_path=checkpoint_callback.best_model_path,
         )
         wandb.finish()
