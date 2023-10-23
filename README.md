@@ -25,6 +25,8 @@ Prerequisites: C++ Compiler (Instruction for how to install this can be found be
 
 **PLEASE FIRST CHECK IF NEW PACKAGES ARE AVAILABLE THROUGH CONDA CHANNELS AND ADD THEM TO ```environment.yml```. USE ```pip``` AS LAST RESORT AND ADD TO ```requirements.txt```**
 
+To update environment use ```conda env update --name graph_pkg_env --file environment.yml --prune```.  
+
 
 3 Add pre-commit hooks
 ----------------

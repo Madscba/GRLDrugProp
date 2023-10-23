@@ -57,14 +57,14 @@ class Rescal_PL(LightningModule):
         loss, target, preds = self._step(batch)
         metrics = {key: val(preds, target) for key, val in self.test_metrics.items()}
         for key, val in metrics.items():
-            self.log(
-                f"{key}",
-                val,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=len(batch),
-            )
+                self.log(
+                    f"{key}",
+                    val.item(),
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=len(batch),
+                )
         return
 
     def configure_optimizers(self):

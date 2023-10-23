@@ -15,7 +15,6 @@ debug
 graph_package/src/main_copy.py
 graph_package/src/etl/pipeline_test.py
 /outputs
-.env
 /checkpoints/deepdds/*
 /checkpoints/rescal/*
 /graph_package/src/main_playground.py
