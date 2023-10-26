@@ -1,11 +1,12 @@
+# DONT CHANGE THIS FILE
 defaults:
   - model: deepdds # override model by writing model=rescal as command line argument to main.py
 
 run_name: 'NO_NAME'
-wandb: True
+wandb: False
 lr: 0.001
-dataset: 'oneil'
-batch_size: 64
+dataset:  'oneil'
+batch_sizes: {"train": 128, "test": 10000, "val": 1000}
 n_splits: 5
 seed: 43
 remove_old_checkpoints: True

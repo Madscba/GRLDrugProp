@@ -17,11 +17,9 @@ graph_package/src/etl/pipeline_test.py
 /outputs
 /checkpoints/deepdds/*
 /checkpoints/rescal/*
-/env_torch_21
 /test_env
-/test_env_torch12
 graph_package/outputs
 /shell_scripts
 .env
-
-
+/graph_package/src/main_playground.py
+.env
