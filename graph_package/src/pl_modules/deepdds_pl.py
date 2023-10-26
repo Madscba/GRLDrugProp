@@ -1,5 +1,5 @@
 from pytorch_lightning import LightningModule
-from graph_package.src.models import DeepDDS
+from graph_package.src.models import DeepDDS, DeepDDS_HPC
 from torch.optim import Adam
 from torch.nn import BCELoss, ModuleDict
 from torchmetrics import AUROC, AveragePrecision
@@ -7,10 +7,10 @@ import torch
 
 
 class DeepDDS_PL(LightningModule):
-    def __init__(self, lr: float = 0.001):
+    def __init__(self, lr: float = 0.001, hpc: bool = False):
         super().__init__()
         self.lr = lr
-        self.model = DeepDDS()
+        self.model = DeepDDS_HPC() if hpc else DeepDDS()
         self.loss_func = BCELoss()
         self.val_metrics = self.build_metrics(type="val")
         self.test_metrics = self.build_metrics(type="test")

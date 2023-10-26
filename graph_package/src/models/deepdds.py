@@ -27,13 +27,38 @@ class DeepDDS(DeepDDS_cx):
             fc_hidden_dims=fc_hidden_dims,
             dropout=dropout,
         )
-    
-    def _forward_molecules(self, molecules: PackedGraph) -> torch.FloatTensor:
 
-        features = self.drug_conv(molecules, molecules.data_dict["atom_feature"].float())["node_feature"]
-        features = self.drug_readout(molecules, features)
-        return self.drug_mlp(features)
-    
 
     def __name__(self) -> str:
         return "DeepDDS"
+
+
+class DeepDDS_HPC(DeepDDS):
+    def __init__(
+        self,
+        context_channels: int = 288,
+        context_hidden_dims: List[int] = (2048, 512),
+        drug_channels: int = TORCHDRUG_NODE_FEATURES,
+        drug_gcn_hidden_dims: List[int] = [1024, 512, 156],
+        drug_mlp_hidden_dims: List[int] = None,
+        context_output_size: int = 156,
+        fc_hidden_dims: List[int] = [1024, 512, 128],
+        dropout: float = 0.2,
+    ):
+        super().__init__(
+            context_channels,
+            context_hidden_dims,
+            drug_channels,
+            drug_gcn_hidden_dims,
+            drug_mlp_hidden_dims,
+            context_output_size,
+            fc_hidden_dims,
+            dropout,
+        )
+    
+    def _forward_molecules(self, molecules: PackedGraph) -> torch.FloatTensor:
+        features = self.drug_conv(
+            molecules, molecules.data_dict["atom_feature"].float()
+        )["node_feature"]
+        features = self.drug_readout(molecules, features)
+        return self.drug_mlp(features)

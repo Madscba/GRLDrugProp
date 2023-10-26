@@ -27,12 +27,6 @@ Prerequisites: C++ Compiler (Instruction for how to install this can be found be
     * conda activate grap_pgk_env
 
 
-Since chemicalx is built on an old version of torchdrug we need to update one deprecated use of torchdrug. Run the following in terminal:
-```bash 
-bash environment_config/update_chemicalx.sh
-```
-
-
 **PLEASE FIRST CHECK IF NEW PACKAGES ARE AVAILABLE THROUGH CONDA CHANNELS AND ADD THEM TO ```environment.yml```. USE ```pip``` AS LAST RESORT AND ADD TO ```requirements.txt```**
 
 To update environment use ```conda env update --name graph_pkg_env --file environment.yml --prune```.  
