@@ -41,14 +41,20 @@ To update environment use ```conda env update --name graph_pkg_env --file enviro
 To install env on HPC at DTU use: 
 ```bash
 module load python/python python3/3.9.17 
+module load cuda/12.1
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements_hpc.txt
 bash environment_config/update_chemicalx.sh
 ```
+To test it run in same terminal:
 
-To install via venv locally first install python 3.9.17. 
-For mac you can use pyenv, see [here](https://apple.stackexchange.com/questions/237430/how-to-install-specific-version-of-python-on-os-x)
+```bash
+voltash
+python graph_package/src/main.py
+```
+When submitting jobs you have to provide ```module load cuda/12.1``` in your bash script. 
+
 
 
 3 Add pre-commit hooks

@@ -68,8 +68,9 @@ smmap==5.0.1
 sympy==1.12
 tabulate==0.9.0
 threadpoolctl==3.2.0
-torch-cluster -f https://pytorch-geometric.com/whl/torch-1.12.0+cu102.html
-torch-scatter -f https://data.pyg.org/whl/torch-1.12.0+cu102.html
+torch==2.1.0
+torch_cluster -f https://pytorch-geometric.com/whl/torch-2.1.0+cu121.html 
+torch_scatter -f https://data.pyg.org/whl/torch-1.12.0+cu102.html
 torchdrug==0.2.1
 torchmetrics==1.2.0
 chemicalx==0.1.0
