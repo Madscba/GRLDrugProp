@@ -1,5 +1,6 @@
 #local package 
 -e .
 
+torchdrug==0.1.0
 chemicalx==0.1.0
 
