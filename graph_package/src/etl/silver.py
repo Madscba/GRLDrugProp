@@ -15,12 +15,11 @@ def generate_oneil_dataset():
     Generate the Oniel dataset from the DrugComb dataset.
     """
     df = load_drugcomb()
-
     df_oneil = df[df["study_name"] == "ONEIL"]
     df_oneil_cleaned = df_oneil.dropna(subset=["drug_row", "drug_col", "synergy_loewe"])
     logger.info(f"Dropped {len(df_oneil)-len(df_oneil_cleaned)} NaN values.")
     oneil_path = Directories.DATA_PATH / "silver" / "oneil"
-    oneil_path.mkdir(exist_ok=True)
+    oneil_path.mkdir(exist_ok=True,parents=True)
     df_oneil_cleaned = df_oneil_cleaned.loc[
         :, ~df_oneil_cleaned.columns.str.startswith("Unnamed")
     ]

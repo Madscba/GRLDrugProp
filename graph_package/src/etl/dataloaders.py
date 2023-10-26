@@ -20,14 +20,27 @@ class ONEIL_DeepDDS_CX(RemoteDatasetLoader):
     
     def get_labeled_triples(self) -> LabeledTriples:
         """Get the labeled triples file from the storage."""
-        path = Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" / "oneil.csv"
+        path = Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv"
         dtype = {"drug_1": str, "drug_2": str, "context": str, "label": float}
         df = pd.read_csv(path,dtype=dtype)
         return LabeledTriples(df)
     
 
-class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, Dataset):
+class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator):
     def __init__(self) -> None:
+        
+        path = Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv"
+        dtype = {"drug_1": str, "drug_2": str, "context": str, "label": float}
+        self.df = pd.read_csv(path, dtype=dtype).reset_index(drop=True)
+        self.batch_names = (
+            "drug_features_left",
+            "drug_molecules_left",
+            "drug_features_right",
+            "drug_molecules_right",
+            "context_features",
+            "label"
+        )
+
         RemoteDatasetLoader.__init__(self, dataset_name="drugcomb")
 
         BatchGenerator.__init__(
@@ -41,24 +54,10 @@ class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, Dataset):
             labeled_triples=self.get_labeled_triples(),
         )
 
-        path = Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" / "oneil.csv"
-        dtype = {"drug_1": str, "drug_2": str, "context": str, "label": float}
-        self.df = pd.read_csv(path, dtype=dtype).reset_index(drop=True)
-        self.batch_names = (
-            "drug_features_left",
-            "drug_molecules_left",
-            "drug_features_right",
-            "drug_molecules_right",
-            "context_features",
-            "label"
-        )
 
     def get_labeled_triples(self) -> LabeledTriples:
         """Get the labeled triples file from the storage."""
-        path = Directories.DATA_PATH / "gold" / "chemicalx" / "oneil" / "oneil.csv"
-        dtype = {"drug_1": str, "drug_2": str, "context": str, "label": float}
-        df = pd.read_csv(path, dtype=dtype)
-        return LabeledTriples(df)
+        return LabeledTriples(self.df)
 
     def get_item(self, index):
         return {name: value for name, value in zip(self.batch_names, data)}

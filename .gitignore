@@ -20,5 +20,8 @@ graph_package/src/etl/pipeline_test.py
 /env_torch_21
 /test_env
 /test_env_torch12
+graph_package/outputs
+/shell_scripts
+.env
 
 

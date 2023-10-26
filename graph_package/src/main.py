@@ -94,7 +94,6 @@ def split_dataset(
     config_name="config.yaml",
 )
 def main(config):
-    
     if config.wandb:
         wandb.login()
     
@@ -102,7 +101,7 @@ def main(config):
     dataset = load_data(model=model_name, dataset=config.dataset)
     kfold = KFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
 
-    if config.remove_old_checkpoints:
+    if config.remove_old_checkpoints and (Directories.CHECKPOINT_PATH / model_name).exists():
         shutil.rmtree(Directories.CHECKPOINT_PATH / model_name)
 
     for k, (train_idx, test_idx) in enumerate(kfold.split(dataset)):

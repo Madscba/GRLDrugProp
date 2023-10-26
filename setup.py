@@ -1,8 +1,8 @@
 """Setup the package."""
 
-from setuptools import find_packages, setup
+import subprocess
 
-find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="graph_package",

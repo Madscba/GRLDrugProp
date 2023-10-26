@@ -9,6 +9,9 @@ Follow the steps in this README to run the codebase of this project.
 
 2 Create virtual environment
 ---------------- 
+
+### Conda envirnoment
+
 Prerequisites: C++ Compiler (Instruction for how to install this can be found beneath), 
 
 1) Windows:
@@ -23,10 +26,26 @@ Prerequisites: C++ Compiler (Instruction for how to install this can be found be
     * CONDA_SUBDIR=osx-64 conda env create --file environment.yml
     * conda activate grap_pgk_env
 
+
+Since chemicalx is built on an old version of torchdrug we need to update one deprecated use of torchdrug. Run the following in terminal:
+```bash 
+bash environment_config/update_chemicalx.sh
+```
+
+
 **PLEASE FIRST CHECK IF NEW PACKAGES ARE AVAILABLE THROUGH CONDA CHANNELS AND ADD THEM TO ```environment.yml```. USE ```pip``` AS LAST RESORT AND ADD TO ```requirements.txt```**
 
 To update environment use ```conda env update --name graph_pkg_env --file environment.yml --prune```.  
 
+### Python venv (for hpc use)
+To install env on HPC at DTU use 
+```bash
+module load python/python python3/3.9.17 
+python3 venv .venv
+source .venv
+pip install requirements_hpc.txt
+bash environment_config/update_chemicalx.sh
+```
 
 3 Add pre-commit hooks
 ----------------

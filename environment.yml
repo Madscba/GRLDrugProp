@@ -1,12 +1,14 @@
-name: graph_pkg_env
+name: graph_pkg_new
 channels:
   - conda-forge
   - pytorch
   - pyg
   - anaconda
+  - milagraph
 dependencies:
-  - python==3.8
-  - pytorch
+  - python==3.9.17
+  - pytorch==1.12.0
+  - torchdrug
   - aiohttp
   - colorlog
   - pytorch-scatter

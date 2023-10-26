@@ -1,14 +1,8 @@
 from typing import List, Optional
 from chemicalx.constants import TORCHDRUG_NODE_FEATURES
 from chemicalx.models import DeepDDS as DeepDDS_cx
-
-context_channels = 288
-context_hidden_dims = (2048, 512)
-drug_gcn_hidden_dims = [1024,512,156]
-drug_mlp_hidden_dims = None
-context_output_size= 156
-fc_hidden_dims = [1024,512,128]
-dropout = 0.2
+import torch
+from torchdrug.data import PackedGraph
 
 
 class DeepDDS(DeepDDS_cx):
@@ -33,5 +27,12 @@ class DeepDDS(DeepDDS_cx):
             fc_hidden_dims=fc_hidden_dims,
             dropout=dropout,
         )
+    
+    def _forward_molecules(self, molecules: PackedGraph) -> torch.FloatTensor:
+
+        features = self.drug_conv(molecules, molecules.data_dict["atom_feature"].float())["node_feature"]
+        features = self.drug_readout(molecules, features)
+        return self.drug_mlp(features)
+    
     def __name__(self) -> str:
         return "DeepDDS"
