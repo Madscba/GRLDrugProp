@@ -22,3 +22,4 @@ graph_package/outputs
 .env
 /graph_package/src/main_playground.py
 .venv
+*.out

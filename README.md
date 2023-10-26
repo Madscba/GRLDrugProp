@@ -41,8 +41,8 @@ To update environment use ```conda env update --name graph_pkg_env --file enviro
 To install env on HPC at DTU use 
 ```bash
 module load python/python python3/3.9.17 
-python3 venv .venv
-source .venv
+python3 -m venv .venv
+source .venv/bin/activate
 pip install requirements_hpc.txt
 bash environment_config/update_chemicalx.sh
 ```
