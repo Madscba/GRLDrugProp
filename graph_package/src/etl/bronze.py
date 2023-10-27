@@ -2,11 +2,11 @@ from graph_package.configs.directories import Directories
 import pandas as pd
 import numpy as np
 from graph_package.utils.helpers import init_logger
-from collections import defaultdict
 import requests
 import asyncio
 import aiohttp
 from tqdm import tqdm
+from pathlib import Path
 import json
 
 logger = init_logger()
@@ -15,6 +15,7 @@ logger = init_logger()
 def download_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
     if not data_path.exists():
+        Path(Directories.DATA_PATH / "bronze" / "drugcomb").mkdir(exist_ok=True,parents=True)
         logger.info("Downloading DrugComb dataset.")
         url = "https://drugcomb.fimm.fi/jing/summary_v_1_5.csv"
         response = requests.get(url, stream=True)
