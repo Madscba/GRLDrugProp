@@ -1,6 +1,6 @@
 from graph_package.configs.directories import Directories
 import pandas as pd
-from chemicalx.data import dataset_resolver
+from chemicalx.data import dataset_resolver, DrugFeatureSet
 from torchdrug.data import KnowledgeGraphDataset
 from torch.utils import data as torch_data
 from torch.utils.data import Dataset
@@ -8,13 +8,14 @@ from torchdrug.core import Registry as R
 from chemicalx.data.datasetloader import RemoteDatasetLoader, LabeledTriples
 from chemicalx.data import BatchGenerator
 from torchdrug.core import Registry as R
+import numpy as np
 import torch.utils.data
-
+import json
 
 class DatasetBase():
     def __init__(self):
         path = Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv"
-        dtype = {"drug_1": str, "drug_2": str, "context": str, "label": float}
+        dtype = {"drug_1_name": str, "drug_2_name": str, "context": str, "label": float}
         self.data_df = pd.read_csv(path, dtype=dtype).reset_index(drop=True)    
         self.indices = list(range(len(self.data_df)))  
 
@@ -38,20 +39,28 @@ class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, DatasetBase):
             context_features=True,
             drug_features=True,
             drug_molecules=True,
-            context_feature_set=self.get_context_features(),
             drug_feature_set=self.get_drug_features(),
+            context_feature_set=self.get_context_features(),
             labeled_triples=self.get_labeled_triples(),
         )
 
         self.batch_names = (
-            "drug_features_left",
             "drug_molecules_left",
-            "drug_features_right",
             "drug_molecules_right",
             "context_features",
             "label",
         )
     
+    def get_drug_features(self) -> DrugFeatureSet:
+        """Get the drug feature set."""
+        path = Directories.DATA_PATH / "bronze" / "drugcomb" / "drug_dict.json"
+        drug_dict = json.load(path.open())
+        drugs = set(self.data_df["drug_1_name"]).union(set(self.data_df["drug_2_name"]))
+        raw_data = {
+            drug: {"smiles": drug_dict[drug]['smiles'], "features": np.array([0]).reshape(1, -1)}
+            for drug in drugs
+        }
+        return DrugFeatureSet.from_dict(raw_data)
 
     def get_labeled_triples(self) -> LabeledTriples:
         """Get the labeled triples file from the storage."""
@@ -59,17 +68,13 @@ class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, DatasetBase):
 
     def __getitem__(self, index):
         row = self.data_df.loc[index]
-        drug_features_left = self._get_drug_features([row["drug_1"]])
-        drug_molecules_left = self._get_drug_molecules([row["drug_1"]])
-        drug_features_right = self._get_drug_features([row["drug_2"]])
-        drug_molecules_right = self._get_drug_molecules([row["drug_2"]])
+        drug_molecules_left = self._get_drug_molecules([row["drug_1_name"]])
+        drug_molecules_right = self._get_drug_molecules([row["drug_2_name"]])
         context_features = self._get_context_features([row["context"]]).squeeze()
 
         label = torch.tensor(self.data_df.loc[index, "label"], dtype=torch.float32)
         data = (
-            drug_features_left,
             drug_molecules_left,
-            drug_features_right,
             drug_molecules_right,
             context_features,
             label,
@@ -87,7 +92,6 @@ class ONEIL_RESCAL(KnowledgeGraphDataset, DatasetBase):
         DatasetBase.__init__(self)
         KnowledgeGraphDataset.__init__(self)
 
-        self.data_df = self._create_inverse_triplets(self.data_df)
         self.indices = list(range(len(self.data_df))) 
         # Convert relevant columns to a NumPy array and load it into the dataset
         self.load_triplet_and_label(
