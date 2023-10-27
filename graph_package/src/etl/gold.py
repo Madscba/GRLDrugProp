@@ -45,26 +45,6 @@ def agg_loewe_and_make_binary(df: pd.DataFrame):
     return sub_df
 
 
-def remove_drugs_not_in_cx(df: pd.DataFrame):
-    path = "https://raw.githubusercontent.com/AstraZeneca/chemicalx/main/dataset/drugcomb/drug_set.json"
-    with urllib.request.urlopen(path) as url:
-        raw_data = json.loads(url.read().decode())
-
-    drugs_not_in_cx = set(df["drug_row_cid"]).union(set(df["drug_col_cid"])) - set(
-        raw_data.keys()
-    )
-    drugcomb_not_in_cx = df["drug_row_cid"].apply(lambda x: x in drugs_not_in_cx) | df[
-        "drug_col_cid"
-    ].apply(lambda x: x in drugs_not_in_cx)
-    drugcombs_in_oneil = df.shape[0]
-    df = df[~drugcomb_not_in_cx]
-
-    logger.info(
-        f"Removed {drugcomb_not_in_cx.sum()} of {drugcombs_in_oneil} drug pairs not in chemicalx"
-    )
-    return df
-
-
 def create_drug_id_vocabs(df: pd.DataFrame):
     # Create unique drug ID's
     unique_drugs = set(df["drug_row_cid"]).union(set(df["drug_col_cid"]))
@@ -109,7 +89,6 @@ def make_triplets_oneil():
 
     df = load_oneil()
     df = get_CIDs(df)
-    df = remove_drugs_not_in_cx(df)
     df, drug_vocab = create_drug_id_vocabs(df)
     df = agg_loewe_and_make_binary(df)
 
