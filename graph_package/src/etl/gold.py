@@ -49,7 +49,7 @@ def create_drug_id_vocabs(df: pd.DataFrame):
 def create_cell_line_id_vocabs(df: pd.DataFrame):
     # Create unique cell-line ID's based on context and label
     sub_df = df.loc[df["label"] == 1]
-    sub_df["context_id"] = sub_df.groupby(["context", "label"]).ngroup()
+    sub_df.loc[:,["context_id"]] = sub_df.groupby(["context", "label"]).ngroup()
     sub_df.drop_duplicates(subset=["context", "context_id"], keep="first", inplace=True)
 
     # Create vocab to map cell line name to graph cell line ID

@@ -23,3 +23,4 @@ graph_package/outputs
 /graph_package/src/main_playground.py
 .venv
 *.out
+plots/*
