@@ -3,7 +3,7 @@ import torch
 from typing import List, Tuple, Dict
 from pytorch_lightning.loggers import WandbLogger
 from models import RESCAL
-from graph_package.configs.definitions import model_dict, dataset_dict
+from graph_package.configs.definitions import model_dict, dataset_dict, dataloader_dict
 from graph_package.configs.directories import Directories
 from torch.utils.data import Subset
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
@@ -32,9 +32,9 @@ def reset_wandb_env():
 
 def load_data(model: str = "deepdds", dataset: str = "oneil"):
     """Fetch formatted data depending on modelling task"""
-    dataset_key = dataset.lower() + "_" + model.lower()
-    dataset = dataset_dict[dataset_key]()
-    return dataset
+    dataset_path = dataset_dict[dataset.lower()]
+    data_loader = dataloader_dict[model.lower()](dataset_path)
+    return data_loader
 
 
 def init_model(model: str = "deepdds", model_kwargs: dict = {}):

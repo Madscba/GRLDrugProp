@@ -13,10 +13,9 @@ import torch.utils.data
 import json
 
 class DatasetBase():
-    def __init__(self):
-        path = Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv"
+    def __init__(self,dataset_path):
         dtype = {"drug_1_name": str, "drug_2_name": str, "context": str, "label": float}
-        self.data_df = pd.read_csv(path, dtype=dtype).reset_index(drop=True)    
+        self.data_df = pd.read_csv(dataset_path, dtype=dtype).reset_index(drop=True)    
         self.indices = list(range(len(self.data_df)))  
 
     def get_labels(self,indices=None):
@@ -25,11 +24,11 @@ class DatasetBase():
         return self.data_df.iloc[indices]["label"]
     
     
-class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, DatasetBase):
+class DeepDDS_DataSet(RemoteDatasetLoader, BatchGenerator, DatasetBase):
 
-    def __init__(self) -> None:
+    def __init__(self,dataset_path) -> None:
 
-        DatasetBase.__init__(self)
+        DatasetBase.__init__(self,dataset_path=dataset_path)
 
         RemoteDatasetLoader.__init__(self, dataset_name="drugcomb")
 
@@ -86,10 +85,10 @@ class ONEIL_DeepDDS(RemoteDatasetLoader, BatchGenerator, DatasetBase):
         return len(self.data_df)
 
 
-class ONEIL_RESCAL(KnowledgeGraphDataset, DatasetBase):
-    def __init__(self, data=""):
+class RESCAL_DataSet(KnowledgeGraphDataset, DatasetBase):
+    def __init__(self, dataset_path):
         
-        DatasetBase.__init__(self)
+        DatasetBase.__init__(self,dataset_path=dataset_path)
         KnowledgeGraphDataset.__init__(self)
 
         self.indices = list(range(len(self.data_df))) 

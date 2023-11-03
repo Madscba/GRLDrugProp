@@ -5,7 +5,7 @@ defaults:
 run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
-dataset:  'oneil'
+dataset:  'oneil' # deepdds_original to try the original deepdds dataset
 batch_sizes: {"train": 128, "test": 10000, "val": 1000}
 n_splits: 5
 seed: 43

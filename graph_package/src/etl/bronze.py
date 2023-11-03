@@ -45,7 +45,6 @@ async def download_info_drugcomb(
         for task in tqdm(asyncio.as_completed(tasks), total=len(tasks)):
             try:
                 info_dict = await task
-                del info_dict["synonyms"]
                 if type == "drugs":
                     name = info_dict["dname"]
                 else:
@@ -63,9 +62,9 @@ async def download_info(session, url):
         return await response.json()
 
 
-def download_cell_line_info_drugcomb():
+def download_cell_line_info_drugcomb(overwrite=True):
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb"
-    if not (data_path / "cell_line_dict.json").exists():
+    if (not (data_path / "cell_line_dict.json").exists()) | overwrite:
         logger.info("Downloading cell-line info from DrugComb API.")
         asyncio.run(
             download_info_drugcomb(
@@ -77,9 +76,9 @@ def download_cell_line_info_drugcomb():
         )
 
 
-def download_drug_info_drugcomb():
+def download_drug_info_drugcomb(overwrite=True):
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb"
-    if not (data_path / "drug_dict.json").exists():
+    if (not (data_path / "drug_dict.json").exists()) | overwrite:
         logger.info("Downloading drug info from DrugComb API.")
         asyncio.run(
             download_info_drugcomb(
@@ -93,7 +92,7 @@ def download_drug_info_drugcomb():
 
 def get_drugcomb():
     download_drugcomb()
-    download_drug_info_drugcomb()
+    download_drug_info_drugcomb(overwrite=False)
     download_cell_line_info_drugcomb()
 
 
