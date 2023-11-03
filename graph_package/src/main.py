@@ -123,8 +123,11 @@ def main(config):
         loggers = []
         if config.wandb:
             reset_wandb_env()
-            wandb.init(group=config.run_name, name=f"fold_{k}", config=dict(config))
+            project = "GRLDrugProp" 
+            entity = "master-thesis-dtu"
+            wandb.init(group=config.run_name, project=project, entity=entity, name=f"fold_{k}", config=dict(config))
             loggers.append(WandbLogger())
+        
         call_backs = []
 
         train_set, test_set = split_dataset(
