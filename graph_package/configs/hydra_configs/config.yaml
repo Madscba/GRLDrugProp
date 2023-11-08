@@ -2,7 +2,7 @@
 defaults:
   - model: deepdds # override model by writing model=rescal as command line argument to main.py
 
-run_name: 'NO_NAME_mba'
+run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
 dataset:  'oneil' # deepdds_original to try the original deepdds dataset
