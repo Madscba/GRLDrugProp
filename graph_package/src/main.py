@@ -57,20 +57,6 @@ def get_checkpoint_path(model_name: str, k: int):
     return str(checkpoint_path)
 
 
-def get_dataloaders(datasets: List[DataLoader], batch_size: Dict):
-    dataloaders = []
-    for dataset in zip(datasets, batch_size):
-        dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=0)
-        dataloaders.append(dataloader)
-    return dataloaders
-
-
-def get_checkpoint_path(model_name: str, k: int):
-    checkpoint_path = Directories.CHECKPOINT_PATH / model_name / f"fold_{k}"
-    checkpoint_path.mkdir(parents=True, exist_ok=True)
-    return str(checkpoint_path)
-
-
 def get_dataloaders(datasets: List[DataLoader], batch_sizes: Dict[str, int]):
     dataloaders = {}
     for dataset, (key,val) in zip(datasets, batch_sizes.items()):
