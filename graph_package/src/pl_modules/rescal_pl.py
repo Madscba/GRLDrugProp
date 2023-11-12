@@ -1,8 +1,23 @@
 from pytorch_lightning import LightningModule
 from graph_package.src.models import RESCAL
+from graph_package.src.error_analysis.utils import (
+    save_performance_plots,
+    save_model_pred,
+)
+from graph_package.configs.directories import Directories
 from torch.optim import Adam
 from torch.nn import BCELoss, BCEWithLogitsLoss, ModuleDict
 from torchmetrics import AUROC, AveragePrecision
+from torchmetrics.classification import (
+    AveragePrecision,
+    Accuracy,
+    AveragePrecision,
+    CalibrationError,
+    ConfusionMatrix,
+    F1Score,
+)
+from graph_package.src.error_analysis.utils import get_performance_curve
+
 import torch
 
 
@@ -57,14 +72,21 @@ class Rescal_PL(LightningModule):
         loss, target, preds = self._step(batch)
         metrics = {key: val(preds, target) for key, val in self.test_metrics.items()}
         for key, val in metrics.items():
-            self.log(
-                f"{key}",
-                val,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True,
-                batch_size=len(batch),
-            )
+            if "confusion" not in key:
+                self.log(
+                    f"{key}",
+                    val,
+                    on_epoch=True,
+                    prog_bar=True,
+                    logger=True,
+                    batch_size=len(batch),
+                )
+            else:
+                df_cm = val.cpu()
+
+        save_performance_plots(df_cm, metrics, preds, target)
+        save_model_pred(batch_idx, batch, preds, target)
+
         return
 
     def configure_optimizers(self):
@@ -76,6 +98,11 @@ class Rescal_PL(LightningModule):
             {
                 f"{type}_auprc": AveragePrecision(**kwargs),
                 f"{type}_auroc": AUROC(**kwargs),
+                f"{type}_accuracy": Accuracy(**kwargs),
+                f"{type}_average_precision": AveragePrecision(**kwargs),
+                f"{type}_calibration_error": CalibrationError(**kwargs),
+                f"{type}_confusion_matrix": ConfusionMatrix(**kwargs),
+                f"{type}_F1": F1Score(**kwargs),
             }
         )
         return module_dict
