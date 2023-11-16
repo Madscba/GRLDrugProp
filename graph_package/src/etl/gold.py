@@ -55,31 +55,11 @@ def create_drug_id_vocabs(df: pd.DataFrame):
 
 def create_cell_line_id_vocabs(df: pd.DataFrame):
     # Create unique cell-line ID's based on context and label
-    sub_df = df.copy()
-    sub_df.loc[:, ["context_id"]] = df.groupby(["context", "label"]).ngroup()
-    sub_df.drop_duplicates(subset=["context", "context_id"], keep="first", inplace=True)
 
-    # Create vocab to map cell line name to graph cell line ID
-    cell_line_mapping = {
-        name: idx for name, idx in sub_df.loc[:, ["context", "context_id"]].values
-    }
-    cell_line_name_mapping = {
-        idx: name for name, idx in sub_df.loc[:, ["context", "context_id"]].values
-    }
-
+    unique_contexts = set(df["context"])
+    cell_line_mapping = {drug: idx for idx, drug in enumerate(unique_contexts)}
     df["context_id"] = df["context"].map(cell_line_mapping)
-    return df, cell_line_name_mapping
-
-
-def save_vocabs(drug_vocab, cell_line_vocab, save_suffix=""):
-    save_path = Directories.DATA_PATH / "gold" / "oneil"
-    save_path.mkdir(parents=True, exist_ok=True)
-    for vocab, name in zip(
-        (drug_vocab, cell_line_vocab),
-        [f"entity_vocab{save_suffix}.json", f"relation_vocab{save_suffix}.json"],
-    ):
-        with open(save_path / name, "w") as json_file:
-            json.dump(vocab, json_file)
+    return df, cell_line_mapping
 
 
 def download_drug_dict_deepdds_original():
@@ -150,6 +130,8 @@ def get_drug_cell_line_ids(df: pd.DataFrame):
 
 def make_original_deepdds_dataset():
     # Download triplets from DeepDDS repo
+    save_path = Directories.DATA_PATH / "gold" / "deepdds_original"
+    save_path.mkdir(parents=True, exist_ok=True)
     df = pd.read_csv(
         "https://raw.githubusercontent.com/Sinwang404/DeepDDs/master/data/new_labels_0_10.csv"
     )
@@ -162,7 +144,13 @@ def make_original_deepdds_dataset():
 
     df, drug_vocab = create_drug_id_vocabs(df)
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
-    save_vocabs(drug_vocab, cell_line_vocab, save_suffix="_deepdds_original")
+    for vocab, name in zip(
+        (drug_vocab, cell_line_vocab),
+        ["entity_vocab.json", "relation_vocab.json"]):
+
+        with open(save_path / name, "w") as json_file:
+            json.dump(vocab, json_file)
+    
     df = df[
         [
             "drug_1_name",
@@ -176,7 +164,7 @@ def make_original_deepdds_dataset():
     ]
     assert df.isna().sum().sum() == 0
     df.to_csv(
-        Directories.DATA_PATH / "gold" / "oneil" / "deepdds_original.csv", index=False
+        Directories.DATA_PATH / "gold" / "deepdds_original" / "deepdds_original.csv", index=False
     )
 
 
@@ -200,7 +188,13 @@ def make_triplets_oneil():
 
     df = df[rename_dict.values()]
 
-    save_vocabs(drug_vocab, cell_line_vocab)
+    for vocab, name in zip(
+        (drug_vocab, cell_line_vocab),
+        ["entity_vocab.json", "relation_vocab.json"]):
+
+        with open(save_path / name, "w") as json_file:
+            json.dump(vocab, json_file)
+        
     df.to_csv(save_path / "oneil.csv", index=False)
 
 
