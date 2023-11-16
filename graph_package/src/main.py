@@ -2,9 +2,10 @@
 import torch
 from typing import List, Tuple, Dict
 from pytorch_lightning.loggers import WandbLogger
-from models import RESCAL
-from graph_package.configs.definitions import model_dict, dataset_dict, dataloader_dict
+from graph_package.configs.definitions import model_dict, dataset_dict 
+from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from graph_package.configs.directories import Directories
+from graph_package.src.pl_modules import BasePL
 from torch.utils.data import Subset
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import hydra
@@ -30,17 +31,18 @@ def reset_wandb_env():
             del os.environ[k]
 
 
-def load_data(model: str = "deepdds", dataset: str = "oneil"):
+def load_data(dataset: str = "oneil"):
     """Fetch formatted data depending on modelling task"""
     dataset_path = dataset_dict[dataset.lower()]
-    data_loader = dataloader_dict[model.lower()](dataset_path)
+    data_loader = KnowledgeGraphDataset(dataset_path)
     return data_loader
 
 
 def init_model(model: str = "deepdds", model_kwargs: dict = {}):
     """Load model from registry"""
     model = model_dict[model.lower()](**model_kwargs)
-    return model
+    pl_module = BasePL(model)
+    return pl_module
 
 
 def get_model_name(config: dict, sys_args: List[str]):
@@ -55,6 +57,9 @@ def get_checkpoint_path(model_name: str, k: int):
     checkpoint_path = Directories.CHECKPOINT_PATH / model_name / f"fold_{k}"
     checkpoint_path.mkdir(parents=True, exist_ok=True)
     return str(checkpoint_path)
+
+
+
 
 
 def get_dataloaders(datasets: List[DataLoader], batch_sizes: Dict[str, int]):
@@ -92,9 +97,8 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    dataset = load_data(model=model_name, dataset=config.dataset)
+    dataset = load_data(dataset=config.dataset)
     kfold = StratifiedKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
-
 
     if config.remove_old_checkpoints:
         check_point_path = Directories.CHECKPOINT_PATH / model_name
@@ -102,8 +106,10 @@ def main(config):
             shutil.rmtree(check_point_path)
     
     if model_name == "rescal":
-        update_dict = {"ent_tot": int(dataset.num_entity.numpy()), "rel_tot": int(dataset.num_relation.numpy())}
+        update_dict = {"ent_tot": dataset.num_nodes, "rel_tot": int(dataset.num_relations)}
         config.model.update(update_dict)
+    else: 
+        config.model.update({"dataset_path": dataset_dict[config.dataset]})
     
     for k, (train_idx, test_idx) in enumerate(kfold.split(dataset, dataset.get_labels(dataset.indices))):
         loggers = []
