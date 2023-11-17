@@ -167,8 +167,8 @@ def error_diagnostics_plots():
     a = 123
 
 
-def get_prediction_dataframe():
-    pred_dict = get_model_pred()
+def get_prediction_dataframe(file_name, save_path=""):
+    pred_dict = get_model_pred(file_name, save_path)
     dataframes = [
         pd.DataFrame(pred_dict[key]) for key in ["batch", "predictions", "targets"]
     ]

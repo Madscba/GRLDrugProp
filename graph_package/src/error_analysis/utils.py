@@ -164,9 +164,9 @@ def save_model_pred(batch_idx, batch, preds, target, save_path=False):
         pickle.dump(output_dict, f)
 
 
-def get_model_pred(save_path=""):
+def get_model_pred(file_name="model_pred_dict.pkl", save_path=""):
     save_path = get_err_analysis_path(save_path)
-    with open(save_path / "model_pred_dict.pkl", "rb") as file:
+    with open(save_path / file_name, "rb") as file:
         pred_dict = pickle.load(file)
     return pred_dict
 
