@@ -1,7 +1,7 @@
 """main module."""
 
 from pytorch_lightning.loggers import WandbLogger
-from graph_package.utils.helpers import (
+from graph_package.src.main_utils import (
     reset_wandb_env,
     load_data,
     init_model,
@@ -9,7 +9,8 @@ from graph_package.utils.helpers import (
     get_checkpoint_path,
     get_dataloaders,
     split_dataset,
-    update_model_kwargs
+    update_model_kwargs,
+    pretrain_single_model
 )
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
@@ -24,35 +25,6 @@ import sys
 import wandb
 import shutil
 
-
-
-
-def pretrain_single_model(config, data_loaders, k):
-    model_name = config.model.pretrain_model
-    check_point_path = Directories.CHECKPOINT_PATH / model_name
-
-    if os.path.isdir(check_point_path):
-        shutil.rmtree(check_point_path)
-
-    checkpoint_callback = ModelCheckpoint(
-            dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
-        )
-
-    model = init_model(model=model_name, model_kwargs=config.model[model_name])
-
-    trainer = Trainer(
-        logger=[],
-        callbacks=[checkpoint_callback],
-        **config.trainer,
-    )
-
-    trainer.fit(
-        model,
-        train_dataloaders=data_loaders["train"],
-        val_dataloaders=data_loaders["val"],
-    )
-
-    return checkpoint_callback.best_model_path
     
 
 @hydra.main(
