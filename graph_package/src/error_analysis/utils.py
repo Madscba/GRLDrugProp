@@ -164,7 +164,14 @@ def save_model_pred(batch_idx, batch, preds, target, save_path=False):
         pickle.dump(output_dict, f)
 
 
-def save_performance_plots(df_cm, metrics, preds, target, save_path):
+def get_model_pred(save_path=""):
+    save_path = get_err_analysis_path(save_path)
+    with open(save_path / "model_pred_dict.pkl", "rb") as file:
+        pred_dict = pickle.load(file)
+    return pred_dict
+
+
+def save_performance_plots(df_cm, metrics, preds, target, save_path=""):
     """
     Create and save confusion-matrix heatmap, roc- and pr curves and summary table as figures
 
