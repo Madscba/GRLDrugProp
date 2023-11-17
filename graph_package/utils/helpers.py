@@ -3,7 +3,29 @@ import colorlog
 from pathlib import Path
 from graph_package.configs.directories import Directories
 import sys
+from graph_package.configs.definitions import model_dict, dataset_dict 
+from graph_package.configs.directories import Directories
+import sys
+from collections import OrderedDict
 
+
+
+def remove_prefix_from_keys(d, prefix):
+    """
+    Recursively removes a prefix from the keys of an ordered dictionary and all its sub-dictionaries.
+
+    Args:
+        d (OrderedDict): The ordered dictionary to modify.
+        prefix (str): The prefix to remove from the keys.
+
+    Returns:
+        OrderedDict: The modified ordered dictionary.
+    """
+    new_dict = OrderedDict()
+    for key, value in d.items():
+        new_key = key[len(prefix):] if key.startswith(prefix) else key
+        new_dict[new_key] = value
+    return new_dict
 
 def init_logger():
     # Create a logger object
