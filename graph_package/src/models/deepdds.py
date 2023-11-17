@@ -144,7 +144,7 @@ class DeepDDS(nn.Module):
         # Concatenate the output of the MLP and the GNN
         concat_in = torch.cat([mlp_out, features_left, features_right], dim=1)
 
-        return self.final(concat_in)
+        return self.final(concat_in).squeeze()
 
 
 

@@ -24,3 +24,4 @@ graph_package/outputs
 .venv
 *.out
 plots/*
+scrapbook.py
