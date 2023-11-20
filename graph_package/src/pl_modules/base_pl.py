@@ -1,46 +1,36 @@
 from pytorch_lightning import LightningModule
-from graph_package.src.models import RESCAL
-from graph_package.src.error_analysis.utils import (
-    save_performance_plots,
-    save_model_pred,
-)
-from graph_package.configs.directories import Directories
+from graph_package.src.models import DeepDDS, DeepDDS_HPC
 from torch.optim import Adam
-from torch.nn import BCELoss, BCEWithLogitsLoss, ModuleDict
-from torchmetrics import AUROC, AveragePrecision
+from torch.nn import ModuleDict, BCEWithLogitsLoss
+from torchmetrics import AUROC
 from torchmetrics.classification import (
-    AveragePrecision,
     Accuracy,
     AveragePrecision,
     CalibrationError,
     ConfusionMatrix,
     F1Score,
 )
-from graph_package.src.error_analysis.utils import get_performance_curve
 
 import torch
 
 
-class Rescal_PL(LightningModule):
-    def __init__(self, ent_tot, rel_tot, dim=100, lr: float = 1e-4):
+class BasePL(LightningModule):
+    def __init__(self, model, model_name, lr: float = 0.001):
         super().__init__()
         self.lr = lr
-        self.model = RESCAL(ent_tot, rel_tot, dim)
-        self.loss_func = BCEWithLogitsLoss()  # BCELoss()
+        self.loss_func = BCEWithLogitsLoss()
         self.val_metrics = self.build_metrics(type="val")
-        self.test_metrics = self.build_metrics(type="test")
+        self.test_metrics = self.build_test_metrics(type="test")
+        self.model = model
+        self.model_name = model_name
+        self.test_step_outputs = {}
 
     def forward(self, inputs):
-        h_index, t_index, r_index = (
-            inputs[:, 0].reshape(1, -1),
-            inputs[:, 1].reshape(1, -1),
-            inputs[:, 2].reshape(1, -1),
-        )
-        return self.model(h_index, t_index, r_index)
+        return self.model(inputs)
 
     def _step(self, batch):
-        inputs = batch[:, :3]
-        target = batch[:, 3].to(dtype=torch.float32)  # needs to be float 32
+        inputs = batch[0]
+        target = batch[1]
         preds = self(inputs)
         preds = preds.view(-1)
         loss = self.loss_func(preds, target)
@@ -84,8 +74,14 @@ class Rescal_PL(LightningModule):
             else:
                 df_cm = val.cpu()
 
-        save_performance_plots(df_cm, metrics, preds, target)
-        save_model_pred(batch_idx, batch, preds, target)
+        self.test_step_outputs = {
+            "df_cm": df_cm,
+            "metrics": metrics,
+            "preds": preds,
+            "target": target,
+            "batch": batch,
+            "batch_idx": batch_idx,
+        }
 
         return
 
@@ -96,10 +92,19 @@ class Rescal_PL(LightningModule):
         kwargs = {"task": "binary"}
         module_dict = ModuleDict(
             {
+                f"{type}_auroc": AUROC(**kwargs),
+                f"{type}_auprc": AveragePrecision(**kwargs),
+            }
+        )
+        return module_dict
+
+    def build_test_metrics(self, type):
+        kwargs = {"task": "binary"}
+        module_dict = ModuleDict(
+            {
                 f"{type}_auprc": AveragePrecision(**kwargs),
                 f"{type}_auroc": AUROC(**kwargs),
                 f"{type}_accuracy": Accuracy(**kwargs),
-                f"{type}_average_precision": AveragePrecision(**kwargs),
                 f"{type}_calibration_error": CalibrationError(**kwargs),
                 f"{type}_confusion_matrix": ConfusionMatrix(**kwargs),
                 f"{type}_F1": F1Score(**kwargs),

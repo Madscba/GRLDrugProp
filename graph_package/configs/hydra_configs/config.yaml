@@ -1,16 +1,16 @@
 # DONT CHANGE THIS FILE
 defaults:
-  - model: deepdds # override model by writing model=rescal as command line argument to run_err_analysis.py
+  - model: deepdds # override model by writing model=rescal or model=hybridmodel as command line argument to main.py
+
 
 run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
 dataset:  'oneil' # deepdds_original to try the original deepdds dataset
-batch_sizes: {"train": 128, "test": 10000, "val": 1000}
-n_splits: 5
+batch_sizes: {"train": 128, "val": 1000, "test": 10000}
+n_splits: 10
 seed: 43
 remove_old_checkpoints: True
-
 
 checkpoint_callback:
   monitor: 'val_auroc'
@@ -19,8 +19,8 @@ checkpoint_callback:
   save_top_k: 1
 
 trainer:
-  check_val_every_n_epoch: 1
-  max_epochs: 30
+  check_val_every_n_epoch: 10
+  max_epochs: 100
   enable_checkpointing: True
   enable_progress_bar: True
   limit_test_batches: 1000

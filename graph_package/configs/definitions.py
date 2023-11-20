@@ -1,14 +1,12 @@
-from graph_package.src.models import DeepDDS, RESCAL
-from graph_package.src.pl_modules import DeepDDS_PL, Rescal_PL
-from graph_package.src.etl.dataloaders import DeepDDS_DataSet, RESCAL_DataSet
+from graph_package.src.models import DeepDDS, RESCAL, DeepDDS_HPC, HybridModel
 from graph_package.configs.directories import Directories  
 
-model_dict = {"deepdds": DeepDDS_PL, "rescal": Rescal_PL}
+
+model_dict = {"deepdds": DeepDDS, "rescal": RESCAL, "deepdds_hpc": DeepDDS_HPC, "hybridmodel": HybridModel}
 
 dataset_dict = {"oneil": Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv",
-                "deepdds_original":  Directories.DATA_PATH / "gold" / "oneil" / "deepdds_original.csv"}
+                "deepdds_original":  Directories.DATA_PATH / "gold" / "deepdds_original" / "deepdds_original.csv"}
 
-dataloader_dict = {
-    "deepdds": DeepDDS_DataSet,
-    "rescal": RESCAL_DataSet,
-}
+
+
+

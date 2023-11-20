@@ -1,0 +1,10 @@
+deepdds:
+  dataset_path: ''
+rescal: 
+  dim: 100
+  ent_tot: ''
+  rel_tot: ''
+
+ckpt_path: ''
+hpc: False
+pretrain_model: "rescal"

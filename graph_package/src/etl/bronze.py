@@ -8,14 +8,20 @@ import aiohttp
 from tqdm import tqdm
 from pathlib import Path
 import json
+import ssl
 
 logger = init_logger()
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
 
 
 def download_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
     if not data_path.exists():
-        Path(Directories.DATA_PATH / "bronze" / "drugcomb").mkdir(exist_ok=True,parents=True)
+        Path(Directories.DATA_PATH / "bronze" / "drugcomb").mkdir(
+            exist_ok=True, parents=True
+        )
         logger.info("Downloading DrugComb dataset.")
         url = "https://drugcomb.fimm.fi/jing/summary_v_1_5.csv"
         response = requests.get(url, stream=True)
@@ -36,7 +42,9 @@ async def download_info_drugcomb(
     file_name: str = "drug_dict.json",
 ):
     drug_dict = {}
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(ssl=ssl_context)
+    ) as session:
         tasks = []
         for i in range(1, n_entities + 1):
             url = f"{base_url}/{i}"
@@ -92,7 +100,7 @@ def download_drug_info_drugcomb(overwrite=True):
 
 def get_drugcomb():
     download_drugcomb()
-    download_drug_info_drugcomb(overwrite=False)
+    download_drug_info_drugcomb()
     download_cell_line_info_drugcomb()
 
 
