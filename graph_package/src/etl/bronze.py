@@ -11,11 +11,11 @@ import jsonlines
 import json
 import ssl
 
+logger = init_logger()
+
 ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
-
-logger = init_logger()
 
 def write_jsonl(file_path, data):
     with jsonlines.open(file_path, mode='w') as writer:
@@ -40,7 +40,9 @@ def load_block_ids(file_path):
 def download_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
     if not data_path.exists():
-        Path(Directories.DATA_PATH / "bronze" / "drugcomb").mkdir(exist_ok=True,parents=True)
+        Path(Directories.DATA_PATH / "bronze" / "drugcomb").mkdir(
+            exist_ok=True, parents=True
+        )
         logger.info("Downloading DrugComb dataset.")
         url = "https://drugcomb.fimm.fi/jing/summary_v_1_5.csv"
         response = requests.get(url, stream=True)
