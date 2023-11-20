@@ -99,48 +99,61 @@ def error_diagnostics_plots(model_names):
 
     # enrich predictions with vocabularies and meta data
     combined_df, pred_dfs = enrich_model_predictions(model_names, pred_dfs)
-    combined_legend = "&".join(model_names)
+    combined_legend = ["&".join(model_names)]
 
-    ##Investigate triplet (drug,drug, cell line)
+    ##Investigate triplet (drug,drug, cell line), "triplet_name"
     barplot_mean_correct_prediction_grouped_by_entity(
-        pred_dfs, model_names, ["triplet_idx"], title="triplet_single_model"
+        pred_dfs, model_names, ["triplet_idx"], "triplet_single_model", "triplet_name"
     )
     barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["triplet_idx"], title="triplet"
-    )
-
-    ##Investigate drug pairs
-    barplot_mean_correct_prediction_grouped_by_entity(
-        pred_dfs, model_names, ["drug_pair_idx"], title="drug_pair_single_model"
-    )
-    barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["drug_pair_idx"], title="drug_pair"
+        [combined_df], combined_legend, ["triplet_idx"], "triplet", "triplet_name"
     )
 
-    ##Investigate cancer cell line
+    ##Investigate drug pairs, "drug_pair_name"
     barplot_mean_correct_prediction_grouped_by_entity(
-        pred_dfs, model_names, ["context_features_id"], title="cancer_cell_single_model"
+        pred_dfs,
+        model_names,
+        ["drug_pair_idx"],
+        "drug_pair_single_model",
+        "drug_pair_name",
     )
     barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["context_features_id"], title="cancer_cell"
-    )
-
-    ##Investigate drug target
-    combined_df["drug_targets_idx"] = combined_df.apply(
-        map_to_index, axis=1, cols=["target_type", "target_type_right"]
-    )
-    barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["drug_targets_idx"], title="drug_target_types"
+        [combined_df], combined_legend, ["drug_pair_idx"], "drug_pair", "drug_pair_name"
     )
 
-    # Investigate disease id
+    ##Investigate cancer cell line, "rel_name"
     barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["disease_id"], title="disease_id"
+        pred_dfs,
+        model_names,
+        ["context_features_id"],
+        "cancer_cell_single_model",
+        "rel_name",
+    )
+    barplot_mean_correct_prediction_grouped_by_entity(
+        [combined_df],
+        combined_legend,
+        ["context_features_id"],
+        "cancer_cell",
+        "rel_name",
     )
 
-    # Investigate tissue
+    ##Investigate drug target, "drug_targets_name"
     barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["tissue_id"], title="tissue_id"
+        [combined_df],
+        combined_legend,
+        ["drug_targets_idx"],
+        "drug_target_types",
+        "drug_targets_name",
+    )
+
+    # Investigate disease id, "disease_id"
+    barplot_mean_correct_prediction_grouped_by_entity(
+        [combined_df], combined_legend, ["disease_id"], "disease_id", "disease_id"
+    )
+
+    # Investigate tissue, "name"
+    barplot_mean_correct_prediction_grouped_by_entity(
+        [combined_df], combined_legend, ["tissue_id"], "tissue_id", "name"
     )
 
     ##Investigate single drug

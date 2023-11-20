@@ -270,7 +270,7 @@ def find_best_model_ckpt(ckpt_folder):
 
 
 def barplot_mean_correct_prediction_grouped_by_entity(
-    pred_dfs, model_names, group_by_columns, title
+    pred_dfs, model_names, group_by_columns, title, xlabels
 ):
     """
     Generate and save barplot
@@ -288,20 +288,26 @@ def barplot_mean_correct_prediction_grouped_by_entity(
         save_path.mkdir(exist_ok=True, parents=True)
 
     for i, df in enumerate(pred_dfs):
-        grouped_df = df.groupby(group_by_columns).agg({"correct_pred": "mean"})
+        grouped_df = df.groupby(group_by_columns).agg(
+            {"correct_pred": "mean", xlabels: "max"}
+        )
         sorted_df = sort_df_by_mean_correct_pred(grouped_df)
         top20_df = sorted_df.tail(20)
 
         plt.figure(figsize=(20, 10))
         plt.subplot(1, 2, 1)
         sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-        plt.xticks(rotation=90)
+        # plt.xticks(rotation=90)
+        plt.gca().set_xticks(range(len(sorted_df)))
+        plt.gca().set_xticklabels(sorted_df[xlabels])
         plt.title(f"{title}\nmean correct prediction")
         plt.legend([model_names[i]])
 
         plt.subplot(1, 2, 2)
         top20_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-        plt.xticks(rotation=90)
+        # plt.xticks(rotation=90)
+        plt.gca().set_xticks(range(len(top20_df)))
+        plt.gca().set_xticklabels(top20_df[xlabels])
         plt.title(f"{title}\ntop 20 w. lowest mean correct prediction")
         plt.legend([model_names[i]])
 
@@ -533,6 +539,11 @@ def enrich_model_predictions(model_names, pred_dfs):
         df["correct_pred"] = np.isclose(df["pred_thresholded"], df["targets"]).astype(
             int
         )
+
+        df = merge_vocabs_with_predictions(df, df_ent_vocab, df_rel_vocab)
+        df = merge_cell_line_and_drug_info(df, cell_line_meta_data, drug_meta_data)
+        df["model_name"] = model_names[idx]
+
         df["drug_pair_idx"] = df.apply(
             map_to_index,
             axis=1,
@@ -547,10 +558,30 @@ def enrich_model_predictions(model_names, pred_dfs):
                 "context_features_id",
             ],
         )
-        df["model_name"] = model_names[idx]
+        df["drug_targets_idx"] = df.apply(
+            map_to_index, axis=1, cols=["target_type", "target_type_right"]
+        )
 
-        df = merge_vocabs_with_predictions(df, df_ent_vocab, df_rel_vocab)
-        df = merge_cell_line_and_drug_info(df, cell_line_meta_data, drug_meta_data)
+        df["triplet_name"] = df.apply(
+            lambda row: ",".join(
+                [str(row[key]) for key in ["dname", "dname_right", "rel_name"]]
+            ),
+            axis=1,
+        )
+        df["drug_targets_name"] = df.apply(
+            lambda row: ",".join(
+                [str(row[key]) for key in ["target_type", "target_type_right"]]
+            ),
+            axis=1,
+        )
+        df["drug_pair_name"] = df.apply(
+            lambda row: ",".join([str(row[key]) for key in ["dname", "dname_right"]]),
+            axis=1,
+        )
+
+        # add triplet name
+        # add drug pair name
+        # add
         new_pred_dfs.append(df)
     get_bce_loss(pred_dfs)
     pred_dfs = new_pred_dfs
