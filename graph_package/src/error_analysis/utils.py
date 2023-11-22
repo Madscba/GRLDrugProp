@@ -310,7 +310,7 @@ def barplot_mean_correct_prediction_grouped_by_entity(
         plt.gca().set_xticklabels(top20_df[xlabels])
         plt.title(f"{title}\ntop 20 w. lowest mean correct prediction")
         plt.legend([model_names[i]])
-
+        plt.tight_layout()
         plt.savefig(save_path / f"{title}_bar_{model_names[i]}")
         plt.show()
         plt.clf()
@@ -587,4 +587,13 @@ def enrich_model_predictions(model_names, pred_dfs):
     pred_dfs = new_pred_dfs
     del new_pred_dfs
     combined_df = pd.concat(pred_dfs)
-    return combined_df, pred_dfs
+
+    if len(pred_dfs) != 2:
+        print("Pairwise comparison is only implemented for 2 models")
+        return combined_df, pred_dfs
+    elif len(pred_dfs) == 2:
+        diff_df = pred_dfs[0].copy()
+        diff_df["correct_pred"] = -abs(
+            pred_dfs[0]["correct_pred"] - pred_dfs[1]["correct_pred"]
+        )
+        return combined_df, pred_dfs, diff_df

@@ -98,63 +98,76 @@ def error_diagnostics_plots(model_names):
     pred_dfs = [get_prediction_dataframe(pred_file) for pred_file in pred_file_names]
 
     # enrich predictions with vocabularies and meta data
-    combined_df, pred_dfs = enrich_model_predictions(model_names, pred_dfs)
     combined_legend = ["&".join(model_names)]
+    diff_legend = ["negative absolute difference"]
+    if len(model_names) == 2:
+        combined_df, pred_dfs, diff_df = enrich_model_predictions(model_names, pred_dfs)
+        df_lists = [pred_dfs, [combined_df], [diff_df]]
+        title_suffix = ["single_model", "both", "diff"]
+        legend_list = [model_names, combined_legend, diff_legend]
+    else:
+        combined_df, pred_dfs = enrich_model_predictions(model_names, pred_dfs)
+        df_lists = [pred_dfs, [combined_df]]
+        title_suffix = ["single_model", "both"]
+        legend_list = [model_names, combined_legend]
 
     ##Investigate triplet (drug,drug, cell line), "triplet_name"
-    barplot_mean_correct_prediction_grouped_by_entity(
-        pred_dfs, model_names, ["triplet_idx"], "triplet_single_model", "triplet_name"
-    )
-    barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["triplet_idx"], "triplet", "triplet_name"
-    )
+    triplet_titles = [f"triplet_{title}" for title in title_suffix]
+    for idx, df_list in enumerate(df_lists):
+        barplot_mean_correct_prediction_grouped_by_entity(
+            df_list,
+            legend_list[idx],
+            ["triplet_idx"],
+            triplet_titles[idx],
+            "triplet_name",
+        )
 
     ##Investigate drug pairs, "drug_pair_name"
-    barplot_mean_correct_prediction_grouped_by_entity(
-        pred_dfs,
-        model_names,
-        ["drug_pair_idx"],
-        "drug_pair_single_model",
-        "drug_pair_name",
-    )
-    barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["drug_pair_idx"], "drug_pair", "drug_pair_name"
-    )
+    drug_pair_titles = [f"drug_pair_{title}" for title in title_suffix]
+    for idx, df_list in enumerate(df_lists):
+        barplot_mean_correct_prediction_grouped_by_entity(
+            df_list,
+            legend_list[idx],
+            ["drug_pair_idx"],
+            drug_pair_titles[idx],
+            "drug_pair_name",
+        )
 
     ##Investigate cancer cell line, "rel_name"
-    barplot_mean_correct_prediction_grouped_by_entity(
-        pred_dfs,
-        model_names,
-        ["context_features_id"],
-        "cancer_cell_single_model",
-        "rel_name",
-    )
-    barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df],
-        combined_legend,
-        ["context_features_id"],
-        "cancer_cell",
-        "rel_name",
-    )
+    cancer_cell_line_titles = [f"cancer_cell_{title}" for title in title_suffix]
+    for idx, df_list in enumerate(df_lists):
+        barplot_mean_correct_prediction_grouped_by_entity(
+            df_list,
+            legend_list[idx],
+            ["context_features_id"],
+            cancer_cell_line_titles[idx],
+            "rel_name",
+        )
 
     ##Investigate drug target, "drug_targets_name"
-    barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df],
-        combined_legend,
-        ["drug_targets_idx"],
-        "drug_target_types",
-        "drug_targets_name",
-    )
+    drug_targets_titles = [f"drug_targets_{title}" for title in title_suffix]
+    for idx, df_list in enumerate(df_lists):
+        barplot_mean_correct_prediction_grouped_by_entity(
+            df_list,
+            legend_list[idx],
+            ["drug_targets_idx"],
+            drug_targets_titles[idx],
+            "drug_targets_name",
+        )
 
     # Investigate disease id, "disease_id"
-    barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["disease_id"], "disease_id", "disease_id"
-    )
+    disease_titles = [f"disease_{title}" for title in title_suffix]
+    for idx, df_list in enumerate(df_lists):
+        barplot_mean_correct_prediction_grouped_by_entity(
+            df_list, legend_list[idx], ["disease_id"], disease_titles[idx], "disease_id"
+        )
 
     # Investigate tissue, "name"
-    barplot_mean_correct_prediction_grouped_by_entity(
-        [combined_df], combined_legend, ["tissue_id"], "tissue_id", "name"
-    )
+    tissue_titles = [f"tissue_{title}" for title in title_suffix]
+    for idx, df_list in enumerate(df_lists):
+        barplot_mean_correct_prediction_grouped_by_entity(
+            df_list, legend_list[idx], ["tissue_id"], tissue_titles[idx], "name"
+        )
 
     ##Investigate single drug
     save_path = Directories.OUTPUT_PATH / "err_diagnostics"
