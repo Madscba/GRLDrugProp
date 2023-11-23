@@ -1,7 +1,7 @@
 from graph_package.configs.directories import Directories
 import torch
 from typing import List, Tuple, Dict
-from graph_package.configs.definitions import model_dict, dataset_dict 
+from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from graph_package.configs.directories import Directories
 from graph_package.src.pl_modules import BasePL
@@ -23,8 +23,8 @@ def pretrain_single_model(config, data_loaders, k):
         shutil.rmtree(check_point_path)
 
     checkpoint_callback = ModelCheckpoint(
-            dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
-        )
+        dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
+    )
 
     model = init_model(model=model_name, model_kwargs=config.model[model_name])
 
@@ -61,10 +61,10 @@ def load_data(dataset: str = "oneil"):
     return data_loader
 
 
-def init_model(model: str = "deepdds", model_kwargs: dict = {}):
+def init_model(model_name: str = "deepdds", model_kwargs: dict = {}):
     """Load model from registry"""
-    model = model_dict[model.lower()](**model_kwargs)
-    pl_module = BasePL(model)
+    model = model_dict[model_name.lower()](**model_kwargs)
+    pl_module = BasePL(model, model_name)
     return pl_module
 
 
@@ -75,15 +75,18 @@ def get_model_name(config: dict, sys_args: List[str]):
     else:
         return "deepdds"
 
+
 def update_rescal_args(dataset):
     update_dict = {
-            "ent_tot": dataset.num_nodes,
-            "rel_tot": int(dataset.num_relations),
-        }
+        "ent_tot": dataset.num_nodes,
+        "rel_tot": int(dataset.num_relations),
+    }
     return update_dict
 
+
 def update_deepdds_args(config):
-        return {"dataset_path": dataset_dict[config.dataset]}
+    return {"dataset_path": dataset_dict[config.dataset]}
+
 
 def update_model_kwargs(config: dict, model_name: str, dataset):
     if model_name == "deepdds":
@@ -93,7 +96,7 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
         config.model.rescal.update(update_rescal_args(dataset))
-    
+
 
 def get_checkpoint_path(model_name: str, k: int):
     checkpoint_path = Directories.CHECKPOINT_PATH / model_name / f"fold_{k}"
@@ -103,7 +106,7 @@ def get_checkpoint_path(model_name: str, k: int):
 
 def get_dataloaders(datasets: List[DataLoader], batch_sizes: Dict[str, int]):
     dataloaders = {}
-    for dataset, (key,val) in zip(datasets, batch_sizes.items()):
+    for dataset, (key, val) in zip(datasets, batch_sizes.items()):
         dataloaders[key] = DataLoader(dataset, batch_size=val, num_workers=0)
     return dataloaders
 

@@ -30,16 +30,12 @@ def load_cell_info_drugcomb():
 
 
 def agg_loewe_and_make_binary(df: pd.DataFrame):
-    sub_df = (
-        df.groupby(["drug_1_name", "drug_2_name", "cell_line_name"])
-        .mean()
-        .reset_index()
-    )
-    sub_df["synergy_loewe"] = sub_df["synergy_loewe"].apply(
+    sub_df = df.groupby(["drug_1_name", "drug_2_name", "context"]).mean().reset_index()
+    sub_df["label"] = sub_df["label"].apply(
         lambda x: 0 if x < 0 else (1 if x > 10 else pd.NA)
     )
     # sub_df["drug_row"], sub_df["drug_col"]  = df["drug_row"].reset_index(), df["drug_col"].reset_index()
-    sub_df.dropna(subset=["synergy_loewe"], inplace=True)
+    sub_df.dropna(subset=["label"], inplace=True)
     return sub_df
 
 
@@ -145,12 +141,11 @@ def make_original_deepdds_dataset():
     df, drug_vocab = create_drug_id_vocabs(df)
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
     for vocab, name in zip(
-        (drug_vocab, cell_line_vocab),
-        ["entity_vocab.json", "relation_vocab.json"]):
-
+        (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
+    ):
         with open(save_path / name, "w") as json_file:
             json.dump(vocab, json_file)
-    
+
     df = df[
         [
             "drug_1_name",
@@ -164,7 +159,8 @@ def make_original_deepdds_dataset():
     ]
     assert df.isna().sum().sum() == 0
     df.to_csv(
-        Directories.DATA_PATH / "gold" / "deepdds_original" / "deepdds_original.csv", index=False
+        Directories.DATA_PATH / "gold" / "deepdds_original" / "deepdds_original.csv",
+        index=False,
     )
 
 
@@ -179,6 +175,7 @@ def make_triplets_oneil():
         "cell_line_name": "context",
         "drug_row_id": "drug_1_id",
         "drug_col_id": "drug_2_id",
+        # "context": "context_id"
     }
     df.rename(columns=rename_dict, inplace=True)
 
@@ -186,18 +183,17 @@ def make_triplets_oneil():
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
     df = agg_loewe_and_make_binary(df)
 
-    df = df[rename_dict.values()]
+    df = df[list(rename_dict.values()) + ["context_id"]]
 
     for vocab, name in zip(
-        (drug_vocab, cell_line_vocab),
-        ["entity_vocab.json", "relation_vocab.json"]):
-
+        (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
+    ):
         with open(save_path / name, "w") as json_file:
             json.dump(vocab, json_file)
-        
+
     df.to_csv(save_path / "oneil.csv", index=False)
 
 
 if __name__ == "__main__":
-    # make_triplets_oneil()
+    make_triplets_oneil()
     make_original_deepdds_dataset()

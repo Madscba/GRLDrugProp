@@ -10,10 +10,11 @@ from graph_package.src.main_utils import (
     get_dataloaders,
     split_dataset,
     update_model_kwargs,
-    pretrain_single_model
+    pretrain_single_model,
 )
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
+from graph_package.src.pl_modules.callbacks import TestDiagnosticCallback
 from graph_package.configs.directories import Directories
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import hydra
@@ -25,7 +26,6 @@ import sys
 import wandb
 import shutil
 
-    
 
 @hydra.main(
     config_path=str(Directories.CONFIG_PATH / "hydra_configs"),
@@ -47,8 +47,6 @@ def main(config):
         check_point_path = Directories.CHECKPOINT_PATH / model_name
         if os.path.isdir(check_point_path):
             shutil.rmtree(check_point_path)
-    
-
 
     for k, (train_idx, test_idx) in enumerate(
         kfold.split(dataset, dataset.get_labels(dataset.indices))
@@ -67,7 +65,7 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = []
+        call_backs = [TestDiagnosticCallback()]
 
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
@@ -88,22 +86,22 @@ def main(config):
         call_backs.append(checkpoint_callback)
 
         if (model_name == "hybridmodel") and config.model.pretrain_model:
-            check_point = pretrain_single_model(config,data_loaders,k)
+            check_point = pretrain_single_model(config, data_loaders, k)
             config.model.update({"ckpt_path": check_point})
 
-        model = init_model(model=model_name, model_kwargs=config.model)
+        model = init_model(model_name=model_name, model_kwargs=config.model)
 
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-
         trainer.fit(
             model,
             train_dataloaders=data_loaders["train"],
             val_dataloaders=data_loaders["val"],
         )
+
         trainer.test(
             model,
             dataloaders=data_loaders["test"],
