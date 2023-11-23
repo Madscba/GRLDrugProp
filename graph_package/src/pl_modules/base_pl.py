@@ -2,7 +2,7 @@ from pytorch_lightning import LightningModule
 from graph_package.src.pl_modules.metrics import RegMetrics, ClfMetrics
 from torchmetrics import MeanSquaredError
 from torch.optim import Adam
-from torch.nn import ModuleDict, BCEWithLogitsLoss
+from torch.nn import ModuleDict, BCEWithLogitsLoss, MSELoss
 from torchmetrics import AUROC
 from torchmetrics.classification import (
     Accuracy,
