@@ -5,7 +5,7 @@ from graph_package.src.etl.gold import make_oneil_dataset, make_oneil_legacy_dat
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--update", type=str, default="gold")
+    parser.add_argument("--update", type=str, default="full")
     args = parser.parse_args()
     if (args.update == "bronze") | (args.update == "full"):
         get_drugcomb()
