@@ -24,7 +24,8 @@ class RegMetrics(torch.nn.Module):
         target_clf = target.apply_(lambda x: 1 if x >= 10 else 0).to(torch.int64)
         clf_metrics = {key:metric(preds,target_clf) for key,metric in self.clf_metrics.items()}
         reg_metrics = {key:metric(preds,target) for key, metric in self.reg_metrics.items()}
-        return clf_metrics.update(reg_metrics)
+        clf_metrics.update(reg_metrics)
+        return clf_metrics
 
 class ClfMetrics(torch.nn.Module):
     def __init__(self, type):

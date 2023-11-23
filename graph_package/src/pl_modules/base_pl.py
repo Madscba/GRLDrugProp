@@ -64,7 +64,7 @@ class BasePL(LightningModule):
         loss, target, preds = self._step(batch)
         metrics = self.test_metrics(preds, target)
         for key, val in metrics.items():
-            if "confusion" not in key:
+            if "CM" not in key:
                 self.log(
                     f"{key}",
                     val,
