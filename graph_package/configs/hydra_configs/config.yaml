@@ -7,6 +7,7 @@ run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
 batch_sizes: {"train": 128,"val": 1000, "test": 10000}
+group_val: False
 
 n_splits: 5
 seed: 43
