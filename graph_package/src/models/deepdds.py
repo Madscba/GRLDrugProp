@@ -155,6 +155,7 @@ class DeepDDS(nn.Module):
 class DeepDDS_HPC(DeepDDS):
     def __init__(
         self,
+        dataset_path,
         context_channels: int = 288,
         context_hidden_dims: List[int] = (2048, 512),
         drug_channels: int = TORCHDRUG_NODE_FEATURES,
