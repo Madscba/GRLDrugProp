@@ -15,3 +15,4 @@ class Directories:
     TESTS = REPO_PATH / "tests"
     TESTS_DATA = TESTS / "data"
     LOGGING_FOLDER = REPO_PATH / "logs"
+    OUTPUT_PATH = REPO_PATH / "outputs"

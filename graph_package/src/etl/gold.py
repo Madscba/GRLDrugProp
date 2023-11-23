@@ -147,12 +147,11 @@ def make_original_deepdds_dataset():
     df, drug_vocab = create_drug_id_vocabs(df)
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
     for vocab, name in zip(
-        (drug_vocab, cell_line_vocab),
-        ["entity_vocab.json", "relation_vocab.json"]):
-
+        (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
+    ):
         with open(save_path / name, "w") as json_file:
             json.dump(vocab, json_file)
-    
+
     df = df[
         [
             "drug_1_name",
@@ -166,7 +165,8 @@ def make_original_deepdds_dataset():
     ]
     assert df.isna().sum().sum() == 0
     df.to_csv(
-        Directories.DATA_PATH / "gold" / "deepdds_original" / "deepdds_original.csv", index=False
+        Directories.DATA_PATH / "gold" / "deepdds_original" / "deepdds_original.csv",
+        index=False,
     )
 
 def make_oneil_legacy_dataset():
@@ -181,6 +181,7 @@ def make_oneil_legacy_dataset():
         "cell_line_name": "context",
         "drug_row_id": "drug_1_id",
         "drug_col_id": "drug_2_id",
+        # "context": "context_id"
     }
     df.rename(columns=rename_dict, inplace=True)
 
@@ -192,12 +193,11 @@ def make_oneil_legacy_dataset():
     df = df[cols_to_keep]
 
     for vocab, name in zip(
-        (drug_vocab, cell_line_vocab),
-        ["entity_vocab.json", "relation_vocab.json"]):
-
+        (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
+    ):
         with open(save_path / name, "w") as json_file:
             json.dump(vocab, json_file)
-        
+
     df.to_csv(save_path / "oneil.csv", index=False)
 
 

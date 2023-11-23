@@ -45,7 +45,7 @@ To test it run in same terminal:
 
 ```bash
 voltash
-python graph_package/src/main.py
+python graph_package/src/run_err_analysis.py
 ```
 When submitting jobs you have to provide ```module load cuda/12.1``` in your bash script. 
 

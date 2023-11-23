@@ -2,10 +2,12 @@
 defaults:
   - model: deepdds # override model by writing model=rescal or model=hybridmodel as command line argument to main.py
 
+
 run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
 batch_sizes: {"train": 128,"val": 1000, "test": 10000}
+
 n_splits: 5
 seed: 43
 remove_old_checkpoints: True
@@ -27,7 +29,7 @@ trainer:
   enable_checkpointing: True
   enable_progress_bar: True
   limit_test_batches: 1000
-  fast_dev_run: False 
+  fast_dev_run: False
 
 
 
