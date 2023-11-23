@@ -26,7 +26,7 @@ def pretrain_single_model(config, data_loaders, k):
         dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
     )
 
-    model = init_model(model=model_name, model_kwargs=config.model[model_name])
+    model = init_model(model=model_name, task = config.task, model_kwargs=config.model[model_name])
 
     trainer = Trainer(
         logger=[],
@@ -54,17 +54,18 @@ def reset_wandb_env():
             del os.environ[k]
 
 
-def load_data(dataset: str = "oneil"):
+def load_data(dataset_config: dict, task="reg"):
     """Fetch formatted data depending on modelling task"""
-    dataset_path = dataset_dict[dataset.lower()]
-    data_loader = KnowledgeGraphDataset(dataset_path)
+    dataset_path = dataset_dict[dataset_config.name.lower()]
+    data_loader = KnowledgeGraphDataset(dataset_path, task = task, target = dataset_config.target)
     return data_loader
 
 
-def init_model(model_name: str = "deepdds", model_kwargs: dict = {}):
+
+def init_model(model: str = "deepdds", task: str ='clf', model_kwargs: dict = {}):
     """Load model from registry"""
-    model = model_dict[model_name.lower()](**model_kwargs)
-    pl_module = BasePL(model, model_name)
+    model = model_dict[model.lower()](**model_kwargs)
+    pl_module = BasePL(model,task = task)
     return pl_module
 
 
@@ -85,7 +86,7 @@ def update_rescal_args(dataset):
 
 
 def update_deepdds_args(config):
-    return {"dataset_path": dataset_dict[config.dataset]}
+        return {"dataset_path": dataset_dict[config.dataset.name]}
 
 
 def update_model_kwargs(config: dict, model_name: str, dataset):

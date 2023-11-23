@@ -36,7 +36,7 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    dataset = load_data(dataset=config.dataset)
+    dataset = load_data(dataset_config=config.dataset, task = config.task)
     update_model_kwargs(config, model_name, dataset)
 
     kfold = StratifiedKFold(
@@ -89,7 +89,8 @@ def main(config):
             check_point = pretrain_single_model(config, data_loaders, k)
             config.model.update({"ckpt_path": check_point})
 
-        model = init_model(model_name=model_name, model_kwargs=config.model)
+
+        model = init_model(model=model_name,task=config.task, model_kwargs=config.model)
 
         trainer = Trainer(
             logger=loggers,

@@ -1,4 +1,5 @@
 from graph_package.configs.directories import Directories
+from graph_package.src.etl.bronze import load_jsonl
 import pandas as pd
 import numpy as np
 from graph_package.utils.helpers import init_logger
@@ -30,7 +31,11 @@ def load_cell_info_drugcomb():
 
 
 def agg_loewe_and_make_binary(df: pd.DataFrame):
-    sub_df = df.groupby(["drug_1_name", "drug_2_name", "context"]).mean().reset_index()
+    sub_df = (
+        df.groupby(["drug_1_name", "drug_2_name", "context"])
+        .mean()
+        .reset_index()
+    )
     sub_df["label"] = sub_df["label"].apply(
         lambda x: 0 if x < 0 else (1 if x > 10 else pd.NA)
     )
@@ -125,6 +130,7 @@ def get_drug_cell_line_ids(df: pd.DataFrame):
 
 
 def make_original_deepdds_dataset():
+    logger.info("Making original DeepDDS dataset.")
     # Download triplets from DeepDDS repo
     save_path = Directories.DATA_PATH / "gold" / "deepdds_original"
     save_path.mkdir(parents=True, exist_ok=True)
@@ -163,9 +169,9 @@ def make_original_deepdds_dataset():
         index=False,
     )
 
-
-def make_triplets_oneil():
-    save_path = Directories.DATA_PATH / "gold" / "oneil"
+def make_oneil_legacy_dataset():
+    logger.info("Making Oneil legacy dataset.")
+    save_path = Directories.DATA_PATH / "gold" / "oneil_legacy"
     save_path.mkdir(parents=True, exist_ok=True)
     df = load_oneil()
     rename_dict = {
@@ -183,7 +189,8 @@ def make_triplets_oneil():
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
     df = agg_loewe_and_make_binary(df)
 
-    df = df[list(rename_dict.values()) + ["context_id"]]
+    cols_to_keep = list(rename_dict.values()) + ["context_id"]
+    df = df[cols_to_keep]
 
     for vocab, name in zip(
         (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
@@ -194,6 +201,47 @@ def make_triplets_oneil():
     df.to_csv(save_path / "oneil.csv", index=False)
 
 
+def get_max_zip_response(df: pd.DataFrame):
+    block_dict = load_jsonl(Directories.DATA_PATH / "silver" / "oneil" / "block_dict.json")
+    block_df = pd.DataFrame(block_dict)
+    block_df = block_df.groupby(['block_id','conc_c','conc_r']).agg({'synergy_zip': 'mean'}).reset_index()
+    block_df = block_df.groupby(['block_id']).agg({'synergy_zip': ['max', 'mean']}).reset_index()
+    block_df.columns = ['block_id', 'synergy_zip_max', 'synergy_zip_mean']  
+    df = df.merge(block_df, on='block_id', how='left',validate='1:1')
+    df = df.groupby(['drug_1_name', 'drug_2_name', 'context']).mean().reset_index()
+    label_func = lambda x: 1 if x >= 10 else 0
+    df["mean_label"] = df["synergy_zip_mean"].apply(label_func)
+    df["max_label"] = df["synergy_zip_max"].apply(label_func)
+    return df
+
+def make_oneil_dataset():
+    logger.info("Making Oneil dataset.")
+    save_path = Directories.DATA_PATH / "gold" / "oneil"
+    save_path.mkdir(parents=True, exist_ok=True)
+    df = load_oneil()
+    rename_dict = {
+        "block_id": "block_id",
+        "drug_row": "drug_1_name",
+        "drug_col": "drug_2_name",
+        "cell_line_name": "context",
+    }
+    df.rename(columns=rename_dict, inplace=True)
+    columns_to_keep = list(rename_dict.values())+["css_col","css_row"]
+    df = df[columns_to_keep]
+
+    df = get_max_zip_response(df)
+    df['css'] = (df['css_col'] + df['css_row'])/2
+    df, drug_vocab = create_drug_id_vocabs(df)
+    df, cell_line_vocab = create_cell_line_id_vocabs(df)
+    for vocab, name in zip(
+        (drug_vocab, cell_line_vocab),
+        ["entity_vocab.json", "relation_vocab.json"]):
+        with open(save_path / name, "w") as json_file:
+            json.dump(vocab, json_file)
+        
+    df.to_csv(save_path / "oneil.csv", index=False)
+
 if __name__ == "__main__":
-    make_triplets_oneil()
-    make_original_deepdds_dataset()
+    make_oneil_dataset()
+    #make_oneil_legacy_dataset()
+    #make_original_deepdds_dataset()

@@ -21,5 +21,6 @@ dependencies:
   - torchmetrics
   - pytorch-lightning
   - hydra-core
+  - jsonlines
   - pip:
     - -r requirements.txt

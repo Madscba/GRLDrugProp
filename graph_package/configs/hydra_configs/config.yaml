@@ -6,11 +6,16 @@ defaults:
 run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
-dataset:  'oneil' # deepdds_original to try the original deepdds dataset
-batch_sizes: {"train": 128, "val": 1000, "test": 10000}
+batch_sizes: {"train": 128,"val": 1000, "test": 10000}
+
 n_splits: 5
 seed: 43
 remove_old_checkpoints: True
+task: 'reg' #clf (does not work for css)
+
+dataset:  
+  name: 'oneil' # deepdds_original, oneil_legacy
+  target: 'zip_mean' # zip_max, css, loewe (legacy)
 
 checkpoint_callback:
   monitor: 'val_auroc'
@@ -18,7 +23,7 @@ checkpoint_callback:
   filename: '{epoch:02d}-{val_auroc:.4f}'
   save_top_k: 1
 
-trainer:
+trainer:  
   check_val_every_n_epoch: 1
   max_epochs: 30
   enable_checkpointing: True

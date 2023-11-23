@@ -1,5 +1,6 @@
 from pytorch_lightning import LightningModule
-from graph_package.src.models import DeepDDS, DeepDDS_HPC
+from graph_package.src.pl_modules.metrics import RegMetrics, ClfMetrics
+from torchmetrics import MeanSquaredError
 from torch.optim import Adam
 from torch.nn import ModuleDict, BCEWithLogitsLoss
 from torchmetrics import AUROC
@@ -10,20 +11,21 @@ from torchmetrics.classification import (
     ConfusionMatrix,
     F1Score,
 )
-
 import torch
+
+loss_func_dict = {"clf": BCEWithLogitsLoss(), "reg": MSELoss()}
 
 
 class BasePL(LightningModule):
-    def __init__(self, model, model_name, lr: float = 0.001):
+    def __init__(self, model, lr: float = 0.001, task: str = "clf"):
         super().__init__()
         self.lr = lr
-        self.loss_func = BCEWithLogitsLoss()
-        self.val_metrics = self.build_metrics(type="val")
-        self.test_metrics = self.build_test_metrics(type="test")
-        self.model = model
-        self.model_name = model_name
-        self.test_step_outputs = {}
+        self.task = task
+        self.loss_func = loss_func_dict[task]
+        metric  = ClfMetrics if task == "clf" else RegMetrics
+        self.val_metrics = metric("val")
+        self.test_metrics = metric("test")
+        self.model =  model
 
     def forward(self, inputs):
         return self.model(inputs)
@@ -34,7 +36,7 @@ class BasePL(LightningModule):
         preds = self(inputs)
         preds = preds.view(-1)
         loss = self.loss_func(preds, target)
-        return loss, target.to(torch.int), preds
+        return loss, target, preds
 
     def training_step(self, batch, batch_idx):
         loss, target, preds = self._step(batch)
@@ -45,7 +47,7 @@ class BasePL(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         loss, target, preds = self._step(batch)
-        metrics = {key: val(preds, target) for key, val in self.val_metrics.items()}
+        metrics = self.val_metrics(preds, target)
         self.log("val_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         for key, val in metrics.items():
             self.log(
@@ -60,7 +62,7 @@ class BasePL(LightningModule):
 
     def test_step(self, batch, batch_idx):
         loss, target, preds = self._step(batch)
-        metrics = {key: val(preds, target) for key, val in self.test_metrics.items()}
+        metrics = self.test_metrics(preds, target)
         for key, val in metrics.items():
             if "confusion" not in key:
                 self.log(
@@ -111,3 +113,4 @@ class BasePL(LightningModule):
             }
         )
         return module_dict
+
