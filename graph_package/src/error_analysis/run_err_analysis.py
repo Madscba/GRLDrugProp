@@ -204,6 +204,7 @@ def error_diagnostics_plots(model_names):
         ].drop_duplicates()
         df_pairs_new = df_sub.drug_molecules_left_id.value_counts()
         df_pairs_new.plot(kind="bar")
+        plt.title("Drug experiments per drug")
         plt.legend([model_names[idx]])
         plt.savefig(save_path / "n_experiments_per_drug_in_testset")
         plt.show()
