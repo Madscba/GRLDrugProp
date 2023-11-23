@@ -64,7 +64,7 @@ class BasePL(LightningModule):
         loss, target, preds = self._step(batch)
         metrics = self.test_metrics(preds, target)
         for key, val in metrics.items():
-            if "confusion" not in key:
+            if "CM" not in key:
                 self.log(
                     f"{key}",
                     val,
@@ -90,27 +90,5 @@ class BasePL(LightningModule):
     def configure_optimizers(self):
         return Adam(self.model.parameters(), lr=self.lr)
 
-    def build_metrics(self, type):
-        kwargs = {"task": "binary"}
-        module_dict = ModuleDict(
-            {
-                f"{type}_auroc": AUROC(**kwargs),
-                f"{type}_auprc": AveragePrecision(**kwargs),
-            }
-        )
-        return module_dict
 
-    def build_test_metrics(self, type):
-        kwargs = {"task": "binary"}
-        module_dict = ModuleDict(
-            {
-                f"{type}_auprc": AveragePrecision(**kwargs),
-                f"{type}_auroc": AUROC(**kwargs),
-                f"{type}_accuracy": Accuracy(**kwargs),
-                f"{type}_calibration_error": CalibrationError(**kwargs),
-                f"{type}_confusion_matrix": ConfusionMatrix(**kwargs),
-                f"{type}_F1": F1Score(**kwargs),
-            }
-        )
-        return module_dict
 
