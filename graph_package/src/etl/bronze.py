@@ -151,7 +151,7 @@ def download_drug_info_drugcomb(overwrite=True):
 
 
 
-def get_drugcomb(over):
+def get_drugcomb(overwrite=False):
     download_drugcomb()
     download_drug_info_drugcomb(overwrite=False)
     download_cell_line_info_drugcomb(overwrite=False)
