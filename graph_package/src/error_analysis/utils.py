@@ -95,7 +95,7 @@ def convert_metrics_to_summary_table(
     alternatively, metrics from the test_step can be used as first argument
     """
     filtered_metrics = {
-        key: val for key, val in callback_metrics.items() if "confusion" not in key
+        key: val for key, val in callback_metrics.items() if "CM" not in key
     }
 
     df = pd.DataFrame(list(filtered_metrics.items()), columns=["Metric", "Value"])

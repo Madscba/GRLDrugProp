@@ -18,7 +18,6 @@ dataset:
   target: 'zip_mean' # zip_max, css, loewe (legacy)
 
 checkpoint_callback:
-  monitor: 'val_auroc'
   mode: 'max'
   filename: '{epoch:02d}-{val_auroc:.4f}'
   save_top_k: 1

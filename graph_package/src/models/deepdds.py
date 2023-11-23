@@ -165,7 +165,7 @@ class DeepDDS_HPC(DeepDDS):
         fc_hidden_dims: List[int] = [1024, 512, 128],
         dropout: float = 0.2,
     ):
-        super().__init__(
+        super().__init__(dataset_path,
             context_channels,
             context_hidden_dims,
             drug_channels,
