@@ -10,15 +10,43 @@ from torch.utils.data import random_split, Subset
 from torchdrug.data import DataLoader
 import os
 from pytorch_lightning import Trainer
-import sys
+from sklearn.model_selection import StratifiedGroupKFold
+import numpy as np
 import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+
+def get_drug_split(dataset, config, n_drugs_per_fold = 3):
+    splits = []
+    df = dataset.data_df
+    for i in range(n_drugs_per_fold,dataset.num_nodes,n_drugs_per_fold):
+        drug_ids = list(range(i-n_drugs_per_fold,i))
+        drug_1_idx=df[df['drug_1_id'].isin(drug_ids)].index
+        drug_2_idx=df[df['drug_2_id'].isin(drug_ids)].index
+        test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
+        train_idx = list(set(dataset.data_df.index).difference(test_idx))
+        splits.append((train_idx,test_idx))
+    return splits
+    
+
+
+def get_cv_splits(dataset, config):
+    if config.group_val == "drug":
+        splits = get_drug_split(dataset, config)
+        return splits
+    else: 
+        if config.group_val == "drug_combination":
+            group = dataset.data_df.groupby(['drug_1_id', 'drug_2_id']).ngroup()
+        elif config.group_val == "cell_line":
+            group = dataset.data_df.groupby(['context_id']).ngroup()
+        else:
+            group = None
+        kfold = StratifiedGroupKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
+        return kfold.split(dataset, dataset.get_labels(dataset.indices), group)
 
 
 def pretrain_single_model(config, data_loaders, k):
     model_name = config.model.pretrain_model
     check_point_path = Directories.CHECKPOINT_PATH / model_name
-
     if os.path.isdir(check_point_path):
         shutil.rmtree(check_point_path)
 

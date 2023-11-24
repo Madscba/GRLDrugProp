@@ -11,6 +11,7 @@ from graph_package.src.main_utils import (
     split_dataset,
     update_model_kwargs,
     pretrain_single_model,
+    get_cv_splits
 )
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
@@ -19,7 +20,7 @@ from graph_package.configs.directories import Directories
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import hydra
 from dotenv import load_dotenv
-from sklearn.model_selection import StratifiedKFold, train_test_split as train_val_split
+from sklearn.model_selection import train_test_split as train_val_split
 import os
 from pytorch_lightning import Trainer
 import sys
@@ -39,18 +40,15 @@ def main(config):
     dataset = load_data(dataset_config=config.dataset, task = config.task)
     update_model_kwargs(config, model_name, dataset)
 
-    kfold = StratifiedKFold(
-        n_splits=config.n_splits, shuffle=True, random_state=config.seed
-    )
 
     if config.remove_old_checkpoints:
         check_point_path = Directories.CHECKPOINT_PATH / model_name
         if os.path.isdir(check_point_path):
             shutil.rmtree(check_point_path)
 
-    for k, (train_idx, test_idx) in enumerate(
-        kfold.split(dataset, dataset.get_labels(dataset.indices))
-    ):
+    splits = get_cv_splits(dataset, config)
+
+    for k, (train_idx, test_idx) in enumerate(splits):
         loggers = []
         if config.wandb:
             reset_wandb_env()
