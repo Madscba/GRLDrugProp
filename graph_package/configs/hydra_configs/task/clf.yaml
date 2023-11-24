@@ -1,0 +1,6 @@
+# @package _global_
+task: 'clf'
+checkpoint_callback:
+  mode: 'max'
+  filename: '{epoch:02d}-{val_auroc:.4f}'
+  save_top_k: 1
