@@ -16,15 +16,15 @@ Prerequisites: C++ Compiler (Instruction for how to install this can be found be
 
 1) Windows:
     * conda env create --file environment.yml  
-    * conda activate grap_pgk_env
+    * conda activate graph_pkg_env
 
 2) osx-64 (Intel chip):
     * conda env create --file environment.yml  
-    * conda activate grap_pgk_env
+    * conda activate graph_pkg_env
 
 3) arm-64 (Apple chip):
     * CONDA_SUBDIR=osx-64 conda env create --file environment.yml
-    * conda activate grap_pgk_env
+    * conda activate graph_pkg_env
 
 
 **PLEASE FIRST CHECK IF NEW PACKAGES ARE AVAILABLE THROUGH CONDA CHANNELS AND ADD THEM TO ```environment.yml```. USE ```pip``` AS LAST RESORT AND ADD TO ```requirements.txt```**
