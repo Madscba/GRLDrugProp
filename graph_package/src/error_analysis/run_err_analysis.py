@@ -7,7 +7,7 @@ from graph_package.src.main import (
 from graph_package.src.error_analysis.utils import (
     find_best_model_ckpt,
     barplot_mean_correct_prediction_grouped_by_entity,
-    sort_df_by_mean_correct_pred,
+    sort_df_by_metric,
     map_to_index,
     get_prediction_dataframe,
     get_node_degree,
@@ -99,17 +99,11 @@ def error_diagnostics_plots(model_names):
 
     # enrich predictions with vocabularies and meta data
     combined_legend = ["&".join(model_names)]
-    diff_legend = ["negative absolute difference"]
-    if len(model_names) == 2:
-        combined_df, pred_dfs, diff_df = enrich_model_predictions(model_names, pred_dfs)
-        df_lists = [pred_dfs, [combined_df], [diff_df]]
-        title_suffix = ["single_model", "both", "diff"]
-        legend_list = [model_names, combined_legend, diff_legend]
-    else:
-        combined_df, pred_dfs = enrich_model_predictions(model_names, pred_dfs)
-        df_lists = [pred_dfs, [combined_df]]
-        title_suffix = ["single_model", "both"]
-        legend_list = [model_names, combined_legend]
+
+    combined_df, pred_dfs = enrich_model_predictions(model_names, pred_dfs)
+    df_lists = [pred_dfs, [combined_df]]
+    title_suffix = ["single_model", "both"]
+    legend_list = [model_names, combined_legend]
 
     ##Investigate triplet (drug,drug, cell line), "triplet_name"
     triplet_titles = [f"triplet_{title}" for title in title_suffix]
@@ -120,6 +114,7 @@ def error_diagnostics_plots(model_names):
             ["triplet_idx"],
             triplet_titles[idx],
             "triplet_name",
+            add_bar_info=False,
         )
 
     ##Investigate drug pairs, "drug_pair_name"
@@ -159,7 +154,11 @@ def error_diagnostics_plots(model_names):
     disease_titles = [f"disease_{title}" for title in title_suffix]
     for idx, df_list in enumerate(df_lists):
         barplot_mean_correct_prediction_grouped_by_entity(
-            df_list, legend_list[idx], ["disease_id"], disease_titles[idx], "disease_id"
+            df_list,
+            legend_list[idx],
+            ["disease_idx"],
+            disease_titles[idx],
+            "disease_id",
         )
 
     # Investigate tissue, "name"
@@ -170,67 +169,60 @@ def error_diagnostics_plots(model_names):
         )
 
     ##Investigate single drug
+    drug_titles = [f"drug_{title}" for title in title_suffix]
     save_path = Directories.OUTPUT_PATH / "err_diagnostics"
-    for idx, df in enumerate(pred_dfs):
-        df_sub = df.loc[
-            :,
-            [
-                "drug_molecules_left_id",
-                "drug_molecules_right_id",
-                "context_features_id",
-                "predictions",
-                "correct_pred",
-                "model_name",
-                "drug_name_left",
-                "drug_name_right",
-                "rel_name",
-            ],
-        ]
-        df_sub = pd.concat(
-            (
-                df_sub,
-                df_sub.rename(
-                    columns={
-                        "drug_molecules_left_id": "drug_molecules_right_id",
-                        "drug_molecules_right_id": "drug_molecules_left_id",
-                        "drug_name_left": "drug_name_right",
-                        "drug_name_right": "drug_name_left",
-                    }
-                ),
-            )
+    for idx, df_list in enumerate(df_lists):
+        if len(df_list) > 1:
+            df_drug_without_dupl = [
+                get_drug_level_df([df_list[i]]) for i in range(len(df_list))
+            ]
+        else:
+            df_drug_without_dupl = [get_drug_level_df(df_list)]
+        barplot_mean_correct_prediction_grouped_by_entity(
+            df_drug_without_dupl,
+            legend_list[idx],
+            ["drug_molecules_left_id"],
+            drug_titles[idx],
+            "drug_name_left",
         )
-        df_sub_new = df_sub[
-            ["drug_molecules_left_id", "drug_molecules_right_id"]
-        ].drop_duplicates()
-        df_pairs_new = df_sub.drug_molecules_left_id.value_counts()
-        df_pairs_new.plot(kind="bar")
-        plt.title("Drug experiments per drug")
-        plt.legend([model_names[idx]])
-        plt.savefig(save_path / "n_experiments_per_drug_in_testset")
-        plt.show()
 
-        df_pairs_without_dupl = df_sub.iloc[df_sub_new.index]
-        df_pairs_pred = df_pairs_without_dupl.groupby("drug_molecules_left_id").agg(
-            {"correct_pred": "mean"}
-        )
-        df_pairs_pred_sorted = sort_df_by_mean_correct_pred(df_pairs_pred)
-        df_pairs_pred_sorted.plot(kind="bar")
-        plt.legend([model_names[idx]])
-        plt.savefig(save_path / "drug_mean_correct_pred_bar_plot")
-        plt.show()
 
-        df_node_degrees = pd.DataFrame(get_node_degree(), columns=["node_degree"])
-        df_drug_degree = df_pairs_without_dupl.merge(
-            df_node_degrees, left_on="drug_molecules_left_id", right_index=True
+def get_drug_level_df(df_list):
+    df = df_list[0]
+    df_sub = df.loc[
+        :,
+        [
+            "drug_molecules_left_id",
+            "drug_molecules_right_id",
+            "context_features_id",
+            "predictions",
+            "correct_pred",
+            "model_name",
+            "drug_name_left",
+            "drug_name_right",
+            "rel_name",
+            "pred_prob",
+            "targets",
+        ],
+    ]
+    df_sub = pd.concat(
+        (
+            df_sub,
+            df_sub.rename(
+                columns={
+                    "drug_molecules_left_id": "drug_molecules_right_id",
+                    "drug_molecules_right_id": "drug_molecules_left_id",
+                    "drug_name_left": "drug_name_right",
+                    "drug_name_right": "drug_name_left",
+                }
+            ),
         )
-        df_pairs_pred = df_drug_degree.groupby("node_degree").agg(
-            {"correct_pred": "mean"}
-        )
-        df_drug_degree_sorted = sort_df_by_mean_correct_pred(df_pairs_pred)
-        df_drug_degree_sorted.plot(kind="bar")
-        plt.legend([model_names[idx]])
-        plt.savefig(save_path / "drug_degree_correct_pred_bar_plot")
-        plt.show()
+    )
+    df_sub_new = df_sub[
+        ["drug_molecules_left_id", "drug_molecules_right_id"]
+    ].drop_duplicates()
+    df_drug_without_dupl = df_sub.iloc[df_sub_new.index]
+    return df_drug_without_dupl
 
 
 if __name__ == "__main__":
