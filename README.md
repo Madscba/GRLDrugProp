@@ -23,7 +23,7 @@ Prerequisites: C++ Compiler (Instruction for how to install this can be found be
     * conda activate grap_pgk_env
 
 3) arm-64 (Apple chip):
-    * CONDA_SUBDIR=osx-64 conda env create --file environment.yml
+    * CONDA_SUBDIR=osx-64 conda env create --file environment.yml 
     * conda activate grap_pgk_env
 
 

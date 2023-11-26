@@ -24,7 +24,7 @@ def generate_oneil_dataset():
     logger.info(f"Dropped {len(df_oneil)-len(df_oneil_cleaned)} NaN values.")
     df_oneil_cleaned = pd.read_csv(Directories.DATA_PATH / "silver" / "oneil" / "oneil.csv")
     unique_block_ids = df_oneil_cleaned["block_id"].unique().tolist()
-    download_response_info_oneil(unique_block_ids,overwrite=True)
+    download_response_info_oneil(unique_block_ids,overwrite=False)
     oneil_path = Directories.DATA_PATH / "silver" / "oneil"
     oneil_path.mkdir(exist_ok=True,parents=True)
     df_oneil_cleaned = df_oneil_cleaned.loc[
