@@ -52,12 +52,7 @@ def pretrain_single_model(config, data_loaders, k):
         dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
     )
 
-    if model_name == "deepdds_hpc":
-        model_kwargs_name = model_name.removesuffix('_hpc')
-    else:
-        model_kwargs_name = model_name
-
-    model = init_model(model=model_name, task = config.task, model_kwargs=config.model[model_kwargs_name])
+    model = init_model(model=model_name, task = config.task, model_kwargs=config.model[model_name])
 
     trainer = Trainer(
         logger=[],

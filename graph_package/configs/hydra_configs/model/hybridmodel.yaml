@@ -6,5 +6,4 @@ rescal:
   rel_tot: ''
 
 ckpt_path: ''
-hpc: False
 pretrain_model: "rescal"

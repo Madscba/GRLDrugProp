@@ -18,8 +18,9 @@ from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from graph_package.src.pl_modules.callbacks import TestDiagnosticCallback
 from graph_package.configs.directories import Directories
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+from pytorch_lightning.utilities.warnings import PossibleUserWarning
 import hydra
-from dotenv import load_dotenv
+from dotenv import load_dotenv 
 from sklearn.model_selection import train_test_split as train_val_split
 import os
 from pytorch_lightning import Trainer
@@ -29,6 +30,7 @@ import shutil
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="hydra")
+warnings.filterwarnings("ignore", category=PossibleUserWarning, module="pytorch_lightning")
 
 
 @hydra.main(

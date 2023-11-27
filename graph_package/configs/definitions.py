@@ -1,8 +1,8 @@
-from graph_package.src.models import DeepDDS, RESCAL, DeepDDS_HPC, HybridModel
+from graph_package.src.models import DeepDDS, RESCAL, HybridModel
 from graph_package.configs.directories import Directories  
 
 
-model_dict = {"deepdds": DeepDDS, "rescal": RESCAL, "deepdds_hpc": DeepDDS_HPC, "hybridmodel": HybridModel}
+model_dict = {"deepdds": DeepDDS, "rescal": RESCAL, "hybridmodel": HybridModel}
 
 dataset_dict = {"oneil_legacy": Directories.DATA_PATH / "gold" / "oneil_legacy" / "oneil.csv",
                 "oneil": Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv",
