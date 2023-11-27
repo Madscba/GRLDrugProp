@@ -1,0 +1,6 @@
+# @package _global_
+task: 'reg'
+checkpoint_callback:
+  mode: 'min'
+  filename: '{epoch:02d}-{val_mse:.4f}'
+  save_top_k: 1

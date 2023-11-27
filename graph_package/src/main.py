@@ -78,9 +78,8 @@ def main(config):
             [train_set, val_set, test_set], batch_sizes=config.batch_sizes
         )
         
-        monitor = "val_auroc" if config.task == 'clf' else "val_mse"
         checkpoint_callback = ModelCheckpoint(
-            dirpath=get_checkpoint_path(model_name, k), monitor=monitor, **config.checkpoint_callback
+            dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
         )
         call_backs.append(checkpoint_callback)
 

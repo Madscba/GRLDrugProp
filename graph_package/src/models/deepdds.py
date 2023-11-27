@@ -19,6 +19,7 @@ import json
 import numpy as np
 import json
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class DeepDDS(nn.Module):
     def __init__(
@@ -91,7 +92,7 @@ class DeepDDS(nn.Module):
         drug_dict = json.load(path.open())
         drug_features = {
             id: {
-                "molecule": Molecule.from_smiles(drug_dict[drug]["smiles"]),
+                "molecule": Molecule.from_smiles(drug_dict[drug]["smiles"]).to(device),
             }
             for drug, id in self.entity_vocab.items()
         }
@@ -102,7 +103,7 @@ class DeepDDS(nn.Module):
         path = "https://raw.githubusercontent.com/AstraZeneca/chemicalx/main/dataset/drugcomb/context_set.json"
         with urllib.request.urlopen(path) as url:
             raw_data = json.loads(url.read().decode())
-        raw_data = {v: torch.FloatTensor(np.array(raw_data[k]).reshape(1, -1)) for k, v in self.context_vocab.items()}
+        raw_data = {v: torch.FloatTensor(np.array(raw_data[k]).reshape(1, -1)).to(device) for k, v in self.context_vocab.items()}
         
         return raw_data
 

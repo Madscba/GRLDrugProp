@@ -2,7 +2,6 @@
 defaults:
   - model: deepdds # override model by writing model=rescal or model=hybridmodel as command line argument to main.py
 
-
 run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
@@ -12,7 +11,7 @@ group_val: False
 n_splits: 5
 seed: 43
 remove_old_checkpoints: True
-task: 'reg' #clf (does not work for css)
+task: 'clf' #clf (does not work for css)
 
 dataset:  
   name: 'oneil' # deepdds_original, oneil_legacy

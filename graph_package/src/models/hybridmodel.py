@@ -45,6 +45,12 @@ class HybridModel(nn.Module):
         rescal_out = self.rescal(input)
         return self.deepdds_weight * deepdds_out + self.rescal_weight * rescal_out
 
+    def __str__(self) -> str:
+        return "hybridmodel"
+
+
+
+
 def remove_prefix_from_keys(d, prefix):
     """
     Recursively removes a prefix from the keys of an ordered dictionary and all its sub-dictionaries.

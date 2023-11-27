@@ -21,6 +21,7 @@ class TestDiagnosticCallback(Callback):
             batch_idx,
         ) = pl_module.test_step_outputs.values()
         print("conf_matrix:\n", df_cm)
+
         save_performance_plots(
             df_cm, metrics, preds, target, self.model_name, save_path=""
         )
