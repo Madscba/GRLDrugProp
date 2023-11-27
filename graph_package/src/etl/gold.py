@@ -5,7 +5,7 @@ import numpy as np
 from graph_package.utils.helpers import init_logger
 import json
 import requests
-import json
+
 
 
 logger = init_logger()
@@ -179,18 +179,14 @@ def make_oneil_legacy_dataset():
         "drug_col": "drug_2_name",
         "synergy_loewe": "label",
         "cell_line_name": "context",
-        "drug_row_id": "drug_1_id",
-        "drug_col_id": "drug_2_id",
-        # "context": "context_id"
     }
+    df = df[rename_dict.keys()]
     df.rename(columns=rename_dict, inplace=True)
+
 
     df, drug_vocab = create_drug_id_vocabs(df)
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
-    df = agg_loewe_and_make_binary(df)
 
-    cols_to_keep = list(rename_dict.values()) + ["context_id"]
-    df = df[cols_to_keep]
 
     for vocab, name in zip(
         (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
@@ -210,8 +206,8 @@ def get_max_zip_response(df: pd.DataFrame):
     df = df.merge(block_df, on='block_id', how='left',validate='1:1')
     df = df.groupby(['drug_1_name', 'drug_2_name', 'context']).mean().reset_index()
     label_func = lambda x: 1 if x >= 10 else 0
-    df["mean_label"] = df["synergy_zip_mean"].apply(label_func)
-    df["max_label"] = df["synergy_zip_max"].apply(label_func)
+    df["mean_label"] = df["synergy_zip_mean"].apply(lambda x: 1 if x >= 5 else 0)
+    df["max_label"] = df["synergy_zip_max"].apply(lambda x: 1 if x >= 10 else 0)
     return df
 
 def make_oneil_dataset():

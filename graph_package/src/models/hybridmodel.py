@@ -8,7 +8,6 @@ from collections import OrderedDict
 class HybridModel(nn.Module):
     def __init__(
         self,
-        hpc,
         rescal: dict,
         deepdds: dict,
         ckpt_path=None,

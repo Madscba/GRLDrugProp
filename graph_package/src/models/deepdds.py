@@ -4,18 +4,17 @@ import torch
 from torchdrug.data import PackedGraph
 import torch.nn as nn
 from torchdrug.layers import MLP
-import torch
 from torch import nn
 from torch.nn.functional import normalize
 import urllib.request
 from torchdrug.data import PackedGraph
-from torchdrug.data import Molecule
 from torchdrug.data.feature import atom_default
 from torchdrug.layers import MLP, MaxReadout
 from torchdrug.models import GraphConvolutionalNetwork
 from torchdrug.data import Graph, Molecule
 import json 
 import numpy as np
+
 
 TORCHDRUG_NODE_FEATURES = len(atom_default(Molecule.dummy_mol.GetAtomWithIdx(0)))
 
@@ -153,3 +152,6 @@ class DeepDDS(nn.Module):
     def __name__(self) -> str:
         return "DeepDDS"
     
+if __name__=="__main__":
+    model = DeepDDS(Directories.DATA_PATH / "gold" / "oneil")
+    print(model(torch.LongTensor([[0,1,2]])))
