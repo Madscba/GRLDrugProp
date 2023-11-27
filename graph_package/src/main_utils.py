@@ -37,7 +37,7 @@ def get_cv_splits(dataset, config):
         elif config.group_val == "cell_line":
             group = dataset.data_df.groupby(['context_id']).ngroup()
         else:
-            group = None
+            group = np.arange(len(dataset))
         kfold = StratifiedGroupKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
         return kfold.split(dataset, dataset.get_labels(dataset.indices), group)
 
@@ -121,7 +121,7 @@ def update_deepdds_args(config):
 
 
 def update_model_kwargs(config: dict, model_name: str, dataset):
-    if model_name == "deepdds":
+    if model_name.startswith("deepdds"):
         config.model.update(update_deepdds_args(config))
     elif model_name == "rescal":
         config.model.update(update_rescal_args(dataset))

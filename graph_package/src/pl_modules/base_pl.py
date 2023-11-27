@@ -45,6 +45,9 @@ class BasePL(LightningModule):
         self.log(
             "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=self.logger_enabled
         )
+        if str(self.model) == "hybridmodel":
+            self.log("deepdds_weight", self.model.deepdds_weight.item(), on_step=True, on_epoch=True, prog_bar=True, logger=True)
+            self.log("rescal_weight", self.model.rescal_weight.item(), on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
