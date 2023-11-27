@@ -27,8 +27,6 @@ def get_drug_split(dataset, config, n_drugs_per_fold = 3):
         splits.append((train_idx,test_idx))
     return splits
     
-
-
 def get_cv_splits(dataset, config):
     if config.group_val == "drug":
         splits = get_drug_split(dataset, config)

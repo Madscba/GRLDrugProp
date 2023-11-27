@@ -1,7 +1,5 @@
 from typing import List, Optional, Iterable
 from graph_package.configs.directories import Directories
-from chemicalx.constants import TORCHDRUG_NODE_FEATURES
-from chemicalx.models import DeepDDS as DeepDDS_cx
 import torch
 from torchdrug.data import PackedGraph
 import torch.nn as nn
@@ -11,13 +9,15 @@ from torch import nn
 from torch.nn.functional import normalize
 import urllib.request
 from torchdrug.data import PackedGraph
+from torchdrug.data import Molecule
+from torchdrug.data.feature import atom_default
 from torchdrug.layers import MLP, MaxReadout
 from torchdrug.models import GraphConvolutionalNetwork
-from chemicalx.data import DrugPairBatch
 from torchdrug.data import Graph, Molecule
 import json 
 import numpy as np
-import json
+
+TORCHDRUG_NODE_FEATURES = len(atom_default(Molecule.dummy_mol.GetAtomWithIdx(0)))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -115,9 +115,12 @@ class DeepDDS(nn.Module):
 
 
     def _forward_molecules(self, molecules: PackedGraph) -> torch.FloatTensor:
-        features = self.drug_conv(molecules, molecules.data_dict["node_feature"])["node_feature"]
+        features = self.drug_conv(
+            molecules, molecules.data_dict["atom_feature"].float()
+        )["node_feature"]
         features = self.drug_readout(molecules, features)
         return self.drug_mlp(features)
+    
 
     def forward(
         self, inputs
@@ -146,8 +149,6 @@ class DeepDDS(nn.Module):
         concat_in = torch.cat([mlp_out, features_left, features_right], dim=1)
 
         return self.final(concat_in).squeeze()
-
-
 
     def __name__(self) -> str:
         return "DeepDDS"

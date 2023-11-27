@@ -26,11 +26,14 @@ from pytorch_lightning import Trainer
 import sys
 import wandb
 import shutil
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="hydra")
 
 
 @hydra.main(
     config_path=str(Directories.CONFIG_PATH / "hydra_configs"),
-    config_name="config.yaml",
+    config_name="config.yaml",version_base="1.1"
 )
 def main(config):
     if config.wandb:
