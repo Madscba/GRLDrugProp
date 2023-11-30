@@ -1,6 +1,8 @@
 import hashlib
 import json
 import os
+import errno
+import os
 
 from matplotlib import pyplot as plt
 from scipy.special import expit
@@ -15,6 +17,7 @@ from sklearn.metrics import (
     auc,
     precision_recall_curve,
     average_precision_score,
+    roc_auc_score,
 )
 import seaborn as sns
 
@@ -125,6 +128,25 @@ def get_err_analysis_path(save_path):
     return save_path
 
 
+def get_roc_visualization(y_true, y_pred_probability):
+    from sklearn.metrics import RocCurveDisplay
+
+    RocCurveDisplay.from_predictions(
+        y_true,
+        y_pred_probability,
+        name=f"test vs the rest",
+        color="darkorange",
+        plot_chance_level=True,
+    )
+    plt.axis("square")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("One-vs-Rest ROC curves:\nVirginica vs (Setosa & Versicolor)")
+    plt.legend()
+    plt.savefig("roc_curve")
+    plt.show()
+
+
 def get_model_pred_path(save_path):
     """
     Dummy function to retrieve default save path if none is supplied
@@ -203,8 +225,12 @@ def get_model_pred_dict(file_name="rescal_model_pred_dict.pkl", save_path=""):
         pred_dict (dict): prediction dictionary (batch_idx, batch, predictions, targets)
     """
     save_path = get_model_pred_path(save_path)
-    with open(save_path / file_name, "rb") as file:
-        pred_dict = pickle.load(file)
+    file_path = save_path / file_name
+    try:
+        with open(file_path, "rb") as file:
+            pred_dict = pickle.load(file)
+    except:
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file_path)
     return pred_dict
 
 
@@ -270,7 +296,12 @@ def find_best_model_ckpt(ckpt_folder):
 
 
 def barplot_mean_correct_prediction_grouped_by_entity(
-    pred_dfs, model_names, group_by_columns, title, xlabels
+    pred_dfs,
+    model_names,
+    group_by_columns,
+    title,
+    xlabel_col_name,
+    add_bar_info: bool = True,
 ):
     """
     Generate and save barplot
@@ -287,37 +318,165 @@ def barplot_mean_correct_prediction_grouped_by_entity(
     if not save_path.exists():
         save_path.mkdir(exist_ok=True, parents=True)
 
+    grouped_dfs = []
     for i, df in enumerate(pred_dfs):
-        grouped_df = df.groupby(group_by_columns).agg(
-            {"correct_pred": "mean", xlabels: "max"}
+        if xlabel_col_name == "triplet_name":
+            # Cannot investigate AUC ROC curve when there is only 1 prediction, so goal is rather to understand which triplets are hard to correctly predict
+            grouped_df = df.groupby(group_by_columns).agg(
+                {"correct_pred": "mean", xlabel_col_name: "max"}
+            )
+            metric = "correct_pred"
+            original_size, filtered_size = 1, 1
+        else:
+            original_size = df.shape[0]
+            # Goal is to say something about the difficulty of specific entities relative to others of the same kind
+            grouped_df = df.groupby(group_by_columns)
+            # Ensure that we both have positive cases and negative cases for each group, and remove groups without
+            df["has_pos_and_neg_target"] = (
+                grouped_df["targets"].transform(lambda x: x.eq(0).any())
+            ) & (grouped_df["targets"].transform(lambda x: x.eq(1).any()))
+            df = df[df["has_pos_and_neg_target"] == 1]
+            filtered_size = df.shape[0]
+
+            x_labels = df.groupby(group_by_columns)[xlabel_col_name].max().reset_index()
+            auc_scores, n_exp, class_balance = {}, {}, {}
+            unique_groups = df.loc[:, group_by_columns[0]].unique()
+            for group in unique_groups:
+                group_data = df[df[group_by_columns[0]] == group]
+                auc = roc_auc_score(group_data["targets"], group_data["pred_prob"])
+                auc_scores[group] = auc
+                n_exp[group] = group_data.shape[0]
+                class_balance[group] = (group_data["targets"]).mean()
+
+            grouped_df = pd.concat(
+                [
+                    pd.DataFrame(dict_.items())
+                    for dict_ in [auc_scores, n_exp, class_balance]
+                ],
+                axis=1,
+            )
+            grouped_df.columns = [
+                group_by_columns[0],
+                "AUC_ROC",
+                group_by_columns[0] + "1",
+                "n_exp",
+                group_by_columns[0] + "2",
+                "class_balance",
+            ]
+            grouped_df.drop(
+                columns=[group_by_columns[0] + "1", group_by_columns[0] + "2"],
+                inplace=True,
+            )
+
+            grouped_df = grouped_df.merge(x_labels, on=group_by_columns[0])
+            metric = "AUC_ROC"
+            grouped_dfs.append(grouped_df.copy())
+
+        check_accepted_sample_ratio(original_size, filtered_size, group_by_columns)
+        generate_bar_plot(
+            grouped_df,
+            i,
+            metric,
+            model_names,
+            plt_colors,
+            save_path,
+            title,
+            xlabel_col_name,
+            add_bar_info,
         )
-        sorted_df = sort_df_by_mean_correct_pred(grouped_df)
-        top20_df = sorted_df.tail(20)
 
-        plt.figure(figsize=(20, 10))
-        plt.subplot(1, 2, 1)
-        sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-        # plt.xticks(rotation=90)
-        plt.gca().set_xticks(range(len(sorted_df)))
-        plt.gca().set_xticklabels(sorted_df[xlabels])
-        plt.title(f"{title}\nmean correct prediction")
-        plt.legend([model_names[i]])
-
-        plt.subplot(1, 2, 2)
-        top20_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-        # plt.xticks(rotation=90)
-        plt.gca().set_xticks(range(len(top20_df)))
-        plt.gca().set_xticklabels(top20_df[xlabels])
-        plt.title(f"{title}\ntop 20 w. lowest mean correct prediction")
-        plt.legend([model_names[i]])
-        plt.tight_layout()
-        plt.savefig(save_path / f"{title}_bar_{model_names[i]}")
-        plt.show()
-        plt.clf()
+    if len(pred_dfs) == 2 and xlabel_col_name != "triplet_name":
+        df_diff = generate_difference_df(
+            group_by_columns, grouped_dfs, metric, model_names, x_labels
+        )
+        generate_bar_plot(
+            df_diff,
+            0,
+            metric,
+            ["absolute negative difference"],
+            plt_colors,
+            save_path,
+            f"{xlabel_col_name}_diff",
+            xlabel_col_name,
+            add_bar_info,
+        )
 
 
-def sort_df_by_mean_correct_pred(df):
-    return df.sort_values(by="correct_pred", ascending=False)
+def generate_difference_df(
+    group_by_columns, grouped_dfs, metric, model_names, x_labels
+):
+    df_diff = grouped_dfs[0].merge(
+        grouped_dfs[1],
+        suffixes=(f"_{model_names[0]}", f"_{model_names[1]}"),
+        on=group_by_columns,
+    )
+    metrics_columns = [f"{metric}_{model_names[i]}" for i in range(len(model_names))]
+    class_balance_columns = [
+        f"class_balance_{model_names[i]}" for i in range(len(model_names))
+    ]
+    n_exp_columns = [f"n_exp_{model_names[i]}" for i in range(len(model_names))]
+    df_diff[metric] = -abs(df_diff[metrics_columns[0]] - df_diff[metrics_columns[1]])
+    df_diff["class_balance"] = (
+        df_diff[class_balance_columns[0]].values
+        + df_diff[class_balance_columns[1]].values
+    ) / 2
+    df_diff["n_exp"] = (
+        df_diff[n_exp_columns[0]].values + df_diff[n_exp_columns[1]].values
+    ) / 2
+    df_diff = df_diff.merge(x_labels, on=group_by_columns[0])
+    return df_diff
+
+
+def generate_bar_plot(
+    grouped_df,
+    i,
+    metric,
+    model_names,
+    plt_colors,
+    save_path,
+    title,
+    xlabel_col_name,
+    add_bar_info,
+):
+    sorted_df = sort_df_by_metric(grouped_df, metric)
+    top20_df = sorted_df.tail(20)
+    top20_df.reset_index(inplace=True)
+    plt.figure(figsize=(20, 10))
+    plt.subplot(1, 2, 1)
+    # sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
+    sorted_df[metric].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
+    # plt.xticks(rotation=90)
+    plt.gca().set_xticks(range(len(sorted_df)))
+    plt.gca().set_xticklabels(sorted_df[xlabel_col_name])
+    plt.title(f"{title}\n {metric}")
+    plt.legend([model_names[i]])
+    plt.subplot(1, 2, 2)
+    top20_df[metric].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
+    # plt.xticks(rotation=90)
+    plt.gca().set_xticks(range(len(top20_df)))
+    plt.gca().set_xticklabels(top20_df[xlabel_col_name])
+    plt.title(f"{title}\ntop 20 w. lowest {metric}")
+    if add_bar_info:
+        for index, value in enumerate(top20_df[metric]):
+            bar_text = f"n:\n{top20_df.loc[index, ['n_exp']].values[0]}\ncb:\n{round(top20_df.loc[index, ['class_balance']].values[0], 2)}"
+            plt.text(index, value, bar_text, ha="center", va="bottom")
+    plt.legend([model_names[i]])
+    plt.tight_layout()
+    plt.savefig(save_path / f"{title}_bar_{model_names[i]}")
+    plt.show()
+    plt.clf()
+
+
+def check_accepted_sample_ratio(original_size, filtered_size, group_by_columns):
+    ratio = round(filtered_size / original_size, 2)
+    if ratio < 0.6:
+        print(
+            f"{group_by_columns}:\nAccepted percentage of experiments: {ratio}.\nA too low % suggest that the groupings are on a too granular level"
+        )
+
+
+def sort_df_by_metric(df, metric):
+    return df.sort_values(by=metric, ascending=False)
 
 
 def map_to_index(row, cols):
@@ -544,23 +703,23 @@ def enrich_model_predictions(model_names, pred_dfs):
         df = merge_cell_line_and_drug_info(df, cell_line_meta_data, drug_meta_data)
         df["model_name"] = model_names[idx]
 
-        df["drug_pair_idx"] = df.apply(
-            map_to_index,
-            axis=1,
-            cols=["drug_molecules_left_id", "drug_molecules_right_id"],
-        )
-        df["triplet_idx"] = df.apply(
-            map_to_index,
-            axis=1,
-            cols=[
+        df["drug_pair_idx"] = df.groupby(
+            ["drug_molecules_left_id", "drug_molecules_right_id"]
+        ).ngroup()
+
+        df["triplet_idx"] = df.groupby(
+            [
                 "drug_molecules_left_id",
                 "drug_molecules_right_id",
                 "context_features_id",
-            ],
-        )
-        df["drug_targets_idx"] = df.apply(
-            map_to_index, axis=1, cols=["target_type", "target_type_right"]
-        )
+            ]
+        ).ngroup()
+
+        df["drug_targets_idx"] = df.groupby(
+            ["target_type", "target_type_right"]
+        ).ngroup()
+
+        df["disease_idx"] = df.groupby(["disease_id"]).ngroup()
 
         df["triplet_name"] = df.apply(
             lambda row: ",".join(
@@ -588,12 +747,4 @@ def enrich_model_predictions(model_names, pred_dfs):
     del new_pred_dfs
     combined_df = pd.concat(pred_dfs)
 
-    if len(pred_dfs) != 2:
-        print("Pairwise comparison is only implemented for 2 models")
-        return combined_df, pred_dfs
-    elif len(pred_dfs) == 2:
-        diff_df = pred_dfs[0].copy()
-        diff_df["correct_pred"] = -abs(
-            pred_dfs[0]["correct_pred"] - pred_dfs[1]["correct_pred"]
-        )
-        return combined_df, pred_dfs, diff_df
+    return combined_df, pred_dfs
