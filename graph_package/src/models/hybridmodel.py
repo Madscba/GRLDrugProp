@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from graph_package.src.models import RESCAL, DeepDDS, DeepDDS_HPC
+from graph_package.src.models import RESCAL, DeepDDS
 from collections import OrderedDict
 
 
@@ -8,7 +8,6 @@ from collections import OrderedDict
 class HybridModel(nn.Module):
     def __init__(
         self,
-        hpc,
         rescal: dict,
         deepdds: dict,
         ckpt_path=None,
@@ -16,10 +15,8 @@ class HybridModel(nn.Module):
     ) -> None:
         super().__init__()
 
-        deepdds_construct = DeepDDS_HPC if hpc else DeepDDS
-
         self.deepdds = self.load_model(
-            deepdds_construct, deepdds, ckpt_path, freeze=pretrain_model == "deepdds"
+            DeepDDS, deepdds, ckpt_path, freeze=pretrain_model == "deepdds"
         )
         self.rescal = self.load_model(
             RESCAL, rescal, ckpt_path, freeze=pretrain_model == "rescal"
@@ -47,8 +44,6 @@ class HybridModel(nn.Module):
 
     def __str__(self) -> str:
         return "hybridmodel"
-
-
 
 
 def remove_prefix_from_keys(d, prefix):

@@ -1,23 +1,23 @@
 from typing import List, Optional, Iterable
 from graph_package.configs.directories import Directories
-from chemicalx.constants import TORCHDRUG_NODE_FEATURES
-from chemicalx.models import DeepDDS as DeepDDS_cx
 import torch
 from torchdrug.data import PackedGraph
 import torch.nn as nn
 from torchdrug.layers import MLP
-import torch
 from torch import nn
 from torch.nn.functional import normalize
 import urllib.request
 from torchdrug.data import PackedGraph
+from torchdrug.data.feature import atom_default
 from torchdrug.layers import MLP, MaxReadout
 from torchdrug.models import GraphConvolutionalNetwork
-from chemicalx.data import DrugPairBatch
 from torchdrug.data import Graph, Molecule
 import json 
 import numpy as np
-import json
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+TORCHDRUG_NODE_FEATURES = len(atom_default(Molecule.dummy_mol.GetAtomWithIdx(0)))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -115,9 +115,12 @@ class DeepDDS(nn.Module):
 
 
     def _forward_molecules(self, molecules: PackedGraph) -> torch.FloatTensor:
-        features = self.drug_conv(molecules, molecules.data_dict["node_feature"])["node_feature"]
+        features = self.drug_conv(
+            molecules, molecules.data_dict["atom_feature"].float()
+        )["node_feature"]
         features = self.drug_readout(molecules, features)
         return self.drug_mlp(features)
+    
 
     def forward(
         self, inputs
@@ -147,39 +150,9 @@ class DeepDDS(nn.Module):
 
         return self.final(concat_in).squeeze()
 
-
-
     def __name__(self) -> str:
         return "DeepDDS"
     
-
-class DeepDDS_HPC(DeepDDS):
-    def __init__(
-        self,
-        dataset_path,
-        context_channels: int = 288,
-        context_hidden_dims: List[int] = (2048, 512),
-        drug_channels: int = TORCHDRUG_NODE_FEATURES,
-        drug_gcn_hidden_dims: List[int] = [1024, 512, 156],
-        drug_mlp_hidden_dims: List[int] = None,
-        context_output_size: int = 156,
-        fc_hidden_dims: List[int] = [1024, 512, 128],
-        dropout: float = 0.2,
-    ):
-        super().__init__(dataset_path,
-            context_channels,
-            context_hidden_dims,
-            drug_channels,
-            drug_gcn_hidden_dims,
-            drug_mlp_hidden_dims,
-            context_output_size,
-            fc_hidden_dims,
-            dropout,
-        )
-    
-    def _forward_molecules(self, molecules: PackedGraph) -> torch.FloatTensor:
-        features = self.drug_conv(
-            molecules, molecules.data_dict["atom_feature"].float()
-        )["node_feature"]
-        features = self.drug_readout(molecules, features)
-        return self.drug_mlp(features)
+if __name__=="__main__":
+    model = DeepDDS(Directories.DATA_PATH / "gold" / "oneil")
+    print(model(torch.LongTensor([[0,1,2]])))
