@@ -97,9 +97,12 @@ def main(config):
 
         trainer = Trainer(
             logger=loggers,
-            callbacks=call_backs,
+            callbacks=call_backs, 
             **config.trainer,
         )
+
+        trainer.validate(model,dataloaders=data_loaders["val"])
+
         trainer.fit(
             model,
             train_dataloaders=data_loaders["train"],

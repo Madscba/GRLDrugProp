@@ -4,20 +4,13 @@ from torchmetrics import MeanSquaredError
 from torch.optim import Adam
 from torch.nn import ModuleDict, BCEWithLogitsLoss, MSELoss
 from torchmetrics import AUROC
-from torchmetrics.classification import (
-    Accuracy,
-    AveragePrecision,
-    CalibrationError,
-    ConfusionMatrix,
-    F1Score,
-)
 import torch
 
 loss_func_dict = {"clf": BCEWithLogitsLoss(), "reg": MSELoss()}
 
 
 class BasePL(LightningModule):
-    def __init__(self, model, lr: float = 0.001, task: str = "clf"):
+    def __init__(self, model, lr: float = 0.001, task: str = "clf", logger_enabled = True):
         super().__init__()
         self.lr = lr
         self.task = task
@@ -26,7 +19,7 @@ class BasePL(LightningModule):
         self.val_metrics = metric("val")
         self.test_metrics = metric("test")
         self.model =  model
-        self.logger_enabled = True if self.logger is not None else False
+        self.logger_enabled = logger_enabled
 
 
     def forward(self, inputs):
