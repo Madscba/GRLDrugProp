@@ -4,13 +4,6 @@ from torchmetrics import MeanSquaredError
 from torch.optim import Adam
 from torch.nn import ModuleDict, BCEWithLogitsLoss, MSELoss
 from torchmetrics import AUROC
-from torchmetrics.classification import (
-    Accuracy,
-    AveragePrecision,
-    CalibrationError,
-    ConfusionMatrix,
-    F1Score,
-)
 import torch
 
 loss_func_dict = {"clf": BCEWithLogitsLoss(), "reg": MSELoss()}
