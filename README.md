@@ -38,7 +38,8 @@ module load python3/3.9.17
 module load cuda/12.1
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements_hpc.txt
+pip install -r requirements_hpc_base.txt
+pip install -r requirements_hpc_torch.txt
 ```
 To test it run in same terminal:
 
