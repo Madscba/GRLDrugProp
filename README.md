@@ -34,7 +34,7 @@ To update environment use ```conda env update --name graph_pkg_env --file enviro
 ### Python venv (for hpc use)
 To install env on HPC at DTU use: 
 ```bash
-module load python/python python3/3.9.17 
+module load python3/3.9.17 
 module load cuda/12.1
 python3 -m venv .venv
 source .venv/bin/activate
@@ -55,7 +55,7 @@ When submitting jobs you have to provide ```module load cuda/12.1``` in your bas
 ```
 
 Always use naming of command line args for naming.
-Only include deviations from config in naming. 
+ 
 
 3 Add pre-commit hooks
 ----------------
