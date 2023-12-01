@@ -39,17 +39,23 @@ module load cuda/12.1
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements_hpc.txt
-
 ```
 To test it run in same terminal:
 
 ```bash
 voltash
-python graph_package/src/run_err_analysis.py
+python graph_package/src/main.py
 ```
 When submitting jobs you have to provide ```module load cuda/12.1``` in your bash script. 
 
+4 Naming convention of runs in W&B
+----------------
+```bash
+{$model}_{$task}_{$target}_{$induction_split}_{any_other_important_change_from_config_you_want}
+```
 
+Always use naming of command line args for naming.
+Only include deviations from config in naming. 
 
 3 Add pre-commit hooks
 ----------------
