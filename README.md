@@ -55,7 +55,7 @@ When submitting jobs you have to provide ```module load cuda/12.1``` in your bas
 {$model}_{$task}_{$target}_{Optional: any_other_important_change_from_config_you_want}
 ```
 Always use naming of command line args for naming.
-If arg contains underscore write it in one word (fx zip_mean becomes zipmean). 
+
 
 3 Add pre-commit hooks
 ----------------
