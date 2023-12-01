@@ -21,7 +21,6 @@ class BasePL(LightningModule):
         self.model =  model
         self.logger_enabled = logger_enabled
 
-
     def forward(self, inputs):
         return self.model(inputs)
 
