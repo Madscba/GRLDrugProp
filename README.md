@@ -38,7 +38,8 @@ module load python3/3.9.17
 module load cuda/12.1
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements_hpc.txt
+pip install -r requirements_hpc_base.txt
+pip install -r requirements_hpc_torch.txt
 ```
 To test it run in same terminal:
 
@@ -51,11 +52,10 @@ When submitting jobs you have to provide ```module load cuda/12.1``` in your bas
 4 Naming convention of runs in W&B
 ----------------
 ```bash
-{$model}_{$task}_{$target}_{$induction_split}_{any_other_important_change_from_config_you_want}
+{$model}_{$task}_{$target}_{Optional: any_other_important_change_from_config_you_want}
 ```
-
 Always use naming of command line args for naming.
- 
+
 
 3 Add pre-commit hooks
 ----------------

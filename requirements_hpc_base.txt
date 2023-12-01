@@ -103,9 +103,6 @@ sympy==1.12
 tabulate==0.9.0
 threadpoolctl==3.2.0
 torch==2.1.0
-torch-cluster -f https://pytorch-geometric.com/whl/torch-2.1.0+cu121.html
-torch-scatter -f https://data.pyg.org/whl/torch-2.1.0+cu121.html
-torchdrug==0.2.1
 torchmetrics==1.2.0
 tornado==6.3.3
 tqdm==4.66.1
