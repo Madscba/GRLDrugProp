@@ -52,9 +52,8 @@ When submitting jobs you have to provide ```module load cuda/12.1``` in your bas
 4 Naming convention of runs in W&B
 ----------------
 ```bash
-{$model}_{$task}_{$target}_{$induction_split}_{any_other_important_change_from_config_you_want}
+{$model}_{$task}_{$target}_{Optional: any_other_important_change_from_config_you_want}
 ```
-
 Always use naming of command line args for naming.
  
 
