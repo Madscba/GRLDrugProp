@@ -34,21 +34,27 @@ To update environment use ```conda env update --name graph_pkg_env --file enviro
 ### Python venv (for hpc use)
 To install env on HPC at DTU use: 
 ```bash
-module load python/python python3/3.9.17 
+module load python3/3.9.17 
 module load cuda/12.1
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements_hpc.txt
-bash environment_config/update_chemicalx.sh
+pip install -r requirements_hpc_base.txt
+pip install -r requirements_hpc_torch.txt
 ```
 To test it run in same terminal:
 
 ```bash
 voltash
-python graph_package/src/run_err_analysis.py
+python graph_package/src/main.py
 ```
 When submitting jobs you have to provide ```module load cuda/12.1``` in your bash script. 
 
+4 Naming convention of runs in W&B
+----------------
+```bash
+{$model}_{$task}_{$target}_{Optional: any_other_important_change_from_config_you_want}
+```
+Always use naming of command line args for naming.
 
 
 3 Add pre-commit hooks

@@ -20,7 +20,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 import seaborn as sns
-
+from datetime import date
 from graph_package.src.main_utils import load_data
 
 
@@ -123,8 +123,10 @@ def get_err_analysis_path(save_path):
     Returns:
         None (displays the plot).
     """
+    today = date.today()
+    today_str = today.strftime("%d_%m_%Y")
     if not save_path:
-        save_path = Directories.OUTPUT_PATH / "err_analysis"
+        save_path = Directories.OUTPUT_PATH / "err_analysis" / today_str
     return save_path
 
 
@@ -156,8 +158,10 @@ def get_model_pred_path(save_path):
     Returns:
         None (displays the plot).
     """
+    today = date.today()
+    today_str = today.strftime("%d_%m_%Y")
     if not save_path:
-        save_path = Directories.OUTPUT_PATH / "model_predictions"
+        save_path = Directories.OUTPUT_PATH / "model_predictions" / today_str
     return save_path
 
 
@@ -199,15 +203,26 @@ def save_model_pred(batch_idx, batch, preds, target, model_name, save_path=False
     Returns:
         None: Function saves dictionary with all of the above information as a pickle file
     """
+    output_dict = {
+        "batch_id": [batch_idx],
+        "batch": batch,
+        "predictions": [preds],
+        "targets": [target],
+    }
+
     save_path = get_model_pred_path(save_path)
     if not save_path.exists():
-        save_path.mkdir(exist_ok=True, parents=True)
-    output_dict = {
-        "batch_id": batch_idx,
-        "batch": batch,
-        "predictions": preds,
-        "targets": target,
-    }
+        save_path.mkdir(exist_ok=True, parents=True),
+
+    pred_path = save_path / f"{model_name}_model_pred_dict.pkl"
+    if pred_path.exists():
+        with open(save_path / f"{model_name}_model_pred_dict.pkl", "rb") as f:
+            old_output_dict = pickle.load(f)
+
+        # append old predictions with new
+        for key, val in old_output_dict.items():
+            concatenated_input = old_output_dict[key] + output_dict[key]
+            output_dict.update({key: concatenated_input})
 
     with open(save_path / f"{model_name}_model_pred_dict.pkl", "wb") as f:
         pickle.dump(output_dict, f)

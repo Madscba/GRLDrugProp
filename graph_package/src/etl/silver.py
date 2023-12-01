@@ -21,7 +21,6 @@ def generate_oneil_dataset():
     df = load_drugcomb()
     df_oneil = df[df["study_name"] == "ONEIL"]
     df_oneil_cleaned = df_oneil.dropna(subset=["drug_row", "drug_col", "synergy_loewe"])   
-    logger.info(f"Dropped {len(df_oneil)-len(df_oneil_cleaned)} NaN values.")
     df_oneil_cleaned = pd.read_csv(Directories.DATA_PATH / "silver" / "oneil" / "oneil.csv")
     unique_block_ids = df_oneil_cleaned["block_id"].unique().tolist()
     download_response_info_oneil(unique_block_ids,overwrite=False)

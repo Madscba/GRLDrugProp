@@ -15,30 +15,34 @@ import numpy as np
 import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 
-def get_drug_split(dataset, config, n_drugs_per_fold = 3):
+
+def get_drug_split(dataset, config, n_drugs_per_fold=3):
     splits = []
     df = dataset.data_df
-    for i in range(n_drugs_per_fold,dataset.num_nodes,n_drugs_per_fold):
-        drug_ids = list(range(i-n_drugs_per_fold,i))
-        drug_1_idx=df[df['drug_1_id'].isin(drug_ids)].index
-        drug_2_idx=df[df['drug_2_id'].isin(drug_ids)].index
+    for i in range(0, dataset.num_nodes, n_drugs_per_fold):
+        drug_ids = list(range(i, min(i+n_drugs_per_fold, dataset.num_nodes)))
+        drug_1_idx = df[df["drug_1_id"].isin(drug_ids)].index
+        drug_2_idx = df[df["drug_2_id"].isin(drug_ids)].index
         test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
         train_idx = list(set(dataset.data_df.index).difference(test_idx))
-        splits.append((train_idx,test_idx))
+        splits.append((train_idx, test_idx))
     return splits
-    
+
+
 def get_cv_splits(dataset, config):
     if config.group_val == "drug":
         splits = get_drug_split(dataset, config)
         return splits
-    else: 
+    else:
         if config.group_val == "drug_combination":
-            group = dataset.data_df.groupby(['drug_1_id', 'drug_2_id']).ngroup()
+            group = dataset.data_df.groupby(["drug_1_id", "drug_2_id"]).ngroup()
         elif config.group_val == "cell_line":
-            group = dataset.data_df.groupby(['context_id']).ngroup()
+            group = dataset.data_df.groupby(["context_id"]).ngroup()
         else:
             group = np.arange(len(dataset))
-        kfold = StratifiedGroupKFold(n_splits=config.n_splits, shuffle=True, random_state=config.seed)
+        kfold = StratifiedGroupKFold(
+            n_splits=config.n_splits, shuffle=True, random_state=config.seed
+        )
         return kfold.split(dataset, dataset.get_labels(dataset.indices), group)
 
 
@@ -52,12 +56,12 @@ def pretrain_single_model(config, data_loaders, k):
         dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
     )
 
-    if model_name == "deepdds_hpc":
-        model_kwargs_name = model_name.removesuffix('_hpc')
-    else:
-        model_kwargs_name = model_name
-
-    model = init_model(model=model_name, task = config.task, model_kwargs=config.model[model_kwargs_name])
+    model = init_model(
+        model=model_name,
+        task=config.task,
+        model_kwargs=config.model[model_name],
+        logger_enabled=False,
+    )
 
     trainer = Trainer(
         logger=[],
@@ -88,15 +92,21 @@ def reset_wandb_env():
 def load_data(dataset_config: dict, task="reg"):
     """Fetch formatted data depending on modelling task"""
     dataset_path = dataset_dict[dataset_config.name.lower()]
-    data_loader = KnowledgeGraphDataset(dataset_path, task = task, target = dataset_config.target)
+    data_loader = KnowledgeGraphDataset(
+        dataset_path, task=task, target=dataset_config.target
+    )
     return data_loader
 
 
-
-def init_model(model: str = "deepdds", task: str ='clf', model_kwargs: dict = {}):
+def init_model(
+    model: str = "deepdds",
+    task: str = "clf",
+    model_kwargs: dict = {},
+    logger_enabled: bool = True,
+):
     """Load model from registry"""
     model = model_dict[model.lower()](**model_kwargs)
-    pl_module = BasePL(model,task = task)
+    pl_module = BasePL(model, task=task, logger_enabled=logger_enabled)
     return pl_module
 
 
@@ -117,7 +127,7 @@ def update_rescal_args(dataset):
 
 
 def update_deepdds_args(config):
-        return {"dataset_path": dataset_dict[config.dataset.name]}
+    return {"dataset_path": dataset_dict[config.dataset.name]}
 
 
 def update_model_kwargs(config: dict, model_name: str, dataset):

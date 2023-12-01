@@ -45,12 +45,6 @@ def main(config):
     dataset = load_data(dataset_config=config.dataset, task = config.task)
     update_model_kwargs(config, model_name, dataset)
 
-
-    if config.remove_old_checkpoints:
-        check_point_path = Directories.CHECKPOINT_PATH / model_name
-        if os.path.isdir(check_point_path):
-            shutil.rmtree(check_point_path)
-
     splits = get_cv_splits(dataset, config)
 
     for k, (train_idx, test_idx) in enumerate(splits):
@@ -97,9 +91,12 @@ def main(config):
 
         trainer = Trainer(
             logger=loggers,
-            callbacks=call_backs,
+            callbacks=call_backs, 
             **config.trainer,
         )
+
+        trainer.validate(model,dataloaders=data_loaders["val"])
+
         trainer.fit(
             model,
             train_dataloaders=data_loaders["train"],

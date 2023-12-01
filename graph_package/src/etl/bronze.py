@@ -45,7 +45,7 @@ def download_drugcomb():
         )
         logger.info("Downloading DrugComb dataset.")
         url = "https://drugcomb.fimm.fi/jing/summary_v_1_5.csv"
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, verify=0)
         total_size = int(response.headers.get("content-length", 0))
         block_size = 1024
         progress_bar = tqdm(total=total_size, unit="iB", unit_scale=True)
