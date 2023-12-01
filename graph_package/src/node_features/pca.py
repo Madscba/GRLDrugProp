@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt 
 
-from utils import (filter_drug_gene_graph, build_adjacency_matrix)
+from utils import (filter_drug_gene_graph, build_adjacency_matrix, create_inverse_triplets)
 from graph_package.utils.helpers import init_logger
 from graph_package.configs.directories import Directories
 
@@ -30,6 +30,7 @@ def generate_pca_feature_vectors(dataset="ONEIL", components=20):
     # Load ONEIL dataset (or bigger dataset)
     drugs = pd.read_csv(data_path)
     drugs = drugs[drugs['study_name']==dataset]
+    drugs = create_inverse_triplets(drugs)
     names = [drug_dict[drug]['dname'] for drug in drugs.drug_row.unique()]
 
     # Make info dict with drug name, DrugBank ID and inchikey for each drug
@@ -41,7 +42,8 @@ def generate_pca_feature_vectors(dataset="ONEIL", components=20):
         drug_info[drug_name]['DB'] = drug_dict[drug]['drugbank_id']
 
     # Filter drugs and genes in Hetionet and build adjacency matrix
-    drug_ids, gene_ids, edges = filter_drug_gene_graph(drug_info,gene_degree=4)
+    filtered_drug_dict, gene_ids, edges = filter_drug_gene_graph(drug_info,gene_degree=4)
+    drug_ids = [filtered_drug_dict[drug]['DB'] for drug in filtered_drug_dict.keys()]
     adjacency_matrix = build_adjacency_matrix(drug_ids,gene_ids,edges)
     degree = [adjacency_matrix[i,:].sum() for i in range(adjacency_matrix.shape[0])]
     logger.info(f"Average drug degree: {sum(degree)/len(degree)} (max is {adjacency_matrix.shape[1]})")
@@ -70,8 +72,8 @@ def generate_pca_feature_vectors(dataset="ONEIL", components=20):
 
     # Save pca features to data/node_features as json/csv (drugDB,feature)
     drug_features = {
-        drug: feature 
-        for drug, feature in zip(drug_ids, pca_feature_vectors.tolist())
+        drug.lower(): feature 
+        for drug, feature in zip(filtered_drug_dict.keys(), pca_feature_vectors.tolist())
     }
     with open(save_path / f"{dataset}_drug_features.json", "w") as json_file:
             json.dump(drug_features, json_file)

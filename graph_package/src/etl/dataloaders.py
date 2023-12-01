@@ -1,6 +1,10 @@
 import json
 import pandas as pd
 from graph_package.configs.directories import Directories
+from graph_package.src.etl.gold import (
+    create_drug_id_vocabs, 
+    create_cell_line_id_vocabs
+)
 from torch.utils.data import Dataset
 from torchdrug.data import Graph
 
@@ -20,8 +24,7 @@ class KnowledgeGraphDataset(Dataset):
         dataset_path, 
         target: str = "zip_mean", 
         task: str = "reg", 
-        load_node_features: bool = False, 
-        use_random_features: bool = False
+        use_node_features: bool = True, 
     ):
         """
         Initialize the Knowledge Graph.
@@ -30,16 +33,11 @@ class KnowledgeGraphDataset(Dataset):
         - dataset_path (str): The path to the dataset.
         - target (str, optional): The target variable for the task.
         - task (str, optional): The type of task ("reg" for regression, "clf" for classification).
-        - load_node_features (bool, optional): Whether to load node features into the KG.
-        - use_random_features (bool, optional): 
-        Whether to use random features for the drugs not in Hetionet. 
-
-            * If 'False' all drugs not in Hetionet are filtered from the KG
+        - use_node_features (bool, optional): Whether to use node features and load them into the KG.
         """
         self.target = target
         self.task = task
-        self.load_node_features = load_node_features
-        self.use_random_features = use_random_features
+        self.use_node_features = use_node_features
         self.label = target_dict[task][target]
         self.data_df = pd.read_csv(
             dataset_path,
@@ -53,16 +51,14 @@ class KnowledgeGraphDataset(Dataset):
                 self.label: float,
             },
         )
-        # TODO: Use random node features or filter on drugs not in hetionet
-        assert not self.use_random_features or self.load_node_features, "The boolean variables are not the same."
-        if self.load_node_features:
-            feature_path = Directories.DATA_PATH / "ONEIL_drug_features.json"
+        if self.use_node_features:
+            feature_path = Directories.DATA_PATH / "node_features" / "ONEIL_drug_features.json"
             with open(feature_path) as f:
                 node_features = json.load(f)
+            self.data_df, drug_vocab = self._filter_drugs(node_features)
+            self.node_features = [node_features[name.lower()] for name in drug_vocab.keys() if name.lower() in node_features.keys()]
         else:    
             self.node_features = None
-        if not self.use_random_features:
-            self.data_df = self.data_df
         triplets = self.data_df.loc[
             :, ["drug_1_id", "drug_2_id", "context_id"]
         ].to_numpy()
@@ -70,8 +66,6 @@ class KnowledgeGraphDataset(Dataset):
         self.num_nodes = len(
             set(self.data_df["drug_1_id"]).union(set(self.data_df["drug_2_id"]))
         )
-        # TODO: Load node features (set as argument) into graph  
-        #self.node_features = pd.read_csv("node_features") if self.load_node_features else None
         self.graph = Graph(
             triplets, 
             num_node=self.num_nodes, 
@@ -85,6 +79,16 @@ class KnowledgeGraphDataset(Dataset):
             indices = self.indices
         return self.data_df.iloc[indices][target_dict['clf'][self.target]]
 
+    def _filter_drugs(self, node_features):
+        het_drugs = [drug.lower() for drug in list(node_features.keys())]
+        filtered_drugs = self.data_df[
+            (self.data_df['drug_1_name'].str.lower().isin(het_drugs)) &
+            (self.data_df['drug_2_name'].str.lower().isin(het_drugs))
+        ]           
+        filtered_drugs, drug_vocab = create_drug_id_vocabs(filtered_drugs)
+        filtered_drugs, _ = create_cell_line_id_vocabs(filtered_drugs)
+        return filtered_drugs, drug_vocab
+
     def __len__(self):
         return len(self.data_df)
 
@@ -94,7 +98,7 @@ class KnowledgeGraphDataset(Dataset):
     def _create_inverse_triplets(self, df: pd.DataFrame):
         """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
         df_inv = df.copy()
-        df_inv["drug_1"], df_inv["drug_2"] = df["drug_2"], df["drug_1"]
+        df_inv["drug_1_name"], df_inv["drug_2_name"] = df["drug_2_name"], df["drug_1_name"]
         df_inv["drug_1_id"], df_inv["drug_2_id"] = df["drug_2_id"], df["drug_1_id"]
         df_combined = pd.concat([df, df_inv], ignore_index=True)
         return df_combined

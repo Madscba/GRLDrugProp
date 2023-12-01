@@ -1,5 +1,6 @@
 import json
 import torch
+import pandas as pd
 from graph_package.utils.helpers import init_logger
 from graph_package.configs.directories import Directories
 
@@ -34,9 +35,9 @@ def filter_drug_gene_graph(drug_info, gene_degree=2):
         for identifier_key, identifier_value in identifiers.items():
             for graph_drug_name, graph_identifiers in drugs_in_graph.items():
                 if drug_name == graph_drug_name:
-                    filtered_drug_dict[graph_drug_name] = graph_identifiers
+                    filtered_drug_dict[drug_name] = graph_identifiers
                 elif graph_identifiers.get(identifier_key) == identifier_value:
-                    filtered_drug_dict[graph_drug_name] = graph_identifiers
+                    filtered_drug_dict[drug_name] = graph_identifiers
 
     drug_ids = [filtered_drug_dict[drug]['DB'] for drug in filtered_drug_dict.keys()]
     logger.info(f"{len(drug_ids)} of {len(drug_info)} drugs found in Hetionet")
@@ -70,7 +71,7 @@ def filter_drug_gene_graph(drug_info, gene_degree=2):
     logger.info(f"Number of genes connected to at least {gene_degree} drugs: {len(gene_ids)}")
     logger.info(f"Average degree of genes: {round(avg_gene_degree,3)}")
 
-    return drug_ids, gene_ids, filtered_edges
+    return filtered_drug_dict, gene_ids, filtered_edges
 
 def build_adjacency_matrix(drug_ids, gene_ids, edges):
 
@@ -90,3 +91,10 @@ def build_adjacency_matrix(drug_ids, gene_ids, edges):
             adjacency_matrix[drug_index, gene_index] = 1.0
 
     return adjacency_matrix
+
+def create_inverse_triplets(df: pd.DataFrame):
+    """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
+    df_inv = df.copy()
+    df_inv["drug_row"], df_inv["drug_col"] = df["drug_col"], df["drug_row"]
+    df_combined = pd.concat([df, df_inv], ignore_index=True)
+    return df_combined
