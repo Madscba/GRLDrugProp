@@ -27,8 +27,7 @@ frozenlist==1.4.0
 fsspec==2023.10.0
 fuzzywuzzy==0.18.0
 gitdb==4.0.11
-GitPython==3.1.40
--e git+https://github.com/Madscba/GRLDrugProp.git@f214922a2b233aa3c73384f65f4dce524dfdc541#egg=graph_package
+GitPython==3.1.4
 huggingface-hub==0.18.0
 hydra-core==1.3.2
 idna==3.4

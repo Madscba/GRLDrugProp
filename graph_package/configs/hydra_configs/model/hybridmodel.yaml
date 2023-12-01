@@ -7,3 +7,4 @@ rescal:
 
 ckpt_path: ''
 pretrain_model: "rescal"
+comb_weight_req_grad: True 

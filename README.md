@@ -39,7 +39,7 @@ module load cuda/12.1
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements_hpc.txt
-bash environment_config/update_chemicalx.sh
+
 ```
 To test it run in same terminal:
 

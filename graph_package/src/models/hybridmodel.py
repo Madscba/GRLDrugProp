@@ -4,7 +4,6 @@ from graph_package.src.models import RESCAL, DeepDDS
 from collections import OrderedDict
 
 
-
 class HybridModel(nn.Module):
     def __init__(
         self,
@@ -12,6 +11,7 @@ class HybridModel(nn.Module):
         deepdds: dict,
         ckpt_path=None,
         pretrain_model="rescal",
+        comb_weight_req_grad=True,
     ) -> None:
         super().__init__()
 
@@ -22,18 +22,24 @@ class HybridModel(nn.Module):
             RESCAL, rescal, ckpt_path, freeze=pretrain_model == "rescal"
         )
 
-        self.deepdds_weight = nn.Parameter(torch.tensor([0.5]))
-        self.rescal_weight = nn.Parameter(torch.tensor([0.5]))
+        self.deepdds_weight = nn.Parameter(
+            torch.tensor([0.05]), requires_grad=comb_weight_req_grad
+        )
+        self.rescal_weight = nn.Parameter(
+            torch.tensor([0.95]), requires_grad=comb_weight_req_grad
+        )
 
-    def load_model(self, model_construct, model_kwargs,  ckpt_path, freeze=False):
+    def load_model(self, model_construct, model_kwargs, ckpt_path, freeze=False):
         model = model_construct(**model_kwargs)
         if freeze:
-            state_dict = remove_prefix_from_keys(torch.load(ckpt_path)["state_dict"],'model.')
+            state_dict = remove_prefix_from_keys(
+                torch.load(ckpt_path)["state_dict"], "model."
+            )
             model.load_state_dict(state_dict)
             self.freeze_model(model)
         return model
 
-    def freeze_model(self,model):
+    def freeze_model(self, model):
         for param in model.parameters():
             param.requires_grad = False
 
@@ -59,6 +65,6 @@ def remove_prefix_from_keys(d, prefix):
     """
     new_dict = OrderedDict()
     for key, value in d.items():
-        new_key = key[len(prefix):] if key.startswith(prefix) else key
+        new_key = key[len(prefix) :] if key.startswith(prefix) else key
         new_dict[new_key] = value
     return new_dict
