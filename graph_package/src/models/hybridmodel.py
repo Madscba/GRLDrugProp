@@ -11,6 +11,7 @@ class HybridModel(nn.Module):
         deepdds: dict,
         ckpt_path=None,
         pretrain_model="rescal",
+        comb_weight = 0.95,
         comb_weight_req_grad=True,
     ) -> None:
         super().__init__()
@@ -22,11 +23,17 @@ class HybridModel(nn.Module):
             RESCAL, rescal, ckpt_path, freeze=pretrain_model == "rescal"
         )
 
+        if not pretrain_model:
+            deepdds_init_weight=rescal_init_weight=0.5
+        else:
+            deepdds_init_weight = comb_weight if pretrain_model=='deepdds' else 1-comb_weight
+            rescal_init_weight = 1-deepdds_init_weight
+
         self.deepdds_weight = nn.Parameter(
-            torch.tensor([0.05]), requires_grad=comb_weight_req_grad
+            torch.tensor([deepdds_init_weight]), requires_grad=comb_weight_req_grad
         )
         self.rescal_weight = nn.Parameter(
-            torch.tensor([0.95]), requires_grad=comb_weight_req_grad
+            torch.tensor([rescal_init_weight]), requires_grad=comb_weight_req_grad
         )
 
     def load_model(self, model_construct, model_kwargs, ckpt_path, freeze=False):
