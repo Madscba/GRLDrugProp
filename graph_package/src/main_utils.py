@@ -20,7 +20,7 @@ def get_drug_split(dataset, config, n_drugs_per_fold=3):
     splits = []
     df = dataset.data_df
     for i in range(0, dataset.num_nodes, n_drugs_per_fold):
-        drug_ids = list(range(i, min(i+n_drugs_per_fold, dataset.num_nodes)))
+        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.num_nodes)))
         drug_1_idx = df[df["drug_1_id"].isin(drug_ids)].index
         drug_2_idx = df[df["drug_2_id"].isin(drug_ids)].index
         test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
@@ -61,6 +61,7 @@ def pretrain_single_model(config, data_loaders, k):
         task=config.task,
         model_kwargs=config.model[model_name],
         logger_enabled=False,
+        target=config.dataset.target,
     )
 
     trainer = Trainer(
@@ -101,12 +102,13 @@ def load_data(dataset_config: dict, task="reg"):
 def init_model(
     model: str = "deepdds",
     task: str = "clf",
+    target: str = "zip_mean",
     model_kwargs: dict = {},
     logger_enabled: bool = True,
 ):
     """Load model from registry"""
     model = model_dict[model.lower()](**model_kwargs)
-    pl_module = BasePL(model, task=task, logger_enabled=logger_enabled)
+    pl_module = BasePL(model, task=task, logger_enabled=logger_enabled, target=target)
     return pl_module
 
 
