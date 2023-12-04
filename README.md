@@ -47,7 +47,15 @@ To test it run in same terminal:
 voltash
 python graph_package/src/main.py
 ```
-When submitting jobs you have to provide ```module load cuda/12.1``` in your bash script. 
+
+When submitting jobs you have to provide 
+
+```bash 
+module load cuda/12.1 
+module load gcc/13.1.0-binutils-2.40
+``` 
+
+in your bash script. 
 
 4 Naming convention of runs in W&B
 ----------------

@@ -111,14 +111,14 @@ async def download_response_info_drugcomb(
                 except:
                     failure_counts +=1 
                     logger.error(f"Failed to download information for {type} with id {i}")
-                if failure_counts > 10:
+                if failure_counts > 5:
                     logger.error(f"Failed to download information for {type} with id {i} more than 10 times. Stopping.")
                     break
 
 async def download_info(session, url):
     async with session.get(url) as response:
         response.raise_for_status()
-        return await asyncio.wait_for(response.json(), timeout=1000000)
+        return await asyncio.wait_for(response.json(),timeout=100000)
 
 
 def download_cell_line_info_drugcomb(overwrite=False):
