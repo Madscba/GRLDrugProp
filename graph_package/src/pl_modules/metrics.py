@@ -4,12 +4,10 @@ import torch
 
 metric_dict = {"auprc":AveragePrecision,
                "auroc":AUROC,
-                "acc":Accuracy,
-                "calib_err":CalibrationError,
                 "CM":ConfusionMatrix,
                 "F1":F1Score}
 
-test = ["auprc","auroc","acc","calib_err","CM","F1"]
+test = ["auprc","auroc","CM","F1"]
 train_val = ["auprc","auroc"]
 
 class RegMetrics(torch.nn.Module):
@@ -21,7 +19,7 @@ class RegMetrics(torch.nn.Module):
         self.reg_metrics = ModuleDict({f"{type}_mse":MeanSquaredError()})
 
     def forward(self, preds: torch.Tensor, target: torch.Tensor):
-        target_clf = (target >= 10).to(torch.int64)
+        target_clf = (target >= 5).to(torch.int64)
         clf_metrics = {key:metric(preds,target_clf) for key,metric in self.clf_metrics.items()}
         reg_metrics = {key:metric(preds,target) for key, metric in self.reg_metrics.items()}
         clf_metrics.update(reg_metrics)
