@@ -34,7 +34,7 @@ def generate_pca_feature_vectors(dataset="ONEIL", components=20):
 
     # Load ONEIL dataset (or bigger dataset)
     drugs = pd.read_csv(data_path)
-    drugs = drugs[drugs['study_name']==dataset]
+    drugs = drugs[drugs['study_name'].isin(dataset)]
     drugs = create_inverse_triplets(drugs)
     names = [drug_dict[drug]['dname'] for drug in drugs.drug_row.unique()]
 
