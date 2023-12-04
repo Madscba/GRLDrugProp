@@ -15,6 +15,9 @@ def load_oneil():
     data_path = Directories.DATA_PATH / "silver" / "oneil" / "oneil.csv"
     return pd.read_csv(data_path)
 
+def load_oneil_almanac():
+    data_path = Directories.DATA_PATH / "silver" / "oneil_almanac" / "oneil_almanac.csv"
+    return pd.read_csv(data_path)
 
 def load_drug_info_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "drug_dict.json"
@@ -210,7 +213,7 @@ def get_max_zip_response(df: pd.DataFrame):
     df["max_label"] = df["synergy_zip_max"].apply(lambda x: 1 if x >= 10 else 0)
     return df
 
-def make_oneil_dataset():
+def make_oneil_dataset(study="ONEIL"):
     logger.info("Making Oneil dataset.")
     save_path = Directories.DATA_PATH / "gold" / "oneil"
     save_path.mkdir(parents=True, exist_ok=True)

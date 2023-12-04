@@ -24,3 +24,4 @@ graph_package/outputs
 *.out
 plots/*
 scrapbook.py
+graph_package/src/outputs/*

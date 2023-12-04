@@ -14,6 +14,23 @@ def load_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
     return pd.read_csv(data_path)
 
+def generate_study_dataset(studies=["ONEIL"]):
+    """
+    Generate the ONEIL and/or ALMANAC dataset from the DrugComb dataset.
+    """
+    study_names = "oneil_almanac" if len(studies)>1 else studies[0].lower()
+    df = load_drugcomb()
+    df_study = df[df["study_name"].isin(studies)]
+    df_study_cleaned = df_study.dropna(subset=["drug_row", "drug_col", "synergy_loewe"])   
+    unique_block_ids = df_study_cleaned["block_id"].unique().tolist()
+    download_response_info(unique_block_ids,study_names=study_names,overwrite=False)
+    study_path = Directories.DATA_PATH / "silver" / study_names
+    study_path.mkdir(exist_ok=True,parents=True)
+    df_study_cleaned = df_study_cleaned.loc[
+        :, ~df_study_cleaned.columns.str.startswith("Unnamed")
+    ]
+    df_study_cleaned.to_csv(study_path / f"{study_names}.csv", index=False)
+
 def generate_oneil_dataset():
     """
     Generate the Oniel dataset from the DrugComb dataset.
@@ -22,7 +39,7 @@ def generate_oneil_dataset():
     df_oneil = df[df["study_name"] == "ONEIL"]
     df_oneil_cleaned = df_oneil.dropna(subset=["drug_row", "drug_col", "synergy_loewe"])   
     unique_block_ids = df_oneil_cleaned["block_id"].unique().tolist()
-    download_response_info_oneil(unique_block_ids,overwrite=False)
+    download_response_info(unique_block_ids,overwrite=False)
     oneil_path = Directories.DATA_PATH / "silver" / "oneil"
     oneil_path.mkdir(exist_ok=True,parents=True)
     df_oneil_cleaned = df_oneil_cleaned.loc[
@@ -31,10 +48,11 @@ def generate_oneil_dataset():
     df_oneil_cleaned.to_csv(oneil_path / "oneil.csv", index=False)
 
 
-def download_response_info_oneil(list_entities, overwrite=False):
+def download_response_info(list_entities, study_names = "oneil", overwrite=False):
     """Download response information from DrugComb API. This is in silver
     since downloading it for all of DrugComb take up too much space."""
-    data_path = Directories.DATA_PATH / "silver" / "oneil"
+    data_path = Directories.DATA_PATH / "silver" / study_names
+    data_path.mkdir(exist_ok=True,parents=True)
     if (not (data_path / "block_dict.json").exists()) | overwrite:
         if (data_path / "block_dict.json").exists():
               os.remove(data_path / "block_dict.json")
@@ -58,6 +76,7 @@ def download_response_info_oneil(list_entities, overwrite=False):
 
 
 if __name__ == "__main__":
+    generate_oneil_almanac_dataset()
     generate_oneil_dataset()
 
     
