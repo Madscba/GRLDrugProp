@@ -6,9 +6,9 @@ from graph_package.configs.directories import Directories
 
 logger = init_logger()
 
-def filter_drug_gene_graph(drug_info, gene_degree=2):
+def filter_drugs_in_graph(drug_info):
     """
-    Function for retrieving neigboring gene ID's in Hetionet for drugs in DrugComb
+    Function for filtering drugs in DrugComb found in Hetionet
     """
 
     # Load Hetionet from json
@@ -41,6 +41,13 @@ def filter_drug_gene_graph(drug_info, gene_degree=2):
 
     drug_ids = [filtered_drug_dict[drug]['DB'] for drug in filtered_drug_dict.keys()]
     logger.info(f"{len(drug_ids)} of {len(drug_info)} drugs found in Hetionet")
+    return drug_ids, filtered_drug_dict, edges
+
+
+def filter_drug_gene_graph(drug_ids, edges, gene_degree=2):
+    """
+    Function for retrieving neigboring gene ID's in Hetionet for drugs in DrugComb
+    """
 
     # Step 2: Filter on genes related to drugs in the subset
     genes_connected_to_drugs = {}
@@ -71,7 +78,7 @@ def filter_drug_gene_graph(drug_info, gene_degree=2):
     logger.info(f"Number of genes connected to at least {gene_degree} drugs: {len(gene_ids)}")
     logger.info(f"Average degree of genes: {round(avg_gene_degree,3)}")
 
-    return filtered_drug_dict, gene_ids, filtered_edges
+    return gene_ids, filtered_edges
 
 def build_adjacency_matrix(drug_ids, gene_ids, edges):
 

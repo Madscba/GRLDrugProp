@@ -4,7 +4,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt 
 
-from utils import (filter_drug_gene_graph, build_adjacency_matrix, create_inverse_triplets)
+from utils import (
+    filter_drugs_in_graph,
+    filter_drug_gene_graph, 
+    build_adjacency_matrix, 
+    create_inverse_triplets
+)
 from graph_package.utils.helpers import init_logger
 from graph_package.configs.directories import Directories
 
@@ -42,9 +47,10 @@ def generate_pca_feature_vectors(dataset="ONEIL", components=20):
         drug_info[drug_name]['DB'] = drug_dict[drug]['drugbank_id']
 
     # Filter drugs and genes in Hetionet and build adjacency matrix
-    filtered_drug_dict, gene_ids, edges = filter_drug_gene_graph(drug_info,gene_degree=4)
+    drug_ids, filtered_drug_dict, edges = filter_drugs_in_graph(drug_info)
+    gene_ids, filtered_edges = filter_drug_gene_graph(drug_ids=drug_ids,edges=edges,gene_degree=4)
     drug_ids = [filtered_drug_dict[drug]['DB'] for drug in filtered_drug_dict.keys()]
-    adjacency_matrix = build_adjacency_matrix(drug_ids,gene_ids,edges)
+    adjacency_matrix = build_adjacency_matrix(drug_ids,gene_ids,filtered_edges)
     degree = [adjacency_matrix[i,:].sum() for i in range(adjacency_matrix.shape[0])]
     logger.info(f"Average drug degree: {sum(degree)/len(degree)} (max is {adjacency_matrix.shape[1]})")
     
