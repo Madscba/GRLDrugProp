@@ -110,17 +110,17 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
     legend_list = [model_names, combined_legend]
 
     ##Investigate triplet (drug,drug, cell line), "triplet_name"
-    triplet_titles = [f"triplet_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["triplet_idx"],
-            triplet_titles[idx],
-            "triplet_name",
-            add_bar_info=False,
-            run_name=run_name,
-        )
+    # triplet_titles = [f"triplet_{title}" for title in title_suffix]
+    # for idx, df_list in enumerate(df_lists):
+    #     barplot_aucroc_grouped_by_entity(
+    #         df_list,
+    #         legend_list[idx],
+    #         ["triplet_idx"],
+    #         triplet_titles[idx],
+    #         "triplet_name",
+    #         add_bar_info=False,
+    #         run_name=run_name,
+    #     )
 
     ##Investigate drug pairs, "drug_pair_name"
     drug_pair_titles = [f"drug_pair_{title}" for title in title_suffix]
@@ -178,7 +178,7 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
             legend_list[idx],
             ["tissue_id"],
             tissue_titles[idx],
-            "name",
+            "tissue_name",
             run_name=run_name,
         )
 

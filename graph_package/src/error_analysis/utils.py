@@ -456,6 +456,7 @@ def generate_difference_df(
 ):
     df_diff = grouped_dfs[0].merge(
         grouped_dfs[1],
+        how="inner",
         suffixes=(f"_{model_names[0]}", f"_{model_names[1]}"),
         on=group_by_columns,
     )
@@ -491,18 +492,33 @@ def generate_bar_plot(
     sorted_df = sort_df_by_metric(grouped_df, metric)
     top20_df = sorted_df.tail(20)
     top20_df.reset_index(inplace=True)
-    plt.figure(figsize=(20, 10))
+    plt.figure(figsize=(16, 10))
     plt.subplot(1, 2, 1)
     # sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
     sorted_df[metric].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
+    plt.gca().set_xticklabels([])
     # plt.xticks(rotation=90)
-    plt.gca().set_xticks(range(len(sorted_df)))
-    plt.gca().set_xticklabels(sorted_df[xlabel_col_name])
+    # plt.gca().set_xticks(range(len(sorted_df)))
+    # plt.gca().set_xticklabels(sorted_df[xlabel_col_name])
+    # todo add avg. aucroc, class balance and n_exp to title with all entitites
+    avg_exp_and_class_balance = [
+        np.round(np.mean(sorted_df[exp_data].values), 2)
+        for exp_data in ["n_exp", "class_balance"]
+    ]
+    avg_exp_and_class_balance_str = f"avg n_exp: {avg_exp_and_class_balance[0]}\navg cb: {avg_exp_and_class_balance[1]:.2f}"
+    plt.text(
+        sorted_df.shape[0] * 0.8,
+        sorted_df[metric].max() * 0.92,
+        avg_exp_and_class_balance_str,
+        ha="center",
+        va="bottom",
+    )
     plt.title(f"{title}\n {metric}")
     plt.legend([model_names[i]])
     plt.subplot(1, 2, 2)
     top20_df[metric].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-    # plt.xticks(rotation=90)
+    # plt.gca().set_ylim(0, 1)
+    # plt.xticks(rotation=45)
     plt.gca().set_xticks(range(len(top20_df)))
     plt.gca().set_xticklabels(top20_df[xlabel_col_name])
     plt.title(f"{title}\ntop 20 w. lowest {metric}")
@@ -693,6 +709,7 @@ def merge_cell_line_and_drug_info(df, cell_line_meta_data, drug_meta_data):
     )
     df = df.drop(columns=["dname", "id"], inplace=False, axis=1)
     df = df.merge(cell_line_meta_data, how="left", left_on="rel_name", right_on="name")
+    df = df.rename(columns={"name": "tissue_name"})
     return df
 
 
