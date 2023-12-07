@@ -90,7 +90,10 @@ def main(config):
             config.model.update({"ckpt_path": check_point})
 
         model = init_model(
-            model=model_name, task=config.task, model_kwargs=config.model
+            model=model_name,
+            task=config.task,
+            model_kwargs=config.model,
+            target=config.dataset.target,
         )
 
         trainer = Trainer(
