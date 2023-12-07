@@ -22,10 +22,18 @@ from sklearn.metrics import (
 import seaborn as sns
 from datetime import date
 from graph_package.src.main_utils import load_data
+import numpy as np
+import torch
 
 
 def get_performance_curve(
-    y_true, y_scores, model_name, curve_type="roc", save_output=False, save_path=None
+    y_true,
+    y_scores,
+    model_name,
+    config,
+    curve_type="roc",
+    save_output=False,
+    save_path=None,
 ):
     """
     Plot ROC or precision-recall curve for binary classification.
@@ -72,7 +80,7 @@ def get_performance_curve(
     plt.legend(loc=legend_loc)
 
     if save_output:
-        save_path = get_err_analysis_path(save_path)
+        save_path = get_err_analysis_path(save_path, config)
 
         plt.savefig(
             save_path / f"{model_name}_{curve_type}_curve.png", bbox_inches="tight"
@@ -81,7 +89,7 @@ def get_performance_curve(
 
 
 def convert_metrics_to_summary_table(
-    callback_metrics, model_name, save_output=False, save_path=False
+    callback_metrics, config, model_name, save_output=False, save_path=False
 ):
     """
     Convert metric dictionary to summary table
@@ -108,13 +116,13 @@ def convert_metrics_to_summary_table(
     ax.table(cellText=df.values, colLabels=df.columns, cellLoc="center", loc="center")
 
     if save_output:
-        save_path = get_err_analysis_path(save_path)
+        save_path = get_err_analysis_path(save_path, config)
         plt.savefig(
             save_path / f"{model_name}_summary_metric_table.png", bbox_inches="tight"
         )
 
 
-def get_err_analysis_path(save_path):
+def get_err_analysis_path(save_path, config):
     """
     Dummy function to retrieve default save path if none is supplied
 
@@ -126,7 +134,8 @@ def get_err_analysis_path(save_path):
     today = date.today()
     today_str = today.strftime("%d_%m_%Y")
     if not save_path:
-        save_path = Directories.OUTPUT_PATH / "err_analysis" / today_str
+        task_target = "_".join([config.task, config.dataset.target])
+        save_path = Directories.OUTPUT_PATH / "err_analysis" / today_str / task_target
     return save_path
 
 
@@ -149,23 +158,29 @@ def get_roc_visualization(y_true, y_pred_probability):
     plt.show()
 
 
-def get_model_pred_path(save_path):
+def get_model_pred_path(save_path, config={}):
     """
     Dummy function to retrieve default save path if none is supplied
 
     Parameters:
         save_path (str): path to save object
+        config (DictConfig): hydra config
     Returns:
         None (displays the plot).
     """
     today = date.today()
     today_str = today.strftime("%d_%m_%Y")
     if not save_path:
-        save_path = Directories.OUTPUT_PATH / "model_predictions" / today_str
+        task_target = "_".join([config.task, config.dataset.target])
+        save_path = (
+            Directories.OUTPUT_PATH / "model_predictions" / today_str / task_target
+        )
     return save_path
 
 
-def get_confusion_matrix_heatmap(values, save_output, model_name, save_path=False):
+def get_confusion_matrix_heatmap(
+    values, save_output, config, model_name, save_path=False
+):
     """
     Turn confusion matrix into heatmap w. values
 
@@ -183,13 +198,13 @@ def get_confusion_matrix_heatmap(values, save_output, model_name, save_path=Fals
     ax.set_xlabel("predicted values")
     ax.set_ylabel("actual values")
     if save_output:
-        save_path = get_err_analysis_path(save_path)
+        save_path = get_err_analysis_path(save_path, config)
 
         fig.savefig(save_path / f"{model_name}_conf_matrix.png")
     return fig
 
 
-def save_model_pred(batch_idx, batch, preds, target, model_name, save_path=False):
+def save_model_pred(batch_idx, batch, preds, target, config, model_name, save_path=""):
     """
     Save model predictions, alongside batch_idx, batch triplets
 
@@ -210,8 +225,9 @@ def save_model_pred(batch_idx, batch, preds, target, model_name, save_path=False
         "targets": [target],
     }
 
-    save_path = get_model_pred_path(save_path)
+    save_path = get_model_pred_path(save_path, config)
     if not save_path.exists():
+        print("making a space to save preds: ", save_path)
         save_path.mkdir(exist_ok=True, parents=True),
 
     pred_path = save_path / f"{model_name}_model_pred_dict.pkl"
@@ -225,6 +241,7 @@ def save_model_pred(batch_idx, batch, preds, target, model_name, save_path=False
             output_dict.update({key: concatenated_input})
 
     with open(save_path / f"{model_name}_model_pred_dict.pkl", "wb") as f:
+        print("saving at: ", save_path / f"{model_name}_model_pred_dict.pkl")
         pickle.dump(output_dict, f)
 
 
@@ -249,7 +266,9 @@ def get_model_pred_dict(file_name="rescal_model_pred_dict.pkl", save_path=""):
     return pred_dict
 
 
-def save_performance_plots(df_cm, metrics, preds, target, model_name, save_path=""):
+def save_performance_plots(
+    df_cm, metrics, preds, target, config, model_name, save_path=""
+):
     """
     Create and save confusion-matrix heatmap, roc- and pr curves and summary table as figures
 
@@ -258,16 +277,22 @@ def save_performance_plots(df_cm, metrics, preds, target, model_name, save_path=
         metrics (dict): dict with metrics
         preds (str): model predictions
         target (str): ground truth
+        config (DictConfig): hydra config
+        model_name (str): model name
         save_path (str): path to save object
 
     Returns:
         None: Function saves dictionary with all of the above information as a pickle file
     """
-    save_path = get_err_analysis_path(save_path)
+    save_path = get_err_analysis_path(save_path, config)
     if not save_path.exists():
         save_path.mkdir(exist_ok=True, parents=True)
     get_confusion_matrix_heatmap(
-        values=df_cm, save_output=True, save_path=save_path, model_name=model_name
+        values=df_cm,
+        save_output=True,
+        save_path=save_path,
+        config=config,
+        model_name=model_name,
     )
     get_performance_curve(
         target,
@@ -275,6 +300,7 @@ def save_performance_plots(df_cm, metrics, preds, target, model_name, save_path=
         curve_type="roc",
         save_output=True,
         save_path=save_path,
+        config=config,
         model_name=model_name,
     )
     get_performance_curve(
@@ -283,10 +309,15 @@ def save_performance_plots(df_cm, metrics, preds, target, model_name, save_path=
         curve_type="pr",
         save_output=True,
         save_path=save_path,
+        config=config,
         model_name=model_name,
     )
     convert_metrics_to_summary_table(
-        metrics, save_output=True, save_path=save_path, model_name=model_name
+        metrics,
+        save_output=True,
+        save_path=save_path,
+        config=config,
+        model_name=model_name,
     )
 
 
@@ -310,13 +341,14 @@ def find_best_model_ckpt(ckpt_folder):
     return max_checkpoint
 
 
-def barplot_mean_correct_prediction_grouped_by_entity(
+def barplot_aucroc_grouped_by_entity(
     pred_dfs,
     model_names,
     group_by_columns,
     title,
     xlabel_col_name,
     add_bar_info: bool = True,
+    run_name: str = "",
 ):
     """
     Generate and save barplot
@@ -398,6 +430,7 @@ def barplot_mean_correct_prediction_grouped_by_entity(
             title,
             xlabel_col_name,
             add_bar_info,
+            run_name,
         )
 
     if len(pred_dfs) == 2 and xlabel_col_name != "triplet_name":
@@ -414,6 +447,7 @@ def barplot_mean_correct_prediction_grouped_by_entity(
             f"{xlabel_col_name}_diff",
             xlabel_col_name,
             add_bar_info,
+            run_name,
         )
 
 
@@ -452,6 +486,7 @@ def generate_bar_plot(
     title,
     xlabel_col_name,
     add_bar_info,
+    run_name,
 ):
     sorted_df = sort_df_by_metric(grouped_df, metric)
     top20_df = sorted_df.tail(20)
@@ -473,11 +508,12 @@ def generate_bar_plot(
     plt.title(f"{title}\ntop 20 w. lowest {metric}")
     if add_bar_info:
         for index, value in enumerate(top20_df[metric]):
-            bar_text = f"n:\n{top20_df.loc[index, ['n_exp']].values[0]}\ncb:\n{round(top20_df.loc[index, ['class_balance']].values[0], 2)}"
+            cb = np.round(top20_df.loc[index, ["class_balance"]].values[0], 2)
+            bar_text = f"n:\n{top20_df.loc[index, ['n_exp']].values[0]}\ncb:\n{cb:.2f}"
             plt.text(index, value, bar_text, ha="center", va="bottom")
     plt.legend([model_names[i]])
     plt.tight_layout()
-    plt.savefig(save_path / f"{title}_bar_{model_names[i]}")
+    plt.savefig(save_path / f"{run_name}_{title}_bar_{model_names[i]}")
     plt.show()
     plt.clf()
 
@@ -528,14 +564,8 @@ def get_prediction_dataframe(file_name, save_path=""):
         df (pd.DataFrame): dataframe with saved model predictions
     """
     pred_dict = get_model_pred_dict(file_name, save_path)
-    dataframes = [
-        pd.DataFrame(ent)
-        for ent in [
-            pred_dict["batch"][0].numpy(),
-            pred_dict["predictions"],
-            pred_dict["targets"],
-        ]
-    ]
+    dataframes = format_and_return_as_dataframes(pred_dict)
+
     df = pd.concat(dataframes, axis=1)
     df.columns = [
         "drug_molecules_left_id",
@@ -545,6 +575,31 @@ def get_prediction_dataframe(file_name, save_path=""):
         "targets",
     ]
     return df
+
+
+def format_and_return_as_dataframes(pred_dict):
+    if len(pred_dict["batch"]) != 2:
+        fold_triplets = torch.vstack(pred_dict["batch"][::2]).numpy()
+        fold_predictions = torch.hstack(pred_dict["predictions"]).numpy()
+        fold_target = torch.hstack(pred_dict["batch"][1::2]).numpy()
+        dataframes = [
+            pd.DataFrame(ent)
+            for ent in [
+                fold_triplets,
+                fold_predictions,
+                fold_target,
+            ]
+        ]
+    else:
+        dataframes = [
+            pd.DataFrame(ent)
+            for ent in [
+                pred_dict["batch"][0],
+                pred_dict["predictions"],
+                pred_dict["batch"][1],
+            ]
+        ]
+    return dataframes
 
 
 def get_bce_loss(pred_dfs):
@@ -620,23 +675,24 @@ def merge_cell_line_and_drug_info(df, cell_line_meta_data, drug_meta_data):
     Returns:
         df (pd.DataFrame):
     """
-    df = pd.merge(
-        df,
+    df = df.merge(
         drug_meta_data,
-        left_on="drug_molecules_left_id",
-        right_on="id",
+        how="left",
+        left_on="drug_name_left",
+        right_on="dname",
         suffixes=("", "_left"),
     )
-    df.drop("id", inplace=True, axis=1)
-    df = pd.merge(
-        df,
+    df = df.drop(columns=["dname", "id"], inplace=False, axis=1)
+
+    df = df.merge(
         drug_meta_data,
-        left_on="drug_molecules_right_id",
-        right_on="id",
+        how="left",
+        left_on="drug_name_right",
+        right_on="dname",
         suffixes=("", "_right"),
     )
-    df.drop("id", inplace=True, axis=1)
-    df = pd.merge(df, cell_line_meta_data, left_on="context_features_id", right_on="id")
+    df = df.drop(columns=["dname", "id"], inplace=False, axis=1)
+    df = df.merge(cell_line_meta_data, how="left", left_on="rel_name", right_on="name")
     return df
 
 
@@ -654,13 +710,13 @@ def merge_vocabs_with_predictions(df, df_ent_vocab, df_rel_vocab):
     df = df.merge(
         df_ent_vocab, left_on="drug_molecules_left_id", right_on="drug_id"
     ).rename(columns={"drug_name": "drug_name_left"})
-    df.drop(["drug_id"], inplace=True, axis=1)
+    df = df.drop(["drug_id"], inplace=False, axis=1)
     df = df.merge(
         df_ent_vocab, left_on="drug_molecules_right_id", right_on="drug_id"
     ).rename(columns={"drug_name": "drug_name_right"})
     df.drop(["drug_id"], inplace=True, axis=1)
     df = df.merge(df_rel_vocab, left_on="context_features_id", right_on="rel_id")
-    df.drop("rel_id", inplace=True, axis=1)
+    df = df.drop("rel_id", inplace=False, axis=1)
     return df
 
 
@@ -738,7 +794,10 @@ def enrich_model_predictions(model_names, pred_dfs):
 
         df["triplet_name"] = df.apply(
             lambda row: ",".join(
-                [str(row[key]) for key in ["dname", "dname_right", "rel_name"]]
+                [
+                    str(row[key])
+                    for key in ["drug_name_left", "drug_name_right", "rel_name"]
+                ]
             ),
             axis=1,
         )
@@ -749,7 +808,9 @@ def enrich_model_predictions(model_names, pred_dfs):
             axis=1,
         )
         df["drug_pair_name"] = df.apply(
-            lambda row: ",".join([str(row[key]) for key in ["dname", "dname_right"]]),
+            lambda row: ",".join(
+                [str(row[key]) for key in ["drug_name_left", "drug_name_right"]]
+            ),
             axis=1,
         )
 
