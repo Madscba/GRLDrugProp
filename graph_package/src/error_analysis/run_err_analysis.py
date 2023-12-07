@@ -110,17 +110,17 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
     legend_list = [model_names, combined_legend]
 
     ##Investigate triplet (drug,drug, cell line), "triplet_name"
-    # triplet_titles = [f"triplet_{title}" for title in title_suffix]
-    # for idx, df_list in enumerate(df_lists):
-    #     barplot_aucroc_grouped_by_entity(
-    #         df_list,
-    #         legend_list[idx],
-    #         ["triplet_idx"],
-    #         triplet_titles[idx],
-    #         "triplet_name",
-    #         add_bar_info=False,
-    #         run_name=run_name
-    #     )
+    triplet_titles = [f"triplet_{title}" for title in title_suffix]
+    for idx, df_list in enumerate(df_lists):
+        barplot_aucroc_grouped_by_entity(
+            df_list,
+            legend_list[idx],
+            ["triplet_idx"],
+            triplet_titles[idx],
+            "triplet_name",
+            add_bar_info=False,
+            run_name=run_name,
+        )
 
     ##Investigate drug pairs, "drug_pair_name"
     drug_pair_titles = [f"drug_pair_{title}" for title in title_suffix]
@@ -218,6 +218,7 @@ def get_drug_level_df(df_list):
             "rel_name",
             "pred_prob",
             "targets",
+            "drug_pair_idx",
         ],
     ]
     df_sub = pd.concat(
@@ -233,11 +234,8 @@ def get_drug_level_df(df_list):
             ),
         )
     )
-    df_sub_new = df_sub[
-        ["drug_molecules_left_id", "drug_molecules_right_id"]
-    ].drop_duplicates()
-    df_drug_without_dupl = df_sub.iloc[df_sub_new.index]
-    return df_drug_without_dupl
+
+    return df_sub
 
 
 if __name__ == "__main__":
