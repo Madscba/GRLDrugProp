@@ -6,7 +6,7 @@ from graph_package.src.main import (
 )
 from graph_package.src.error_analysis.utils import (
     find_best_model_ckpt,
-    barplot_mean_correct_prediction_grouped_by_entity,
+    barplot_aucroc_grouped_by_entity,
     sort_df_by_metric,
     map_to_index,
     get_prediction_dataframe,
@@ -82,7 +82,7 @@ def main(config):
     error_diagnostics_plots()
 
 
-def error_diagnostics_plots(model_names):
+def error_diagnostics_plots(model_names, path_to_prediction_folder):
     """
     Load predictions and provide diagnostics bar plots on entity level:
 
@@ -95,7 +95,11 @@ def error_diagnostics_plots(model_names):
     """
     # load predictions from trained model(s)
     pred_file_names = [f"{model}_model_pred_dict.pkl" for model in model_names]
-    pred_dfs = [get_prediction_dataframe(pred_file) for pred_file in pred_file_names]
+    pred_dfs = [
+        get_prediction_dataframe(pred_file, save_path=path_to_prediction_folder)
+        for pred_file in pred_file_names
+    ]
+    run_name = path_to_prediction_folder.name
 
     # enrich predictions with vocabularies and meta data
     combined_legend = ["&".join(model_names)]
@@ -106,66 +110,76 @@ def error_diagnostics_plots(model_names):
     legend_list = [model_names, combined_legend]
 
     ##Investigate triplet (drug,drug, cell line), "triplet_name"
-    triplet_titles = [f"triplet_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_mean_correct_prediction_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["triplet_idx"],
-            triplet_titles[idx],
-            "triplet_name",
-            add_bar_info=False,
-        )
+    # triplet_titles = [f"triplet_{title}" for title in title_suffix]
+    # for idx, df_list in enumerate(df_lists):
+    #     barplot_aucroc_grouped_by_entity(
+    #         df_list,
+    #         legend_list[idx],
+    #         ["triplet_idx"],
+    #         triplet_titles[idx],
+    #         "triplet_name",
+    #         add_bar_info=False,
+    #         run_name=run_name,
+    #     )
 
     ##Investigate drug pairs, "drug_pair_name"
     drug_pair_titles = [f"drug_pair_{title}" for title in title_suffix]
     for idx, df_list in enumerate(df_lists):
-        barplot_mean_correct_prediction_grouped_by_entity(
+        barplot_aucroc_grouped_by_entity(
             df_list,
             legend_list[idx],
             ["drug_pair_idx"],
             drug_pair_titles[idx],
             "drug_pair_name",
+            run_name=run_name,
         )
 
     ##Investigate cancer cell line, "rel_name"
     cancer_cell_line_titles = [f"cancer_cell_{title}" for title in title_suffix]
     for idx, df_list in enumerate(df_lists):
-        barplot_mean_correct_prediction_grouped_by_entity(
+        barplot_aucroc_grouped_by_entity(
             df_list,
             legend_list[idx],
             ["context_features_id"],
             cancer_cell_line_titles[idx],
             "rel_name",
+            run_name=run_name,
         )
 
     ##Investigate drug target, "drug_targets_name"
     drug_targets_titles = [f"drug_targets_{title}" for title in title_suffix]
     for idx, df_list in enumerate(df_lists):
-        barplot_mean_correct_prediction_grouped_by_entity(
+        barplot_aucroc_grouped_by_entity(
             df_list,
             legend_list[idx],
             ["drug_targets_idx"],
             drug_targets_titles[idx],
             "drug_targets_name",
+            run_name=run_name,
         )
 
     # Investigate disease id, "disease_id"
     disease_titles = [f"disease_{title}" for title in title_suffix]
     for idx, df_list in enumerate(df_lists):
-        barplot_mean_correct_prediction_grouped_by_entity(
+        barplot_aucroc_grouped_by_entity(
             df_list,
             legend_list[idx],
             ["disease_idx"],
             disease_titles[idx],
             "disease_id",
+            run_name=run_name,
         )
 
     # Investigate tissue, "name"
     tissue_titles = [f"tissue_{title}" for title in title_suffix]
     for idx, df_list in enumerate(df_lists):
-        barplot_mean_correct_prediction_grouped_by_entity(
-            df_list, legend_list[idx], ["tissue_id"], tissue_titles[idx], "name"
+        barplot_aucroc_grouped_by_entity(
+            df_list,
+            legend_list[idx],
+            ["tissue_id"],
+            tissue_titles[idx],
+            "tissue_name",
+            run_name=run_name,
         )
 
     ##Investigate single drug
@@ -178,12 +192,13 @@ def error_diagnostics_plots(model_names):
             ]
         else:
             df_drug_without_dupl = [get_drug_level_df(df_list)]
-        barplot_mean_correct_prediction_grouped_by_entity(
+        barplot_aucroc_grouped_by_entity(
             df_drug_without_dupl,
             legend_list[idx],
             ["drug_molecules_left_id"],
             drug_titles[idx],
             "drug_name_left",
+            run_name=run_name,
         )
 
 
@@ -203,6 +218,7 @@ def get_drug_level_df(df_list):
             "rel_name",
             "pred_prob",
             "targets",
+            "drug_pair_idx",
         ],
     ]
     df_sub = pd.concat(
@@ -218,15 +234,20 @@ def get_drug_level_df(df_list):
             ),
         )
     )
-    df_sub_new = df_sub[
-        ["drug_molecules_left_id", "drug_molecules_right_id"]
-    ].drop_duplicates()
-    df_drug_without_dupl = df_sub.iloc[df_sub_new.index]
-    return df_drug_without_dupl
+
+    return df_sub
 
 
 if __name__ == "__main__":
     # load_dotenv(".env")
     # main()
+
+    task = "clf"
+    target = "zip_mean"
+    day_of_prediction = "03_12_2023"
+    task_target = "_".join([task, target])
+    path_to_prediction_folder = (
+        Directories.OUTPUT_PATH / "model_predictions" / day_of_prediction / task_target
+    )
     models = ["rescal", "deepdds"]
-    error_diagnostics_plots(models)
+    error_diagnostics_plots(models, path_to_prediction_folder)
