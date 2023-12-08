@@ -21,6 +21,7 @@ dataset:
 checkpoint_callback:
   mode: 'max'
   filename: '{epoch:02d}-{val_auroc:.4f}'
+  monitor: 'val_auroc'
   save_top_k: 1
 
 trainer:  

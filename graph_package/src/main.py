@@ -109,7 +109,8 @@ def main(config):
             train_dataloaders=data_loaders["train"],
             val_dataloaders=data_loaders["val"],
         )
-
+        
+        wandb.config.checkpoint_path = checkpoint_callback.best_model_path
         trainer.test(
             model,
             dataloaders=data_loaders["test"],
