@@ -65,7 +65,7 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = [TestDiagnosticCallback(model_name=model_name)]
+        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config)]
 
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
