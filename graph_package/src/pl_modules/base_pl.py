@@ -10,14 +10,14 @@ loss_func_dict = {"clf": BCEWithLogitsLoss(), "reg": MSELoss()}
 
 
 class BasePL(LightningModule):
-    def __init__(self, model, lr: float = 0.001, task: str = "clf", logger_enabled = True):
+    def __init__(self, model, lr: float = 0.001, task: str = "clf", logger_enabled: bool = True, target: str = 'zip_mean'):
         super().__init__()
         self.lr = lr
         self.task = task
         self.loss_func = loss_func_dict[task]
         metric  = ClfMetrics if task == "clf" else RegMetrics
-        self.val_metrics = metric("val")
-        self.test_metrics = metric("test")
+        self.val_metrics = metric("val",target)
+        self.test_metrics = metric("test", target)
         self.model =  model
         self.logger_enabled = logger_enabled
 

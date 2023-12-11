@@ -7,6 +7,7 @@ from graph_package.src.etl.gold import (
 )
 from torch.utils.data import Dataset
 from torchdrug.data import Graph
+import numpy as np
 
 target_dict = {
     "reg": {
@@ -77,7 +78,11 @@ class KnowledgeGraphDataset(Dataset):
     def get_labels(self, indices=None):
         if indices is None:
             indices = self.indices
-        return self.data_df.iloc[indices][target_dict['clf'][self.target]]
+        if self.target == 'css': 
+            labels = np.random.randint(0,1,len(indices))
+        else: 
+            labels = self.data_df.iloc[indices][target_dict['clf'][self.target]]
+        return labels
 
     def _filter_drugs(self, node_features):
         het_drugs = [drug.lower() for drug in list(node_features.keys())]
