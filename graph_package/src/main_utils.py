@@ -120,13 +120,12 @@ def get_model_name(config: dict, sys_args: List[str]):
         return "deepdds"
 
 
-def update_rescal_args(dataset):
+def update_shallow_embedding_args(dataset):
     update_dict = {
         "ent_tot": dataset.num_nodes,
         "rel_tot": int(dataset.num_relations),
     }
     return update_dict
-
 
 def update_deepdds_args(config):
     return {"dataset_path": dataset_dict[config.dataset.name]}
@@ -135,11 +134,11 @@ def update_deepdds_args(config):
 def update_model_kwargs(config: dict, model_name: str, dataset):
     if model_name.startswith("deepdds"):
         config.model.update(update_deepdds_args(config))
-    elif model_name == "rescal":
-        config.model.update(update_rescal_args(dataset))
+    elif model_name in ["rescal", "transe", "distmult", "complex", "rotate"]:
+        config.model.update(update_shallow_embedding_args(dataset))
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
-        config.model.rescal.update(update_rescal_args(dataset))
+        config.model.rescal.update(update_shallow_embedding_args(dataset))
 
 
 def get_checkpoint_path(model_name: str, k: int):
