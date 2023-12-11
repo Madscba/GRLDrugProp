@@ -1,7 +1,12 @@
 from graph_package.src.etl.bronze import get_drugcomb
-from graph_package.src.etl.silver import generate_study_dataset
+from graph_package.src.etl.silver import generate_oneil_dataset, generate_oneil_almanac_dataset
 import argparse
-from graph_package.src.etl.gold import make_oneil_dataset, make_oneil_legacy_dataset,make_original_deepdds_dataset
+from graph_package.src.etl.gold import (
+    make_oneil_dataset, 
+    make_oneil_legacy_dataset,
+    make_original_deepdds_dataset,
+    make_oneil_almanac_dataset
+)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -10,12 +15,13 @@ def main():
     if (args.update == "bronze") | (args.update == "full"):
         get_drugcomb()
     if (args.update == "silver") | (args.update == "full"):
-        generate_study_dataset(studies=["ONEIL"])
-        generate_study_dataset(studies=["ONEIL","ALMANAC"])
+        generate_oneil_dataset()
+        generate_oneil_almanac_dataset()
     if (args.update == "gold") | (args.update == "full"):
         make_oneil_dataset()
         make_oneil_legacy_dataset()
         make_original_deepdds_dataset()  
+        make_oneil_almanac_dataset()
 
 if __name__ == "__main__":
     main() 

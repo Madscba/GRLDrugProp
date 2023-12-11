@@ -200,8 +200,8 @@ def make_oneil_legacy_dataset():
     df.to_csv(save_path / "oneil.csv", index=False)
 
 
-def get_max_zip_response(df: pd.DataFrame):
-    block_dict = load_jsonl(Directories.DATA_PATH / "silver" / "oneil_almanac" / "block_dict.json")
+def get_max_zip_response(df: pd.DataFrame, dataset: str='oneil'):
+    block_dict = load_jsonl(Directories.DATA_PATH / "silver" / dataset / "block_dict.json")
     block_df = pd.DataFrame(block_dict)
     block_df = block_df.groupby(['block_id','conc_c','conc_r']).agg({'synergy_zip': 'mean'}).reset_index()
     block_df = block_df.groupby(['block_id']).agg({'synergy_zip': ['max', 'mean']}).reset_index()
@@ -213,7 +213,7 @@ def get_max_zip_response(df: pd.DataFrame):
     df["max_label"] = df["synergy_zip_max"].apply(lambda x: 1 if x >= 10 else 0)
     return df
 
-def make_oneil_dataset(study="ONEIL"):
+def make_oneil_dataset():
     logger.info("Making Oneil dataset.")
     save_path = Directories.DATA_PATH / "gold" / "oneil"
     save_path.mkdir(parents=True, exist_ok=True)
@@ -237,7 +237,6 @@ def make_oneil_dataset(study="ONEIL"):
         ["entity_vocab.json", "relation_vocab.json"]):
         with open(save_path / name, "w") as json_file:
             json.dump(vocab, json_file)
-    print("Num triplets:", df.shape[0])
     df.to_csv(save_path / "oneil.csv", index=False)
 
 def make_oneil_almanac_dataset():
@@ -245,7 +244,6 @@ def make_oneil_almanac_dataset():
     save_path = Directories.DATA_PATH / "gold" / "oneil_almanac"
     save_path.mkdir(parents=True, exist_ok=True)
     df = load_oneil_almanac()
-    print("Num triplets:", df.shape[0])
     rename_dict = {
         "block_id": "block_id",
         "drug_row": "drug_1_name",
@@ -256,11 +254,10 @@ def make_oneil_almanac_dataset():
     columns_to_keep = list(rename_dict.values())+["css_col","css_row"]
     df = df[columns_to_keep]
 
-    df = get_max_zip_response(df)
+    df = get_max_zip_response(df,'oneil_almanac')
     df['css'] = (df['css_col'] + df['css_row'])/2
     df, drug_vocab = create_drug_id_vocabs(df)
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
-    print("Num triplets:", df.shape[0])
     for vocab, name in zip(
         (drug_vocab, cell_line_vocab),
         ["entity_vocab.json", "relation_vocab.json"]):
