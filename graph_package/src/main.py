@@ -22,11 +22,9 @@ from pytorch_lightning.utilities.warnings import PossibleUserWarning
 import hydra
 from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split as train_val_split
-import os
 from pytorch_lightning import Trainer
 import sys
 import wandb
-import shutil
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning, module="hydra")
@@ -80,8 +78,11 @@ def main(config):
         )
 
         train_set, val_set = split_dataset(
-            dataset, split_method="custom", split_idx=(train_idx, val_idx)
+            dataset, split_method="custom", split_idx=(list(train_idx), list(val_idx))
         )
+
+        inv_indices = train_set.dataset.make_inv_triplets(train_set.indices)
+        train_set.indices = train_set.indices + inv_indices
 
         data_loaders = get_dataloaders(
             [train_set, val_set, test_set], batch_sizes=config.batch_sizes
@@ -116,6 +117,7 @@ def main(config):
             train_dataloaders=data_loaders["train"],
             val_dataloaders=data_loaders["val"],
         )
+
         trainer.test(
             model,
             dataloaders=data_loaders["test"],
