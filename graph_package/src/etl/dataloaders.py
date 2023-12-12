@@ -55,17 +55,31 @@ class KnowledgeGraphDataset(Dataset):
         else: 
             labels = self.data_df.iloc[indices][target_dict['clf'][self.target]]
         return labels
+    
+    def _update_dataset(self, df: pd.DataFrame):
+        self.data_df = pd.concat([self.data_df, df], ignore_index=True)
+        triplets = self.data_df.loc[
+            :, ["drug_1_id", "drug_2_id", "context_id"]
+        ].to_numpy()
+        self.graph = Graph(triplets, num_node=self.num_nodes, num_relation=self.num_relations)
+    
+    def make_inv_triplets(self,indices):
+        """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
+        df_subset = self.data_df.iloc[indices]
+        df_inv = df_subset.copy()
+        df_inv["drug_1_name"], df_inv["drug_2_name"] = df_subset["drug_2_name"], df_subset["drug_1_name"]
+        df_inv["drug_1_id"], df_inv["drug_2_id"] = df_subset["drug_2_id"], df_subset["drug_1_id"]
+        inv_idx_start = len(self.data_df)
+        self._update_dataset(df_inv)
+        sub_set_indices = list(range(inv_idx_start, len(self.data_df)))  
+        return sub_set_indices 
+    
+    def del_inv_triplets(self):
+        self.data_df = self.data_df.iloc[:len(self.indices)]
+        self.graph = self.graph.edge_mask(self.indices)
 
     def __len__(self):
         return len(self.data_df)
 
     def __getitem__(self, index):
         return self.graph.edge_list[index], self.data_df.iloc[index][self.label]
-
-    def _create_inverse_triplets(self, df: pd.DataFrame):
-        """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
-        df_inv = df.copy()
-        df_inv["drug_1"], df_inv["drug_2"] = df["drug_2"], df["drug_1"]
-        df_inv["drug_1_id"], df_inv["drug_2_id"] = df["drug_2_id"], df["drug_1_id"]
-        df_combined = pd.concat([df, df_inv], ignore_index=True)
-        return df_combined
