@@ -13,7 +13,7 @@ def filter_drugs_in_graph(drug_info):
     """
 
     # Load Hetionet from json
-    data_path = Directories.DATA_PATH / "node_features"
+    data_path = Directories.DATA_PATH / "gold" / "hetionet"
     logger.info("Loading Hetionet..")
     with open(data_path / "hetionet-v1.0.json") as f:
         graph = json.load(f)
@@ -58,19 +58,26 @@ def filter_drug_node_graph(drug_ids, edges, node='Gene', min_degree=2):
     for edge in tqdm(edges):
         source_type, source_id = edge['source_id']
         target_type, target_id = edge['target_id']
-
-        if source_type == 'Compound' and target_type == node and source_id in drug_ids:
-            filtered_edges.append(edge)
-            if target_id in nodes_connected_to_drugs:
-                nodes_connected_to_drugs[target_id] += 1 
-            else:
-                nodes_connected_to_drugs[target_id] = 1
-        elif source_type == node and target_type == 'Compound'  and target_id in drug_ids:
-            filtered_edges.append(edge)
-            if source_id in nodes_connected_to_drugs:
-                nodes_connected_to_drugs[source_id] += 1 
-            else:
-                nodes_connected_to_drugs[source_id] = 1
+        if node == 'Compound':
+            if source_type == 'Compound' and target_type == node and source_id in drug_ids and target_id in drug_ids:
+                filtered_edges.append(edge)
+                if target_id in nodes_connected_to_drugs:
+                    nodes_connected_to_drugs[target_id] += 1 
+                else:
+                    nodes_connected_to_drugs[target_id] = 1
+        else:
+            if source_type == 'Compound' and target_type == node and source_id in drug_ids:
+                filtered_edges.append(edge)
+                if target_id in nodes_connected_to_drugs:
+                    nodes_connected_to_drugs[target_id] += 1 
+                else:
+                    nodes_connected_to_drugs[target_id] = 1
+            elif source_type == node and target_type == 'Compound'  and target_id in drug_ids:
+                filtered_edges.append(edge)
+                if source_id in nodes_connected_to_drugs:
+                    nodes_connected_to_drugs[source_id] += 1 
+                else:
+                    nodes_connected_to_drugs[source_id] = 1
     
     # Step 3: Filter nodes based on degree
     nodes_connected_to_at_least_one_drugs = [

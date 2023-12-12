@@ -22,7 +22,8 @@ def generate_pca_feature_vectors(datasets=["ONEIL"], components=20, node_types="
     Function for generating PCA feature vectors based on Drug-Gene graph
     """
     # Defining paths
-    save_path = Directories.DATA_PATH / "node_features"
+    datasets_name = "oneil_almanac" if datasets==["ONEIL","ALMANAC"] else 'oneil'
+    save_path = Directories.DATA_PATH / "gold" / datasets_name
     save_path.mkdir(parents=True, exist_ok=True)
 
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
@@ -80,9 +81,9 @@ def generate_pca_feature_vectors(datasets=["ONEIL"], components=20, node_types="
         drug.lower(): feature 
         for drug, feature in zip(filtered_drug_dict.keys(), feature_vectors.tolist())
     }
-    with open(save_path / f"{datasets}_drug_features.json", "w") as json_file:
+    with open(save_path / f"{datasets_name}_drug_features.json", "w") as json_file:
             json.dump(drug_features, json_file)
-    logger.info(f"Saved PCA feature vectors to {save_path}!")
+    logger.info(f"Saved PCA feature vectors to {save_path}")
 
 if __name__ == "__main__":
-    generate_pca_feature_vectors(["ONEIL","ALMANAC"],components=10, node_types=[ "Disease", "Side Effect", "Gene"])
+    generate_pca_feature_vectors(["ONEIL","ALMANAC"],components=10, node_types=[ "Compound", "Disease", "Side Effect", "Gene"])

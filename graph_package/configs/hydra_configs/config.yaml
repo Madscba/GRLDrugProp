@@ -17,6 +17,7 @@ task: 'reg' #clf (does not work for css)
 dataset:  
   name: 'oneil' # deepdds_original, oneil_legacy
   target: 'zip_mean' # zip_max, css, loewe (legacy)
+  use_node_features: False # If true, dataset is filtered in Hetionet
 
 checkpoint_callback:
   mode: 'max'

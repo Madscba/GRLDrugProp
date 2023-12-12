@@ -1,4 +1,7 @@
+import ssl
 import json
+import torch
+import urllib.request
 import pandas as pd
 from graph_package.configs.directories import Directories
 from graph_package.src.etl.gold import (
@@ -25,7 +28,7 @@ class KnowledgeGraphDataset(Dataset):
         dataset_path, 
         target: str = "zip_mean", 
         task: str = "reg", 
-        use_node_features: bool = True, 
+        use_node_features: bool = False 
     ):
         """
         Initialize the Knowledge Graph.
@@ -52,14 +55,18 @@ class KnowledgeGraphDataset(Dataset):
                 self.label: float,
             },
         )
+        self.node_features = None
         if self.use_node_features:
-            feature_path = Directories.DATA_PATH / "node_features" / "ONEIL_drug_features.json"
+            feature_path = dataset_path.parent / f"{dataset_path.parts[-2]}_drug_features.json"
             with open(feature_path) as f:
                 node_features = json.load(f)
             self.data_df, drug_vocab = self._filter_drugs(node_features)
-            self.node_features = [node_features[name.lower()] for name in drug_vocab.keys() if name.lower() in node_features.keys()]
-        else:    
-            self.node_features = None
+            self.node_features = [
+                node_features[name.lower()] for name in drug_vocab.keys() 
+                if name.lower() in node_features.keys()
+            ]
+            self.context_vocab = json.load(open(dataset_path.parent / "relation_vocab.json","r"))
+            self.edge_features = self.load_context_features()
         triplets = self.data_df.loc[
             :, ["drug_1_id", "drug_2_id", "context_id"]
         ].to_numpy()
@@ -71,7 +78,8 @@ class KnowledgeGraphDataset(Dataset):
             triplets, 
             num_node=self.num_nodes, 
             num_relation=self.num_relations, 
-            node_feature=self.node_features
+            node_feature=self.node_features,
+            edge_feature=self.edge_features
         )
         self.indices = list(range(len(self.data_df)))
 
@@ -84,6 +92,20 @@ class KnowledgeGraphDataset(Dataset):
             labels = self.data_df.iloc[indices][target_dict['clf'][self.target]]
         return labels
 
+
+    def load_context_features(self) -> dict:
+        """Get the context feature set."""
+       # Create an SSL context that does not verify the SSL certificate
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        path = "https://raw.githubusercontent.com/AstraZeneca/chemicalx/main/dataset/drugcomb/context_set.json"
+        with urllib.request.urlopen(path, context=ssl_context) as url:
+            raw_data = json.loads(url.read().decode())
+        #raw_data = {k: torch.FloatTensor(np.array(raw_data[k]).reshape(1, -1)).to(device) for k, v in self.context_vocab.items()}
+        context_features = [raw_data[k] for k, _ in self.context_vocab.items()]
+        return context_features
+    
     def _filter_drugs(self, node_features):
         het_drugs = [drug.lower() for drug in list(node_features.keys())]
         filtered_drugs = self.data_df[

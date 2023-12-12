@@ -1,6 +1,6 @@
 from graph_package.configs.directories import Directories
 import torch
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from graph_package.configs.directories import Directories
@@ -93,7 +93,8 @@ def load_data(dataset_config: dict, task="reg"):
     """Fetch formatted data depending on modelling task"""
     dataset_path = dataset_dict[dataset_config.name.lower()]
     data_loader = KnowledgeGraphDataset(
-        dataset_path, task=task, target=dataset_config.target
+        dataset_path, task=task, target=dataset_config.target,
+        use_node_features=dataset_config.use_node_features
     )
     return data_loader
 
@@ -103,10 +104,14 @@ def init_model(
     task: str = "clf",
     target: str = "zip_mean",
     model_kwargs: dict = {},
+    graph: Optional[KnowledgeGraphDataset] = None,
     logger_enabled: bool = True,
 ):
     """Load model from registry"""
-    model = model_dict[model.lower()](**model_kwargs)
+    if model == "rgcn":
+        model = model_dict[model.lower()](graph,**model_kwargs)
+    else:
+        model = model_dict[model.lower()](**model_kwargs)
     pl_module = BasePL(model, task=task, logger_enabled=logger_enabled, target=target)
     return pl_module
 
@@ -129,6 +134,8 @@ def update_shallow_embedding_args(dataset):
 def update_deepdds_args(config):
     return {"dataset_path": dataset_dict[config.dataset.name]}
 
+def update_rgcn_args(config):
+    return {"dataset_path": dataset_dict[config.dataset.name]}
 
 def update_model_kwargs(config: dict, model_name: str, dataset):
     if model_name.startswith("deepdds"):
@@ -136,6 +143,8 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
         config.model.rescal.update(update_shallow_embedding_args(dataset))
+    elif model_name =="rgcn":
+        config.model.update(update_rgcn_args(config))
     else:
         config.model.update(update_shallow_embedding_args(dataset))
 
