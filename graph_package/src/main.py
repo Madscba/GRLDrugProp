@@ -81,6 +81,7 @@ def main(config):
             dataset, split_method="custom", split_idx=(list(train_idx), list(val_idx))
         )
 
+        # add reverse edges to training set
         inv_indices = train_set.dataset.make_inv_triplets(train_set.indices)
         train_set.indices = train_set.indices + inv_indices
 
