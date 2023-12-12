@@ -6,8 +6,10 @@ channels:
   - anaconda
   - milagraph
 dependencies:
-  - python==3.8
+  - python==3.9.17
   - pytorch
+  - torchvision
+  - torchdrug
   - aiohttp
   - colorlog
   - pytorch-scatter
@@ -22,5 +24,8 @@ dependencies:
   - pytorch-lightning
   - hydra-core
   - jsonlines
+  - scipy
+  - scikit-learn
+  - seaborn
   - pip:
     - -r requirements.txt

@@ -1,6 +1,7 @@
 import json
 import torch
 import pandas as pd
+from tqdm import tqdm
 from graph_package.utils.helpers import init_logger
 from graph_package.configs.directories import Directories
 
@@ -13,6 +14,7 @@ def filter_drugs_in_graph(drug_info):
 
     # Load Hetionet from json
     data_path = Directories.DATA_PATH / "node_features"
+    logger.info("Loading Hetionet..")
     with open(data_path / "hetionet-v1.0.json") as f:
         graph = json.load(f)
     nodes = graph['nodes']
@@ -29,7 +31,7 @@ def filter_drugs_in_graph(drug_info):
     # Create filtered drug dict
     filtered_drug_dict = {}
 
-    logger.info("Filtering drugs in Hetionet")
+    logger.info("Filtering drugs in Hetionet..")
     # Check each drug in drug_info and add it to filtered dict if found in drugs_in_graph
     for drug_name, identifiers in drug_info.items():
         for identifier_key, identifier_value in identifiers.items():
@@ -44,58 +46,69 @@ def filter_drugs_in_graph(drug_info):
     return drug_ids, filtered_drug_dict, edges
 
 
-def filter_drug_gene_graph(drug_ids, edges, gene_degree=2):
+def filter_drug_node_graph(drug_ids, edges, node='Gene', min_degree=2):
     """
-    Function for retrieving neigboring gene ID's in Hetionet for drugs in DrugComb
+    Function for retrieving neigboring node ID's in Hetionet for drugs in DrugComb
     """
 
-    # Step 2: Filter on genes related to drugs in the subset
-    genes_connected_to_drugs = {}
+    # Step 2: Filter on nodes related to drugs in the subset
+    nodes_connected_to_drugs = {}
     filtered_edges = []
-    logger.info("Filtering genes in Hetionet")
-    for edge in edges:
+    logger.info(f"Filtering {node} in Hetionet..")
+    for edge in tqdm(edges):
         source_type, source_id = edge['source_id']
         target_type, target_id = edge['target_id']
 
-        if source_type == 'Compound' and target_type == 'Gene' and source_id in drug_ids:
+        if source_type == 'Compound' and target_type == node and source_id in drug_ids:
             filtered_edges.append(edge)
-            if target_id in genes_connected_to_drugs:
-                genes_connected_to_drugs[target_id] += 1 
+            if target_id in nodes_connected_to_drugs:
+                nodes_connected_to_drugs[target_id] += 1 
             else:
-                genes_connected_to_drugs[target_id] = 1
+                nodes_connected_to_drugs[target_id] = 1
+        elif source_type == node and target_type == 'Compound'  and target_id in drug_ids:
+            filtered_edges.append(edge)
+            if source_id in nodes_connected_to_drugs:
+                nodes_connected_to_drugs[source_id] += 1 
+            else:
+                nodes_connected_to_drugs[source_id] = 1
     
-    # Step 3: Filter genes based on degree
-    genes_connected_to_at_least_one_drugs = [
-        gene_id for gene_id, _ in genes_connected_to_drugs.items()
+    # Step 3: Filter nodes based on degree
+    nodes_connected_to_at_least_one_drugs = [
+        node_id for node_id, _ in nodes_connected_to_drugs.items()
     ]
-    gene_ids = [
-        gene_id for gene_id, degree in genes_connected_to_drugs.items() if degree >= gene_degree
+    node_ids = [
+        node_id for node_id, degree in nodes_connected_to_drugs.items() if degree >= min_degree
     ]
-    avg_gene_degree = sum(genes_connected_to_drugs.values())/len(genes_connected_to_drugs)
+    avg_node_degree = sum(nodes_connected_to_drugs.values())/len(nodes_connected_to_drugs)
 
-    # Basic descriptive statistics on drug-gene graph
-    logger.info(f"Number of genes connected to at least one drug: {len(genes_connected_to_at_least_one_drugs)}")
-    logger.info(f"Number of genes connected to at least {gene_degree} drugs: {len(gene_ids)}")
-    logger.info(f"Average degree of genes: {round(avg_gene_degree,3)}")
+    # Basic descriptive statistics on drug-node graph
+    logger.info(f"Number of {node} connected to at least one drug: {len(nodes_connected_to_at_least_one_drugs)}")
+    logger.info(f"Number of {node} connected to at least {min_degree} drugs: {len(node_ids)}")
+    logger.info(f"Avg degree of {node} nodes to drugs: {round(avg_node_degree,3)}")
 
-    return gene_ids, filtered_edges
+    return node_ids, filtered_edges
 
-def build_adjacency_matrix(drug_ids, gene_ids, edges):
+def build_adjacency_matrix(drug_ids, node_ids, edges):
 
     drug_indices = {drug: index for index, drug in enumerate(drug_ids)}
-    gene_indices = {gene: index for index, gene in enumerate(gene_ids)}
+    node_indices = {node: index for index, node in enumerate(node_ids)}
 
-    adjacency_matrix = torch.zeros((len(drug_ids), len(gene_ids)), dtype=torch.float32)
+    adjacency_matrix = torch.zeros((len(drug_ids), len(node_ids)), dtype=torch.float32)
     
-    logger.info("Building adjacency matrix")
-    for edge in edges:
+    logger.info("Building adjacency matrix..")
+    for edge in tqdm(edges):
         _, source_id = edge['source_id']
         _, target_id = edge['target_id']
 
-        if source_id in drug_ids and target_id in gene_ids:
+        if source_id in drug_ids and target_id in node_ids:
             drug_index = drug_indices[source_id]
-            gene_index = gene_indices[target_id]
-            adjacency_matrix[drug_index, gene_index] = 1.0
+            node_index = node_indices[target_id]
+            adjacency_matrix[drug_index, node_index] = 1.0
+
+        elif target_id in drug_ids and source_id in node_ids:
+            drug_index = drug_indices[target_id]
+            node_index = node_indices[source_id]
+            adjacency_matrix[drug_index, node_index] = 1.0
 
     return adjacency_matrix
 

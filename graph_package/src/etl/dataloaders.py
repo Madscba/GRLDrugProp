@@ -98,7 +98,7 @@ class KnowledgeGraphDataset(Dataset):
         return len(self.data_df)
 
     def __getitem__(self, index):
-        return self.graph.edge_list[index], self.data_df.iloc[index][self.label] #, self.graph.node_feature[index]
+        return self.graph.edge_list[index], self.data_df.iloc[index][self.label]
 
     def _create_inverse_triplets(self, df: pd.DataFrame):
         """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""

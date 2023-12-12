@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from utils import (
     filter_drugs_in_graph,
-    filter_drug_gene_graph, 
+    filter_drug_node_graph, 
     build_adjacency_matrix, 
     create_inverse_triplets
 )
@@ -17,7 +17,7 @@ from sklearn.decomposition import PCA
 
 logger = init_logger()
 
-def generate_pca_feature_vectors(dataset="ONEIL", components=20):
+def generate_pca_feature_vectors(datasets=["ONEIL"], components=20, node_types="all"):
     """
     Function for generating PCA feature vectors based on Drug-Gene graph
     """
@@ -34,7 +34,7 @@ def generate_pca_feature_vectors(dataset="ONEIL", components=20):
 
     # Load ONEIL dataset (or bigger dataset)
     drugs = pd.read_csv(data_path)
-    drugs = drugs[drugs['study_name'].isin(dataset)]
+    drugs = drugs[drugs['study_name'].isin(datasets)]
     drugs = create_inverse_triplets(drugs)
     names = [drug_dict[drug]['dname'] for drug in drugs.drug_row.unique()]
 
@@ -46,44 +46,43 @@ def generate_pca_feature_vectors(dataset="ONEIL", components=20):
         drug_info[drug_name]['inchikey'] = drug_dict[drug]['inchikey'] 
         drug_info[drug_name]['DB'] = drug_dict[drug]['drugbank_id']
 
-    # Filter drugs and genes in Hetionet and build adjacency matrix
+    # Filter drugs and nodes in Hetionet and build adjacency matrix
     drug_ids, filtered_drug_dict, edges = filter_drugs_in_graph(drug_info)
-    gene_ids, filtered_edges = filter_drug_gene_graph(drug_ids=drug_ids,edges=edges,gene_degree=4)
-    drug_ids = [filtered_drug_dict[drug]['DB'] for drug in filtered_drug_dict.keys()]
-    adjacency_matrix = build_adjacency_matrix(drug_ids,gene_ids,filtered_edges)
-    degree = [adjacency_matrix[i,:].sum() for i in range(adjacency_matrix.shape[0])]
-    logger.info(f"Average drug degree: {sum(degree)/len(degree)} (max is {adjacency_matrix.shape[1]})")
-    
-    # Generate PCA feature vectors
-    drug_gene_array = np.array(adjacency_matrix)
-    pca = PCA(n_components=components)
-    pca_feature_vectors = pca.fit_transform(drug_gene_array)
+    db_ids = [filtered_drug_dict[drug]['DB'] for drug in filtered_drug_dict.keys()]
+    node_types_list = ["Gene", "Disease", "Side Effect", "Pharmacologic Class"] if node_types == 'all' else node_types
+    feature_vectors = np.zeros((len(db_ids),len(node_types_list),components))
+    for i, node_type in enumerate(node_types_list):
+        node_ids, filtered_edges = filter_drug_node_graph(drug_ids=drug_ids,edges=edges,node=node_type)
+        adjacency_matrix = build_adjacency_matrix(db_ids,node_ids,filtered_edges)
+        degree = [adjacency_matrix[i,:].sum() for i in range(adjacency_matrix.shape[0])]
+        logger.info(f"Avg degree of drug nodes to {node_type}: {sum(degree)/len(degree)} (max is {adjacency_matrix.shape[1]})")
+        
+        # Generate PCA feature vectors
+        drug_node_array = np.array(adjacency_matrix)
+        pca = PCA(n_components=min(components,drug_node_array.shape[1]))
+        pca_feature_vectors = pca.fit_transform(drug_node_array)
+        feature_vectors[:,i,:] = pca_feature_vectors
 
-    # Plot the first two principal components
-    plt.scatter(pca_feature_vectors[:, 0], pca_feature_vectors[:, 1])
-    plt.title('PCA: First Two Components')
-    plt.xlabel('Principal Component 1')
-    plt.ylabel('Principal Component 2')
-    plt.show()
+        # Get the explained variance ratio
+        explained_variance_ratio = pca.explained_variance_ratio_
 
-    # Get the explained variance ratio
-    explained_variance_ratio = pca.explained_variance_ratio_
+        # Calculate the accumulated explained variance
+        accumulated_explained_variance = np.cumsum(explained_variance_ratio)
 
-    # Calculate the accumulated explained variance
-    accumulated_explained_variance = np.cumsum(explained_variance_ratio)
+        # Print the accumulated explained variance
+        logger.info(f"Acc explained variance for {node_type} pca features: {accumulated_explained_variance[-1]}")
 
-    # Print or use the explained variance ratio as needed
-    print("Explained Variance Ratio:", explained_variance_ratio)
-    print("Accumulated Explained Variance:", accumulated_explained_variance)
+    # Reshape feature vectors 
+    feature_vectors = feature_vectors.reshape(len(db_ids),-1)
 
     # Save pca features to data/node_features as json/csv (drugDB,feature)
     drug_features = {
         drug.lower(): feature 
-        for drug, feature in zip(filtered_drug_dict.keys(), pca_feature_vectors.tolist())
+        for drug, feature in zip(filtered_drug_dict.keys(), feature_vectors.tolist())
     }
-    with open(save_path / f"{dataset}_drug_features.json", "w") as json_file:
+    with open(save_path / f"{datasets}_drug_features.json", "w") as json_file:
             json.dump(drug_features, json_file)
-    logger.info(f"Saved PCA feature vectors to {save_path}")
+    logger.info(f"Saved PCA feature vectors to {save_path}!")
 
 if __name__ == "__main__":
-    generate_pca_feature_vectors("ONEIL",20)
+    generate_pca_feature_vectors(["ONEIL","ALMANAC"],components=10, node_types=[ "Disease", "Side Effect", "Gene"])
