@@ -2,11 +2,9 @@ from graph_package.configs.directories import Directories
 from graph_package.utils.helpers import init_logger
 import pandas as pd
 import asyncio
-import shutil
-import jsonlines
 import json
 import os
-from graph_package.src.etl.bronze import download_response_info_drugcomb, load_jsonl, load_block_ids
+from graph_package.src.etl.bronze import download_response_info_drugcomb, load_block_ids
 from graph_package.src.node_features.utils import filter_drugs_in_graph
 
 logger = init_logger()
@@ -24,22 +22,19 @@ def partial_name_match(filtered_drug_dict):
     final_drugs = filtered_drugs+fd_lower+fd_cap+fd_title+['5-Aminolevulinic acid hydrochloride']
     return final_drugs
 
-def filter_from_hetionet(studies):
-    data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
+def filter_from_hetionet(drugs: pd.DataFrame):
+    """
+    Filter drugs from DrugComb to match drugs in Hetionet
+    """
     dict_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "drug_dict.json"
 
     # Load drug dict from DrugComb with metadata on drugs
     with open(dict_path) as f:
         drug_dict = json.load(f)
 
-    # Load ONEIL-ALMANAC dataset 
-    drugs = pd.read_csv(data_path)
-
-    drugs = drugs[drugs['study_name'].isin(studies)]
     unique_drug_names = list(set(drugs['drug_row'].tolist() + drugs['drug_col'].tolist()))
     # Make info dict with drug name, DrugBank ID and inchikey for each drug
     drug_info = {}
-    nans = []
     for drug in unique_drug_names:
         # Check for different name conventions and edge cases
         drug_name = drug.capitalize() if not drug[0].isupper() else drug
@@ -60,45 +55,27 @@ def filter_from_hetionet(studies):
         drugs['drug_row'].isin(potential_drug_names) 
         & drugs['drug_col'].isin(potential_drug_names)
     ]
-    unique_final_names = list(set(filtered_df['drug_row'].tolist() + filtered_df['drug_col'].tolist()))
-    print("Num drugs: ", len(unique_final_names))
-    print("Num triplets:", filtered_df.shape[0])
     return filtered_df
 
-def generate_oneil_almanac_dataset():
+def generate_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
     """
-    Generate the ONEIL and/or ALMANAC dataset from the DrugComb dataset.
-    """
-    studies = ["ONEIL","ALMANAC"]
-    study_names = "oneil_almanac"
-    df = load_drugcomb()
-    df_study = df[df["study_name"].isin([studies])]
-    df_study_cleaned = df_study.dropna(subset=["drug_row", "drug_col", "synergy_zip"])
-    df_study_cleaned = filter_from_hetionet(studies)
-    unique_block_ids = df_study_cleaned["block_id"].unique().tolist()
-    download_response_info(unique_block_ids,study_names=study_names,overwrite=False)
-    study_path = Directories.DATA_PATH / "silver" / study_names
-    study_path.mkdir(exist_ok=True,parents=True)
-    df_study_cleaned = df_study_cleaned.loc[
-        :, ~df_study_cleaned.columns.str.startswith("Unnamed")
-    ]
-    df_study_cleaned.to_csv(study_path / f"{study_names}.csv", index=False)
-
-def generate_oneil_dataset():
-    """
-    Generate the Oniel dataset from the DrugComb dataset.
+    Generate the ONEIL and ONEIL-ALMANAC dataset from the DrugComb dataset.
     """
     df = load_drugcomb()
-    df_oneil = df[df["study_name"] == "ONEIL"]
-    df_oneil_cleaned = df_oneil.dropna(subset=["drug_row", "drug_col", "synergy_zip"])   
-    unique_block_ids = df_oneil_cleaned["block_id"].unique().tolist()
-    download_response_info(unique_block_ids,overwrite=False)
-    oneil_path = Directories.DATA_PATH / "silver" / "oneil"
-    oneil_path.mkdir(exist_ok=True,parents=True)
-    df_oneil_cleaned = df_oneil_cleaned.loc[
-        :, ~df_oneil_cleaned.columns.str.startswith("Unnamed")
-    ]
-    df_oneil_cleaned.to_csv(oneil_path / "oneil.csv", index=False)
+    for study in studies:
+        study_names = ["ONEIL","ALMANAC"] if study == 'oneil_almanac' else ["ONEIL"]
+        df_study = df[df["study_name"].isin(study_names)]
+        df_study_cleaned = df_study.dropna(subset=["drug_row", "drug_col", "synergy_zip"])   
+        if study == "oneil_almanac":
+            df_study_cleaned = filter_from_hetionet(df_study_cleaned)
+        unique_block_ids = df_study_cleaned["block_id"].unique().tolist()
+        download_response_info(unique_block_ids,study,overwrite=False)
+        study_path = Directories.DATA_PATH / "silver" / study
+        study_path.mkdir(exist_ok=True,parents=True)
+        df_study_cleaned = df_study_cleaned.loc[
+            :, ~df_study_cleaned.columns.str.startswith("Unnamed")
+        ]
+        df_study_cleaned.to_csv(study_path / f"{study}.csv", index=False)
 
 
 def download_response_info(list_entities, study_names = "oneil", overwrite=False):
@@ -127,10 +104,6 @@ def download_response_info(list_entities, study_names = "oneil", overwrite=False
                 logger.info(f"Retrying for {len(list_entities)} entities.")
 
 
-
 if __name__ == "__main__":
-    #generate_study_dataset(studies=["ONEIL"])
-    generate_study_dataset(studies=["ONEIL","ALMANAC"])
-    generate_oneil_dataset()
-
+    generate_oneil_almanac_dataset()
     

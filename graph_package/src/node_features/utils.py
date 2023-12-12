@@ -1,5 +1,7 @@
-import re
+import os
 import json
+import requests
+import bz2
 import torch
 import pandas as pd
 from graph_package.utils.helpers import init_logger
@@ -7,13 +9,32 @@ from graph_package.configs.directories import Directories
 
 logger = init_logger()
 
+def download_hetionet(data_path):
+    url = 'https://media.githubusercontent.com/media/hetio/hetionet/main/hetnet/json/hetionet-v1.0.json.bz2?download=true'
+    response = requests.get(url)
+    if response.status_code == 200:
+        logger.info("Downloading Hetionet json file from GitHub.")
+        # Decompress the content
+        decompressed_content = bz2.decompress(response.content)
+
+        # Decode bytes to string
+        decompressed_content_str = decompressed_content.decode('utf-8')
+
+        # Save the decompressed content to a file
+        with open(data_path / "hetionet-v1.0.json", 'w') as file:
+            file.write(decompressed_content_str)
+    else:
+        logger.info(f'Failed to download Hetionet json file. Status code: {response.status_code}')
+
 def filter_drugs_in_graph(drug_info):
     """
     Function for filtering drugs in DrugComb found in Hetionet
     """
 
-    # Load Hetionet from json
-    data_path = Directories.DATA_PATH / "node_features"
+    # Load or download Hetionet from json
+    data_path = Directories.DATA_PATH / "gold" / "hetionet"
+    if not os.path.exists(data_path / "hetionet-v1.0.json"):
+        download_hetionet(data_path)
     with open(data_path / "hetionet-v1.0.json") as f:
         graph = json.load(f)
     nodes = graph['nodes']
