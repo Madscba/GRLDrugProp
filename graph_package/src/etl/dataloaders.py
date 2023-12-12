@@ -62,15 +62,7 @@ class KnowledgeGraphDataset(Dataset):
             :, ["drug_1_id", "drug_2_id", "context_id"]
         ].to_numpy()
         self.graph = Graph(triplets, num_node=self.num_nodes, num_relation=self.num_relations)
-         
-
-
-    def __len__(self):
-        return len(self.data_df)
-
-    def __getitem__(self, index):
-        return self.graph.edge_list[index], self.data_df.iloc[index][self.label]
-
+    
     def make_inv_triplets(self,indices):
         """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
         df_subset = self.data_df.iloc[indices]
@@ -81,3 +73,13 @@ class KnowledgeGraphDataset(Dataset):
         self._update_dataset(df_inv)
         sub_set_indices = list(range(inv_idx_start, len(self.data_df)))  
         return sub_set_indices 
+    
+    def del_inv_triplets(self):
+        self.data_df = self.data_df.iloc[:len(self.indices)]
+        self.graph = self.graph.edge_mask(self.indices)
+
+    def __len__(self):
+        return len(self.data_df)
+
+    def __getitem__(self, index):
+        return self.graph.edge_list[index], self.data_df.iloc[index][self.label]
