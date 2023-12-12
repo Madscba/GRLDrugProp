@@ -5,7 +5,6 @@ from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from graph_package.configs.directories import Directories
 from graph_package.src.pl_modules import BasePL
-from torch.utils.data import Subset
 from torch.utils.data import random_split, Subset
 from torchdrug.data import DataLoader
 import os
