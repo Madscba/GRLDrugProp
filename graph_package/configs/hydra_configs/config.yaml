@@ -12,7 +12,7 @@ group_val: False
 n_splits: 5
 seed: 43
 remove_old_checkpoints: True
-task: 'clf' #clf (does not work for css)
+task: 'reg' #clf (does not work for css)
 
 dataset:  
   name: 'oneil' # deepdds_original, oneil_legacy
@@ -26,7 +26,7 @@ checkpoint_callback:
 
 trainer:  
   check_val_every_n_epoch: 1
-  max_epochs: 30
+  max_epochs: 100
   enable_checkpointing: True
   enable_progress_bar: True
   limit_test_batches: 1000
