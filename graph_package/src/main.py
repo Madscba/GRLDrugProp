@@ -70,12 +70,19 @@ def main(config):
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
         )
-        train_set, val_set = train_val_split(
-            train_set,
+
+
+        train_idx, val_idx = train_val_split(
+            train_set.indices,
             test_size=0.1,
             random_state=config.seed,
             stratify=dataset.get_labels(train_set.indices),
         )
+
+        train_set, val_set = split_dataset(
+            dataset, split_method="custom", split_idx=(train_idx, val_idx)
+        )
+
         data_loaders = get_dataloaders(
             [train_set, val_set, test_set], batch_sizes=config.batch_sizes
         )
