@@ -15,6 +15,9 @@ def load_oneil():
     data_path = Directories.DATA_PATH / "silver" / "oneil" / "oneil.csv"
     return pd.read_csv(data_path)
 
+def load_oneil_almanac():
+    data_path = Directories.DATA_PATH / "silver" / "oneil_almanac" / "oneil_almanac.csv"
+    return pd.read_csv(data_path)
 
 def load_drug_info_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "drug_dict.json"
@@ -56,7 +59,6 @@ def create_drug_id_vocabs(df: pd.DataFrame):
 
 def create_cell_line_id_vocabs(df: pd.DataFrame):
     # Create unique cell-line ID's based on context and label
-
     unique_contexts = set(df["context"])
     cell_line_mapping = {drug: idx for idx, drug in enumerate(unique_contexts)}
     df["context_id"] = df["context"].map(cell_line_mapping)
@@ -197,47 +199,47 @@ def make_oneil_legacy_dataset():
     df.to_csv(save_path / "oneil.csv", index=False)
 
 
-def get_max_zip_response(df: pd.DataFrame):
-    block_dict = load_jsonl(Directories.DATA_PATH / "silver" / "oneil" / "block_dict.json")
+def get_max_zip_response(df: pd.DataFrame, study: str='oneil'):
+    block_dict = load_jsonl(Directories.DATA_PATH / "silver" / study / "block_dict.json")
     block_df = pd.DataFrame(block_dict)
     block_df = block_df.groupby(['block_id','conc_c','conc_r']).agg({'synergy_zip': 'mean'}).reset_index()
     block_df = block_df.groupby(['block_id']).agg({'synergy_zip': ['max', 'mean']}).reset_index()
     block_df.columns = ['block_id', 'synergy_zip_max', 'synergy_zip_mean']  
     df = df.merge(block_df, on='block_id', how='left',validate='1:1')
     df = df.groupby(['drug_1_name', 'drug_2_name', 'context']).mean().reset_index()
-    label_func = lambda x: 1 if x >= 10 else 0
     df["mean_label"] = df["synergy_zip_mean"].apply(lambda x: 1 if x >= 5 else 0)
     df["max_label"] = df["synergy_zip_max"].apply(lambda x: 1 if x >= 10 else 0)
     return df
 
-def make_oneil_dataset():
-    logger.info("Making Oneil dataset.")
-    save_path = Directories.DATA_PATH / "gold" / "oneil"
-    save_path.mkdir(parents=True, exist_ok=True)
-    df = load_oneil()
-    rename_dict = {
-        "block_id": "block_id",
-        "drug_row": "drug_1_name",
-        "drug_col": "drug_2_name",
-        "cell_line_name": "context",
-    }
-    df.rename(columns=rename_dict, inplace=True)
-    columns_to_keep = list(rename_dict.values())+["css_col","css_row"]
-    df = df[columns_to_keep]
+def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
+    """
+    Make ONEIL and ONEIL-ALMANAC datasets
+    """
+    for study in studies:
+        logger.info(f"Making {study} dataset.")
+        save_path = Directories.DATA_PATH / "gold" / study
+        save_path.mkdir(parents=True, exist_ok=True)
+        df = load_oneil() if study == 'oneil' else load_oneil_almanac()
+        rename_dict = {
+            "block_id": "block_id",
+            "drug_row": "drug_1_name",
+            "drug_col": "drug_2_name",
+            "cell_line_name": "context",
+        }
+        df.rename(columns=rename_dict, inplace=True)
+        columns_to_keep = list(rename_dict.values())+["css_col","css_row"]
+        df = df[columns_to_keep]
 
-    df = get_max_zip_response(df)
-    df['css'] = (df['css_col'] + df['css_row'])/2
-    df, drug_vocab = create_drug_id_vocabs(df)
-    df, cell_line_vocab = create_cell_line_id_vocabs(df)
-    for vocab, name in zip(
-        (drug_vocab, cell_line_vocab),
-        ["entity_vocab.json", "relation_vocab.json"]):
-        with open(save_path / name, "w") as json_file:
-            json.dump(vocab, json_file)
-        
-    df.to_csv(save_path / "oneil.csv", index=False)
+        df = get_max_zip_response(df,study)
+        df['css'] = (df['css_col'] + df['css_row'])/2
+        df, drug_vocab = create_drug_id_vocabs(df)
+        df, cell_line_vocab = create_cell_line_id_vocabs(df)
+        for vocab, name in zip(
+            (drug_vocab, cell_line_vocab),
+            ["entity_vocab.json", "relation_vocab.json"]):
+            with open(save_path / name, "w") as json_file:
+                json.dump(vocab, json_file)
+        df.to_csv(save_path / f"{study}.csv", index=False)
 
 if __name__ == "__main__":
-    make_oneil_dataset()
-    #make_oneil_legacy_dataset()
-    #make_original_deepdds_dataset()
+    make_oneil_almanac_dataset()
