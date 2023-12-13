@@ -91,41 +91,31 @@ class KnowledgeGraphDataset(Dataset):
         else: 
             labels = self.data_df.iloc[indices][target_dict['clf'][self.target]]
         return labels
-
-
-    def load_context_features(self) -> dict:
-        """Get the context feature set."""
-       # Create an SSL context that does not verify the SSL certificate
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        path = "https://raw.githubusercontent.com/AstraZeneca/chemicalx/main/dataset/drugcomb/context_set.json"
-        with urllib.request.urlopen(path, context=ssl_context) as url:
-            raw_data = json.loads(url.read().decode())
-        #raw_data = {k: torch.FloatTensor(np.array(raw_data[k]).reshape(1, -1)).to(device) for k, v in self.context_vocab.items()}
-        context_features = [raw_data[k] for k, _ in self.context_vocab.items()]
-        return context_features
     
-    def _filter_drugs(self, node_features):
-        het_drugs = [drug.lower() for drug in list(node_features.keys())]
-        filtered_drugs = self.data_df[
-            (self.data_df['drug_1_name'].str.lower().isin(het_drugs)) &
-            (self.data_df['drug_2_name'].str.lower().isin(het_drugs))
-        ]           
-        filtered_drugs, drug_vocab = create_drug_id_vocabs(filtered_drugs)
-        filtered_drugs, _ = create_cell_line_id_vocabs(filtered_drugs)
-        return filtered_drugs, drug_vocab
+    def _update_dataset(self, df: pd.DataFrame):
+        self.data_df = pd.concat([self.data_df, df], ignore_index=True)
+        triplets = self.data_df.loc[
+            :, ["drug_1_id", "drug_2_id", "context_id"]
+        ].to_numpy()
+        self.graph = Graph(triplets, num_node=self.num_nodes, num_relation=self.num_relations)
+    
+    def make_inv_triplets(self,indices):
+        """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
+        df_subset = self.data_df.iloc[indices]
+        df_inv = df_subset.copy()
+        df_inv["drug_1_name"], df_inv["drug_2_name"] = df_subset["drug_2_name"], df_subset["drug_1_name"]
+        df_inv["drug_1_id"], df_inv["drug_2_id"] = df_subset["drug_2_id"], df_subset["drug_1_id"]
+        inv_idx_start = len(self.data_df)
+        self._update_dataset(df_inv)
+        sub_set_indices = list(range(inv_idx_start, len(self.data_df)))  
+        return sub_set_indices 
+    
+    def del_inv_triplets(self):
+        self.data_df = self.data_df.iloc[:len(self.indices)]
+        self.graph = self.graph.edge_mask(self.indices)
 
     def __len__(self):
         return len(self.data_df)
 
     def __getitem__(self, index):
         return self.graph.edge_list[index], self.data_df.iloc[index][self.label]
-
-    def _create_inverse_triplets(self, df: pd.DataFrame):
-        """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
-        df_inv = df.copy()
-        df_inv["drug_1_name"], df_inv["drug_2_name"] = df["drug_2_name"], df["drug_1_name"]
-        df_inv["drug_1_id"], df_inv["drug_2_id"] = df["drug_2_id"], df["drug_1_id"]
-        df_combined = pd.concat([df, df_inv], ignore_index=True)
-        return df_combined
