@@ -34,7 +34,8 @@ def make_cell_line_features():
         gene: re.findall(r"\((.*?)\)", gene)[0] for gene in gene_expressions.columns
     }
     gene_expressions.rename(columns=rename_dict, inplace=True)
-    gene_expressions = gene_expressions[ncbi_ids["ncbi_gene_id"]]
+    gene_ids = set(ncbi_ids["ncbi_gene_id"]).intersection(set(gene_expressions.columns))
+    gene_expressions = gene_expressions[list(gene_ids)]
     gene_expressions.fillna(gene_expressions.mean(), inplace=True)
 
     cell_dict = json.load(
