@@ -60,3 +60,5 @@ def init_logger():
     logger.addHandler(stream_handler)
 
     return logger
+
+logger = init_logger()
