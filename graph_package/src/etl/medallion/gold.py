@@ -1,8 +1,10 @@
 from graph_package.configs.directories import Directories
-from graph_package.src.etl.bronze import load_jsonl
+from graph_package.src.etl.medallion.bronze import load_jsonl
 import pandas as pd
 import numpy as np
+import os
 from graph_package.utils.helpers import init_logger
+from graph_package.src.etl.feature_engineering.cell_line_features import make_cell_line_features
 import json
 import requests
 
@@ -211,6 +213,20 @@ def get_max_zip_response(df: pd.DataFrame, study: str='oneil'):
     df["max_label"] = df["synergy_zip_max"].apply(lambda x: 1 if x >= 10 else 0)
     return df
 
+def filter_cell_lines(data_df):
+    feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express.json"
+    if not os.path.exists(feature_path):
+        make_cell_line_features()
+    with open(feature_path) as f:
+        all_edge_features = json.load(f)
+    cell_lines = [cl.lower() for cl in list(all_edge_features.keys())]
+    data_df = data_df[
+        (data_df['context'].str.lower().isin(cell_lines))
+    ]
+    data_df, _ = create_drug_id_vocabs(data_df)
+    data_df, _ = create_cell_line_id_vocabs(data_df)
+    return data_df
+
 def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
     """
     Make ONEIL and ONEIL-ALMANAC datasets
@@ -232,6 +248,8 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
 
         df = get_max_zip_response(df,study)
         df['css'] = (df['css_col'] + df['css_row'])/2
+        if study == 'oneil_almanac':
+            df = filter_cell_lines(df)
         df, drug_vocab = create_drug_id_vocabs(df)
         df, cell_line_vocab = create_cell_line_id_vocabs(df)
         for vocab, name in zip(

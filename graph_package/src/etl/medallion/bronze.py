@@ -1,7 +1,7 @@
 from graph_package.configs.directories import Directories
 import pandas as pd
 import numpy as np
-from graph_package.utils.helpers import init_logger
+from graph_package.utils.helpers import logger
 import requests
 import asyncio
 import aiohttp
@@ -10,8 +10,6 @@ from pathlib import Path
 import jsonlines
 import json
 import ssl
-
-logger = init_logger()
 
 ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False

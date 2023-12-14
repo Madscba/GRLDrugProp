@@ -1,13 +1,12 @@
 from graph_package.configs.directories import Directories
-from graph_package.utils.helpers import init_logger
+from graph_package.utils.helpers import logger
 import pandas as pd
 import asyncio
 import json
 import os
-from graph_package.src.etl.bronze import download_response_info_drugcomb, load_block_ids
-from graph_package.src.node_features.utils import filter_drugs_in_graph
-
-logger = init_logger()
+import requests
+import bz2
+from graph_package.src.etl.medallion.bronze import download_response_info_drugcomb, load_block_ids
 
 def load_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
@@ -22,7 +21,65 @@ def partial_name_match(filtered_drug_dict):
     final_drugs = filtered_drugs+fd_lower+fd_cap+fd_title+['5-Aminolevulinic acid hydrochloride']
     return final_drugs
 
-def filter_from_hetionet(drugs: pd.DataFrame):
+def download_hetionet(data_path):
+    url = 'https://media.githubusercontent.com/media/hetio/hetionet/main/hetnet/json/hetionet-v1.0.json.bz2?download=true'
+    response = requests.get(url)
+    if response.status_code == 200:
+        logger.info("Downloading Hetionet json file from GitHub..")
+        # Decompress the content
+        decompressed_content = bz2.decompress(response.content)
+
+        # Decode bytes to string
+        decompressed_content_str = decompressed_content.decode('utf-8')
+
+        # Save the decompressed content to a file
+        with open(data_path / "hetionet-v1.0.json", 'w') as file:
+            file.write(decompressed_content_str)
+    else:
+        logger.info(f'Failed to download Hetionet json file. Status code: {response.status_code}')
+
+def filter_drugs_in_graph(drug_info):
+    """
+    Function for filtering drugs in DrugComb found in Hetionet
+    """
+
+    # Load Hetionet from json
+    data_path = Directories.DATA_PATH / "hetionet"
+    if not os.path.exists(data_path / "hetionet-v1.0.json"):
+        download_hetionet(data_path)
+    with open(data_path / "hetionet-v1.0.json") as f:
+        graph = json.load(f)
+    nodes = graph['nodes']
+    edges = graph['edges']
+
+    # Select subset of drug IDs corresponding to drug IDs that exist in the graph
+    drugs_in_graph = {}
+    for node in nodes:
+        if node['kind'] == 'Compound':
+            drugs_in_graph[node['name']] = {}
+            drugs_in_graph[node['name']]['inchikey'] = node['data']['inchikey'][9:]
+            drugs_in_graph[node['name']]['DB'] = node['identifier']
+
+    # Check each drug in drug_info and add it to filtered dict if found in drugs_in_graph
+    filtered_drug_dict = {}
+    logger.info("Filtering drugs in Hetionet..")
+    for drug_name, identifiers in drug_info.items():
+        for identifier_key, identifier_value in identifiers.items():
+            for graph_drug_name, graph_identifiers in drugs_in_graph.items():
+                if graph_drug_name.lower() in drug_name.lower() or graph_drug_name in drug_name.title():
+                    filtered_drug_dict[drug_name] = graph_identifiers
+                elif identifier_key =='synonyms':
+                    if graph_drug_name in identifier_value:
+                        filtered_drug_dict[drug_name] = graph_identifiers
+                elif graph_identifiers.get(identifier_key) == identifier_value:
+                    filtered_drug_dict[drug_name] = graph_identifiers
+
+    drug_ids = [filtered_drug_dict[drug]['DB'] for drug in filtered_drug_dict.keys()]
+    logger.info(f"{len(drug_ids)} of {len(drug_info)} drugs found in Hetionet")
+    drug_edges = [e for e in edges if (e['target_id'][0] =='Compound') or (e['source_id'][0] =='Compound')]
+    return drug_ids, filtered_drug_dict, drug_edges
+
+def get_drug_info(drugs: pd.DataFrame):
     """
     Filter drugs from DrugComb to match drugs in Hetionet
     """
@@ -45,6 +102,12 @@ def filter_from_hetionet(drugs: pd.DataFrame):
         drug_info[drug_name]['synonyms'] = drug_dict[drug]['synonyms'].split(";")
         drug_info[drug_name]['inchikey'] = drug_dict[drug]['inchikey'] 
         drug_info[drug_name]['DB'] = drug_dict[drug]['drugbank_id']
+
+    return drug_info
+
+def filter_from_hetionet(drugs):
+    # Get drug info 
+    drug_info = get_drug_info(drugs)
 
     # Find drugs in Hetionet
     _, filtered_drug_dict, _ = filter_drugs_in_graph(drug_info)
@@ -105,5 +168,5 @@ def download_response_info(list_entities, study_names = "oneil", overwrite=False
 
 
 if __name__ == "__main__":
-    generate_oneil_almanac_dataset()
+    generate_oneil_almanac_dataset(studies=["oneil"])
     

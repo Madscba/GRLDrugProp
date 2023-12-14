@@ -1,10 +1,7 @@
-import ssl
 import json
-import torch
-import urllib.request
 import pandas as pd
 from graph_package.configs.directories import Directories
-from graph_package.src.etl.gold import (
+from graph_package.src.etl.medallion.gold import (
     create_drug_id_vocabs, 
     create_cell_line_id_vocabs
 )
@@ -28,7 +25,8 @@ class KnowledgeGraphDataset(Dataset):
         dataset_path, 
         target: str = "zip_mean", 
         task: str = "reg", 
-        use_node_features: bool = False 
+        use_node_features: bool = False,
+        use_edge_features: bool = False 
     ):
         """
         Initialize the Knowledge Graph.
@@ -38,13 +36,16 @@ class KnowledgeGraphDataset(Dataset):
         - target (str, optional): The target variable for the task.
         - task (str, optional): The type of task ("reg" for regression, "clf" for classification).
         - use_node_features (bool, optional): Whether to use node features and load them into the KG.
+        - use_edge_features (bool, optional): Whether to use edge features and load them into the KG.
         """
         self.target = target
         self.task = task
+        self.dataset_path = dataset_path
         self.use_node_features = use_node_features
+        self.use_edge_features = use_edge_features
         self.label = target_dict[task][target]
         self.data_df = pd.read_csv(
-            dataset_path,
+            self.dataset_path,
             dtype={
                 "drug_1_id": int,
                 "drug_2_id": int,
@@ -55,32 +56,10 @@ class KnowledgeGraphDataset(Dataset):
                 self.label: float,
             },
         )
-        self.node_features = None
-        if self.use_node_features:
-            feature_path = dataset_path.parent / f"{dataset_path.parts[-2]}_drug_features.json"
-            with open(feature_path) as f:
-                node_features = json.load(f)
-            self.data_df, drug_vocab = self._filter_drugs(node_features)
-            self.node_features = [
-                node_features[name.lower()] for name in drug_vocab.keys() 
-                if name.lower() in node_features.keys()
-            ]
-            self.context_vocab = json.load(open(dataset_path.parent / "relation_vocab.json","r"))
-            self.edge_features = self.load_context_features()
         triplets = self.data_df.loc[
             :, ["drug_1_id", "drug_2_id", "context_id"]
         ].to_numpy()
-        self.num_relations = len(set(self.data_df["context"]))
-        self.num_nodes = len(
-            set(self.data_df["drug_1_id"]).union(set(self.data_df["drug_2_id"]))
-        )
-        self.graph = Graph(
-            triplets, 
-            num_node=self.num_nodes, 
-            num_relation=self.num_relations, 
-            node_feature=self.node_features,
-            edge_feature=self.edge_features
-        )
+        self.graph = self._init_graph(triplets)
         self.indices = list(range(len(self.data_df)))
 
     def get_labels(self, indices=None):
@@ -92,13 +71,78 @@ class KnowledgeGraphDataset(Dataset):
             labels = self.data_df.iloc[indices][target_dict['clf'][self.target]]
         return labels
     
+    def _init_graph(self, triplets):
+        node_features = None
+        edge_features = None
+        if self.use_node_features:
+            self.data_df, node_features = self._get_node_features()
+        if self.use_edge_features:
+            self.data_df, edge_features = self._get_edge_features()
+        triplets = self.data_df.loc[
+            :, ["drug_1_id", "drug_2_id", "context_id"]
+        ].to_numpy()
+        self.num_relations = len(set(self.data_df["context"]))
+        self.num_nodes = len(
+            set(self.data_df["drug_1_id"]).union(set(self.data_df["drug_2_id"]))
+        )
+        graph = Graph(
+            triplets, 
+            num_node=self.num_nodes, 
+            num_relation=self.num_relations, 
+            node_feature=node_features,
+            edge_feature=edge_features
+        )
+        return graph
+
     def _update_dataset(self, df: pd.DataFrame):
         self.data_df = pd.concat([self.data_df, df], ignore_index=True)
         triplets = self.data_df.loc[
             :, ["drug_1_id", "drug_2_id", "context_id"]
         ].to_numpy()
-        self.graph = Graph(triplets, num_node=self.num_nodes, num_relation=self.num_relations)
+        self.graph = self._init_graph(triplets)
     
+    def _filter_drugs(self, node_features):
+        het_drugs = [drug.lower() for drug in list(node_features.keys())]
+        filtered_drugs = self.data_df[
+            (self.data_df['drug_1_name'].str.lower().isin(het_drugs)) &
+            (self.data_df['drug_2_name'].str.lower().isin(het_drugs))
+        ]           
+        filtered_drugs, drug_vocab = create_drug_id_vocabs(filtered_drugs)
+        filtered_drugs, _ = create_cell_line_id_vocabs(filtered_drugs)
+        return filtered_drugs, drug_vocab
+    
+    def _get_node_features(self):
+        feature_path = self.dataset_path.parent / f"{self.dataset_path.parts[-2]}_drug_features.json"
+        with open(feature_path) as f:
+            node_features = json.load(f)
+        data_df, drug_vocab = self._filter_drugs(node_features)
+        feature_dict = {}
+        for node, feature in node_features.items():
+            concatenated_features = []
+            for value in feature.values():
+                concatenated_features.extend(value)
+            feature_dict[node] = concatenated_features
+        node_features = [
+            feature_dict[name.lower()] for name in drug_vocab.keys() 
+            if name.lower() in feature_dict.keys()
+        ]
+        return data_df, node_features
+
+    def _get_edge_features(self):
+        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express.json"
+        with open(feature_path) as f:
+            all_edge_features = json.load(f)
+        cell_lines = [cl.lower() for cl in list(all_edge_features.keys())]
+        data_df = self.data_df[
+            (self.data_df['context'].str.lower().isin(cell_lines)) &
+            (self.data_df['context'].str.lower().isin(cell_lines))
+        ]
+        data_df, _ = create_drug_id_vocabs(data_df)
+        data_df, _ = create_cell_line_id_vocabs(data_df)
+        edge_df = data_df['context'].map(all_edge_features)
+        edge_features = [edge_df[i] for i in edge_df.index]
+        return data_df, edge_features
+
     def make_inv_triplets(self,indices):
         """Create inverse triplets so that if (h,r,t) then (t,r,h) is also in the graph"""
         df_subset = self.data_df.iloc[indices]
