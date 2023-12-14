@@ -19,7 +19,7 @@ def make_cell_line_features():
     gene_expressions = pd.read_csv(
         save_path / "raw" / "CRISPRGeneEffect.csv", index_col=0
     )
-
+    gene_expressions = pd.read_csv('OmicsCNGene.csv', index_col=0)
     if not (save_path / "ncbi_ids.csv").exists():
         # This is not used since landmark genes are uploaded to github, it is only here for reference.
         url = "https://raw.githubusercontent.com/Sinwang404/DeepDDs/master/data/CCLE_RNAseq_rsem_transcripts_tpm_20180929/CCLE_RNAseq_rsem_transcripts_tpm_20180929_954.csv"

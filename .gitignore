@@ -5,7 +5,6 @@ data/gold
 data/hetionet
 data/features/node_features
 data/features/cell_line_features/raw/
-data/features/cell_line_features/CCLE_954_gene_express.json
 .idea/
 .vscode/
 poetry.lock 
