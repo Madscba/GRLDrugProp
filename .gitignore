@@ -3,7 +3,6 @@ data/bronze
 data/silver
 data/gold
 data/features/cell_line_features/raw/
-data/features/cell_line_features/CCLE_954_gene_express.json
 .idea/
 .vscode/
 poetry.lock 
