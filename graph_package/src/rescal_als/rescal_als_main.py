@@ -143,18 +143,18 @@ def main(config):
         logging.basicConfig(level=logging.INFO)
         _log = logging.getLogger("Example Kinships")
 
-        K = (
-            train_set.dataset.graph.undirected()
-            .edge_mask(np.append(train_set.indices, test_set.indices))
-            .adjacency
-        )  # This adjacency matrix corresponds to all the triplets that has been used to train and evaluate our SGD version of Rescal
+        all_indices = np.append(train_set.indices, test_set.indices)
+
+        # Create an undirected graph and get the adjacency matrix
+        K = train_set.dataset.graph.undirected().edge_mask(all_indices).adjacency
+
         e, k = K.shape[0], K.shape[2]
         SZ = e * e * k
 
-        idx_train = list(train_set.indices)
-        idx_test = list(test_set.indices)
+        # Create an empty adjacency matrix T
+        T = np.zeros((k, e, e))
 
-        # All the triplets seen by our SGD Rescal are not synergetic, so we need to modify the adjacency matrix, such that non synergetic relations are not set to 1
+        # Get the synergetic information for train and test sets
         train_syn = (
             train_set.dataset.data_df.iloc[train_set.indices]["synergy_zip_mean"] >= 5
         ).astype(int)
@@ -162,58 +162,61 @@ def main(config):
             test_set.dataset.data_df.iloc[test_set.indices]["synergy_zip_mean"] >= 5
         ).astype(int)
 
-        T = construct_T_from_torch(K)
+        idx_train = train_set.indices
+        idx_test = test_set.indices
 
-        # modify to only have ones, where it is synergetic (zip_mean > 5)
-        train_idx_3dim = np.unravel_index(idx_train, (e, e, k))
-        test_idx_3dim = np.unravel_index(idx_test, (e, e, k))
+        # Map indices to 3D coordinates
+        train_idx_3dim = np.unravel_index(train_set.indices, (e, e, k))
+        test_idx_3dim = np.unravel_index(test_set.indices, (e, e, k))
 
-        # a triplet in our graph are not necessarily equal to a label being 1, so we have to modify.
-        # Note that missing values will be interpreted just as our negative samples.
-        for i, idx in enumerate(train_syn.index.values):
-            T[train_idx_3dim[2][i]][
-                train_idx_3dim[0][i], train_idx_3dim[1][i]
-            ] = train_syn[idx]
-            T[train_idx_3dim[2][i]][
-                train_idx_3dim[1][i], train_idx_3dim[0][i]
-            ] = train_syn[idx]
+        # Set values in the adjacency matrix based on synergetic condition
+        T[train_idx_3dim[2], train_idx_3dim[0], train_idx_3dim[1]] = train_syn.values
+        T[train_idx_3dim[2], train_idx_3dim[1], train_idx_3dim[0]] = train_syn.values
 
-        for i, idx in enumerate(test_syn.index.values):
-            T[test_idx_3dim[2][i]][test_idx_3dim[0][i], test_idx_3dim[1][i]] = test_syn[
-                idx
-            ]
-            T[test_idx_3dim[2][i]][test_idx_3dim[1][i], test_idx_3dim[0][i]] = test_syn[
-                idx
-            ]
+        T[test_idx_3dim[2], test_idx_3dim[0], test_idx_3dim[1]] = test_syn.values
+        T[test_idx_3dim[2], test_idx_3dim[1], test_idx_3dim[0]] = test_syn.values
+
+        T = [lil_matrix(T[i, :, :]) for i in range(k)]
 
         GROUND_TRUTH = deepcopy(
             T
         )  # Not used in this impl. -> We use test_syn as the true labels.
 
         # hyperparams to test ALS over.
-        ranks = [6, 7, 8, 9, 10, 15, 20, 36]
+        ranks = [10, 20, 30, 37]
         metrics = ["AUC_ROC_train", "AUC_ROC_test", "AUC_PR_train", "AUC_PR_test"]
-        reg_scales = [0, 1, 5, 10]
+        reg_scale_A = [0, 10, 25, 40, 50]
+        reg_scale_R = [0, 10, 25, 40, 50]
 
         # create result dataframe
         index = pd.MultiIndex.from_product(
-            [metrics, ranks, reg_scales], names=["metric", "rank", "reg_scale"]
+            [metrics, ranks, reg_scale_A, reg_scale_R],
+            names=["metric", "rank", "reg_scale_A", "reg_scale_R"],
         )
         df_metric = pd.DataFrame(index=index)
 
         for rank in ranks:
-            for reg_scale in reg_scales:
-                conf = {"reg": reg_scale, "rank": rank}
+            for reg_scale_a in reg_scale_A:
+                for reg_scale_r in reg_scale_R:
+                    conf = {
+                        "reg_scale_A": reg_scale_a,
+                        "reg_scale_R": reg_scale_r,
+                        "rank": rank,
+                    }
 
-                AUC_PR_test, AUC_ROC_test = innerfold(
-                    T, idx_test, idx_test, e, k, SZ, GROUND_TRUTH, conf, test_syn
-                )
+                    AUC_PR_test, AUC_ROC_test = innerfold(
+                        T, idx_test, idx_test, e, k, SZ, GROUND_TRUTH, conf, test_syn
+                    )
 
-                _log.info("AUC-PR Test Mean: %f" % (AUC_PR_test))
-                _log.info("AUC-ROC Test Mean: %f" % (AUC_ROC_test))
+                    _log.info("AUC-PR Test Mean: %f" % (AUC_PR_test))
+                    _log.info("AUC-ROC Test Mean: %f" % (AUC_ROC_test))
 
-                df_metric["AUC_PR_test", rank, reg_scale] = AUC_PR_test
-                df_metric["AUC_ROC_test", rank, reg_scale] = AUC_ROC_test
+                    df_metric[
+                        "AUC_PR_test", rank, reg_scale_a, reg_scale_r
+                    ] = AUC_PR_test
+                    df_metric[
+                        "AUC_ROC_test", rank, reg_scale_a, reg_scale_r
+                    ] = AUC_ROC_test
         results = df_metric.iloc[0]
         a = 2
 

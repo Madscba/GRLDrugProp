@@ -22,8 +22,8 @@ def predict_rescal_als(T, config={}):
         config["rank"],
         init="nvecs",
         conv=1e-5,
-        lambda_A=config["reg"],
-        lambda_R=config["reg"],
+        lambda_A=config["reg_scale_A"],
+        lambda_R=config["reg_scale_R"],
         maxIter=1000,
     )
     n = A.shape[0]
@@ -52,7 +52,7 @@ def innerfold(T, mask_idx, target_idx, e, k, sz, GROUND_TRUTH, config={}, test_s
     for i in range(len(mask_idx[0])):
         Tc[mask_idx[2][i]][mask_idx[0][i], mask_idx[1][i]] = 0
         # inverse triplets should also be set to 0 to prevent data leakage
-        # Tc[mask_idx[2][i]][mask_idx[1][i], mask_idx[0][i]] = 0
+        Tc[mask_idx[2][i]][mask_idx[1][i], mask_idx[0][i]] = 0
 
     # predict unknown values
     P = predict_rescal_als(Tc, config=config)
