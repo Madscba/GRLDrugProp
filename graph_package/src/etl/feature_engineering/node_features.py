@@ -44,29 +44,10 @@ def filter_drug_node_graph(drug_ids, edges, node='Gene', min_degree=2):
     for edge in tqdm(edges):
         source_type, source_id = edge['source_id']
         target_type, target_id = edge['target_id']
-        r = edge['kind'] # Type of relation
-        if r=='palliates': 
-            # Ignore palliates relation
-            continue
-        elif node == 'Compound':
-            # Case where a drug is connected to another drug through the 'resembles' relation
-            if r=='resembles':
-                nodes_connected_to_drugs, filtered_edges = add_connected_node(
-                    edge,
-                    r,
-                    nodes_connected_to_drugs,
-                    filtered_edges,
-                    target_id
-                )
-                nodes_connected_to_drugs, filtered_edges = add_connected_node(
-                    edge,
-                    r,
-                    nodes_connected_to_drugs,
-                    filtered_edges,
-                    source_id
-                )
-        else:
-            # Case where a drug is connected to the specified node through the relation r as source/head
+        r = edge['kind']
+        # Ignore palliates relation
+        if r != 'palliates':
+             # Case where a drug is connected to the specified node through the relation r as source/head
             if (source_type == 'Compound' and target_type == node and source_id in drug_ids):
                 nodes_connected_to_drugs, filtered_edges = add_connected_node(
                     edge,
@@ -84,7 +65,7 @@ def filter_drug_node_graph(drug_ids, edges, node='Gene', min_degree=2):
                     filtered_edges,
                     source_id
                 )
-    
+
     # Filter nodes based on degree
     nodes_connected_to_at_least_one_drugs, node_ids, avg_node_degree = get_connected_nodes_ids(
         nodes_connected_to_drugs,
