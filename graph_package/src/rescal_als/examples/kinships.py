@@ -21,10 +21,10 @@ def predict_rescal_als(T, config={}):
         T,
         config["rank"],
         init="nvecs",
-        conv=1e-4,
+        conv=1e-5,
         lambda_A=config["reg"],
         lambda_R=config["reg"],
-        maxIter=500,
+        maxIter=1000,
     )
     n = A.shape[0]
     P = zeros((n, n, len(R)))
@@ -43,7 +43,7 @@ def normalize_predictions(P, e, k):
     return P
 
 
-def innerfold(T, mask_idx, target_idx, e, k, sz, GROUND_TRUTH, config={}):
+def innerfold(T, mask_idx, target_idx, e, k, sz, GROUND_TRUTH, config={}, test_syn=[]):
     Tc = [deepcopy(Ti) for Ti in T]
     mask_idx = np.unravel_index(mask_idx, (e, e, k))
     target_idx = np.unravel_index(target_idx, (e, e, k))
@@ -52,16 +52,21 @@ def innerfold(T, mask_idx, target_idx, e, k, sz, GROUND_TRUTH, config={}):
     for i in range(len(mask_idx[0])):
         Tc[mask_idx[2][i]][mask_idx[0][i], mask_idx[1][i]] = 0
         # inverse triplets should also be set to 0 to prevent data leakage
-        Tc[mask_idx[2][i]][mask_idx[1][i], mask_idx[0][i]] = 0
+        # Tc[mask_idx[2][i]][mask_idx[1][i], mask_idx[0][i]] = 0
 
     # predict unknown values
     P = predict_rescal_als(Tc, config=config)
     P = normalize_predictions(P, e, k)
 
     # compute area under precision recall curve
-    prec, recall, _ = precision_recall_curve(GROUND_TRUTH[target_idx], P[target_idx])
+    if len(test_syn) > 0:
+        true_targets = test_syn
+    else:
+        true_targets = GROUND_TRUTH[target_idx]
+
+    prec, recall, _ = precision_recall_curve(true_targets, P[target_idx])
     auc_pr = auc(recall, prec)
-    auc_roc = roc_auc_score(GROUND_TRUTH[target_idx], P[target_idx])
+    auc_roc = roc_auc_score(true_targets, P[target_idx])
     return auc_pr, auc_roc
 
 

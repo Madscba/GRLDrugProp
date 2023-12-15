@@ -71,12 +71,12 @@ def construct_T_from_torch(K):
     lil_matrices = []
 
     for last_index in unique_last_indices:
-        # Select the rows corresponding to the current last index
+        # select the rows corresponding to the current last index /corresponding to cell line
         mask = last_indices == last_index
         rows = indices[:, mask]
         data = values[mask]
 
-        # Create a lil_matrix for the current last index
+        # convert to a lil_matrix for the current last index / current cell line
         lil_matrix = sp.lil_matrix((size[0], size[1]))
         lil_matrix[rows[0], rows[1]] = data
 
@@ -132,6 +132,10 @@ def main(config):
             dataset, split_method="custom", split_idx=(train_idx, val_idx)
         )
 
+        # We take undirected adjacency matrix, so inverse should automatically be generated
+        # inv_indices = dataset.make_inv_triplets(train_set.indices)
+        # train_set.indices = train_set.indices + inv_indices
+
         data_loaders = get_dataloaders(
             [train_set, val_set, test_set], batch_sizes=config.batch_sizes
         )
@@ -139,154 +143,79 @@ def main(config):
         logging.basicConfig(level=logging.INFO)
         _log = logging.getLogger("Example Kinships")
 
-        # mat = loadmat(r'C:\Users\Mads-\Documents\Universitet\Kandidat\5_semester\thesis\GRLDrugProp\graph_package\src\rescal_als\data\alyawarradata.mat')
-        # K = np.array(mat['Rs'], np.float32)
-        # e, k = K.shape[0], K.shape[2]
-        # SZ = e * e * k
-        # todo extract train and test from adjacency idx such that we have the same test and train set.
-
-        # K = train_set.dataset.graph.edge_mask(dataset.indices).adjacency
         K = (
             train_set.dataset.graph.undirected()
             .edge_mask(np.append(train_set.indices, test_set.indices))
             .adjacency
-        )
+        )  # This adjacency matrix corresponds to all the triplets that has been used to train and evaluate our SGD version of Rescal
         e, k = K.shape[0], K.shape[2]
         SZ = e * e * k
 
-        K_train = (
-            train_set.dataset.graph.undirected()
-            .edge_mask(train_set.indices)
-            .adjacency.to_dense()
-            .numpy()
-        )
-        K_test = (
-            train_set.dataset.graph.undirected()
-            .edge_mask(test_set.indices)
-            .adjacency.to_dense()
-            .numpy()
-        )
+        idx_train = list(train_set.indices)
+        idx_test = list(test_set.indices)
 
-        train_idx = np.nonzero(K_train.flatten())[0]
-        test_idx = np.nonzero(K_test.flatten())[0]
+        # All the triplets seen by our SGD Rescal are not synergetic, so we need to modify the adjacency matrix, such that non synergetic relations are not set to 1
+        train_syn = (
+            train_set.dataset.data_df.iloc[train_set.indices]["synergy_zip_mean"] >= 5
+        ).astype(int)
+        test_syn = (
+            test_set.dataset.data_df.iloc[test_set.indices]["synergy_zip_mean"] >= 5
+        ).astype(int)
 
-        check_strat_train = train_idx.shape[0] / K_train.size
-        check_strat_test = test_idx.shape[0] / K_train.size
-        # copy ground truth before preprocessing
-        # GROUND_TRUTH = K.copy()
-
-        GROUND_TRUTH = deepcopy(K.to_dense().numpy())
-
-        # construct array for rescal
-        # T = [lil_matrix(K[:, :, i]) for i in range(k)]
-        # T = [train_set.dataset.graph.edge_mask(train_set.indices).adjacency[:e,:e,i] for i in range(k)]
         T = construct_T_from_torch(K)
-        # _log.info('Datasize: %d x %d x %d | No. of classes: %d' % (T[0].shape + (len(T),) + (k,)))
 
-        # Do cross-validation
-        # FOLDS = 10
-        # IDX = list(range(SZ))
-        # shuffle(IDX)
+        # modify to only have ones, where it is synergetic (zip_mean > 5)
+        train_idx_3dim = np.unravel_index(idx_train, (e, e, k))
+        test_idx_3dim = np.unravel_index(idx_test, (e, e, k))
 
-        FOLDS = 10
-        IDX = list(range(SZ))
-        shuffle(IDX)
+        # a triplet in our graph are not necessarily equal to a label being 1, so we have to modify.
+        # Note that missing values will be interpreted just as our negative samples.
+        for i, idx in enumerate(train_syn.index.values):
+            T[train_idx_3dim[2][i]][
+                train_idx_3dim[0][i], train_idx_3dim[1][i]
+            ] = train_syn[idx]
+            T[train_idx_3dim[2][i]][
+                train_idx_3dim[1][i], train_idx_3dim[0][i]
+            ] = train_syn[idx]
 
-        fsz = int(SZ / FOLDS)
-        ranks = [1, 5, 7, 8, 9, 10, 15, 20]
+        for i, idx in enumerate(test_syn.index.values):
+            T[test_idx_3dim[2][i]][test_idx_3dim[0][i], test_idx_3dim[1][i]] = test_syn[
+                idx
+            ]
+            T[test_idx_3dim[2][i]][test_idx_3dim[1][i], test_idx_3dim[0][i]] = test_syn[
+                idx
+            ]
+
+        GROUND_TRUTH = deepcopy(
+            T
+        )  # Not used in this impl. -> We use test_syn as the true labels.
+
+        # hyperparams to test ALS over.
+        ranks = [6, 7, 8, 9, 10, 15, 20, 36]
         metrics = ["AUC_ROC_train", "AUC_ROC_test", "AUC_PR_train", "AUC_PR_test"]
-        reg_scales = [0, 0.2, 0.5, 1, 5]
+        reg_scales = [0, 1, 5, 10]
+
+        # create result dataframe
         index = pd.MultiIndex.from_product(
             [metrics, ranks, reg_scales], names=["metric", "rank", "reg_scale"]
         )
-        data = np.random.rand(len(index))
-        df_metric = pd.DataFrame(data, index=index, columns=["random_data"])
+        df_metric = pd.DataFrame(index=index)
+
         for rank in ranks:
             for reg_scale in reg_scales:
-                offset = 0
                 conf = {"reg": reg_scale, "rank": rank}
 
-                AUC_PR_train = np.zeros(FOLDS)
-                AUC_ROC_train = np.zeros(FOLDS)
-                AUC_PR_test = np.zeros(FOLDS)
-                AUC_ROC_test = np.zeros(FOLDS)
-                for f in range(FOLDS):
-                    idx_test = IDX[offset : offset + fsz]
-                    idx_train = np.setdiff1d(IDX, idx_test)
-                    shuffle(idx_train)
-                    idx_train = idx_train[:fsz].tolist()  # original
-                    # idx_train = idx_train[::2].tolist()
-                    _log.info("Train Fold %d" % f)
-                    AUC_PR_train[f], AUC_ROC_train[f] = innerfold(
-                        T, idx_train + idx_test, idx_train, e, k, SZ, GROUND_TRUTH, conf
-                    )
-                    _log.info("Test Fold %d" % f)
-                    AUC_PR_test[f], AUC_ROC_test[f] = innerfold(
-                        T, idx_test, idx_test, e, k, SZ, GROUND_TRUTH, conf
-                    )
-
-                    offset += fsz
-
-                _log.info(
-                    "AUC-PR Test Mean / Std: %f / %f"
-                    % (AUC_PR_test.mean(), AUC_PR_test.std())
-                )
-                _log.info(
-                    "AUC-ROC Test Mean / Std: %f / %f"
-                    % (AUC_ROC_test.mean(), AUC_ROC_test.std())
-                )
-                _log.info(
-                    "AUC-PR Train Mean / Std: %f / %f"
-                    % (AUC_PR_train.mean(), AUC_PR_train.std())
-                )
-                _log.info(
-                    "AUC-ROC Train Mean / Std: %f / %f"
-                    % (AUC_ROC_train.mean(), AUC_ROC_train.std())
+                AUC_PR_test, AUC_ROC_test = innerfold(
+                    T, idx_test, idx_test, e, k, SZ, GROUND_TRUTH, conf, test_syn
                 )
 
-                df_metric["AUC_PR_test", rank, reg_scale] = AUC_PR_test.mean()
-                df_metric["AUC_ROC_test", rank, reg_scale] = AUC_ROC_test.mean()
-                df_metric["AUC_ROC_train", rank, reg_scale] = AUC_PR_train.mean()
-                df_metric["AUC_PR_train", rank, reg_scale] = AUC_ROC_train.mean()
+                _log.info("AUC-PR Test Mean: %f" % (AUC_PR_test))
+                _log.info("AUC-ROC Test Mean: %f" % (AUC_ROC_test))
+
+                df_metric["AUC_PR_test", rank, reg_scale] = AUC_PR_test
+                df_metric["AUC_ROC_test", rank, reg_scale] = AUC_ROC_test
+        results = df_metric.iloc[0]
         a = 2
-        b = a**2
-        # checkpoint_callback = ModelCheckpoint(
-        #     dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
-        # )
-        # call_backs.append(checkpoint_callback)
-
-        # if (model_name == "hybridmodel") and config.model.pretrain_model:
-        #     check_point = pretrain_single_model(config, data_loaders, k)
-        #     config.model.update({"ckpt_path": check_point})
-
-        # model = init_model(
-        #     model=model_name,
-        #     task=config.task,
-        #     model_kwargs=config.model,
-        #     target=config.dataset.target,
-        # )
-
-        # trainer = Trainer(
-        #     logger=loggers,
-        #     callbacks=call_backs,
-        #     **config.trainer,
-        # )
-
-        # trainer.validate(model, dataloaders=data_loaders["val"])
-
-        # trainer.fit(
-        #     model,
-        #     train_dataloaders=data_loaders["train"],
-        #     val_dataloaders=data_loaders["val"],
-        # )
-        # trainer.test(
-        #     model,
-        #     dataloaders=data_loaders["test"],
-        #     ckpt_path=checkpoint_callback.best_model_path,
-        # )
-        # if config.wandb:
-        #     wandb.config.checkpoint_path = checkpoint_callback.best_model_path
-        #     wandb.finish()
 
 
 if __name__ == "__main__":
