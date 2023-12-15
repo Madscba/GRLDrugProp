@@ -126,6 +126,8 @@ def generate_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
     """
     df = load_drugcomb()
     for study in studies:
+        study_path = Directories.DATA_PATH / "silver" / study
+        study_path.mkdir(exist_ok=True,parents=True)
         study_names = ["ONEIL","ALMANAC"] if study == 'oneil_almanac' else ["ONEIL"]
         df_study = df[df["study_name"].isin(study_names)]
         df_study_cleaned = df_study.dropna(subset=["drug_row", "drug_col", "synergy_zip"])   
@@ -133,8 +135,6 @@ def generate_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
             df_study_cleaned = filter_from_hetionet(df_study_cleaned)
         unique_block_ids = df_study_cleaned["block_id"].unique().tolist()
         download_response_info(unique_block_ids,study,overwrite=False)
-        study_path = Directories.DATA_PATH / "silver" / study
-        study_path.mkdir(exist_ok=True,parents=True)
         df_study_cleaned = df_study_cleaned.loc[
             :, ~df_study_cleaned.columns.str.startswith("Unnamed")
         ]
@@ -149,6 +149,7 @@ def download_response_info(list_entities, study_names = "oneil", overwrite=False
     if (not (data_path / "block_dict.json").exists()) | overwrite:
         if (data_path / "block_dict.json").exists():
               os.remove(data_path / "block_dict.json")
+        (data_path / "block_dict.json").touch()
         while list_entities:
             logger.info("Downloading block info from DrugComb API.")
             asyncio.run(

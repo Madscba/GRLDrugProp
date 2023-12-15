@@ -96,22 +96,23 @@ async def download_response_info_drugcomb(
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
         tasks = []
         failure_counts = 0
+        writer = jsonlines.open(path, mode='a') 
         for i in list_entities:
             url = f"{base_url}/{i}"
             task = asyncio.ensure_future(download_info(session, url))
             tasks.append(task)
-        with jsonlines.open(path, mode='a') as writer:
-            for task in tqdm(asyncio.as_completed(tasks), total=len(tasks)):
-                try:
-                    response_list = await task
-                    for val in response_list:
-                        writer.write(val)
-                except:
-                    failure_counts +=1 
-                    logger.error(f"Failed to download information for {type} with id {i}")
-                if failure_counts > 5:
-                    logger.error(f"Failed to download information for {type} with id {i} more than 10 times. Stopping.")
-                    break
+        for task in tqdm(asyncio.as_completed(tasks), total=len(tasks)):
+            try:
+                response_list = await task
+                for val in response_list:
+                    writer.write(val)
+            except:
+                failure_counts +=1 
+                logger.error(f"Failed to download information for {type} with id {i}")
+            if failure_counts > 5:
+                logger.error(f"Failed to download information for {type} with id {i} more than 10 times. Stopping.")
+                break
+        writer.close()
 
 async def download_info(session, url):
     async with session.get(url) as response:
