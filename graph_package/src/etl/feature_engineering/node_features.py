@@ -158,7 +158,7 @@ def make_node_features(datasets=["ONEIL","ALMANAC"], components=20, node_types="
     drug_ids = [drug_info[drug]['DB'] for drug in drug_info.keys()]
 
     # Load Hetionet from json and filter edges
-    het_path = Directories.DATA_PATH / "gold" / "hetionet"
+    het_path = Directories.DATA_PATH / "hetionet"
     if not os.path.exists(het_path / "hetionet-v1.0.json"):
         download_hetionet(het_path)
     with open(het_path / "hetionet-v1.0.json") as f:
@@ -189,7 +189,7 @@ def make_node_features(datasets=["ONEIL","ALMANAC"], components=20, node_types="
     for feature_vector, relation in zip(feature_vectors,relations):
         for i, drug in enumerate(drug_info.keys()):
             drug_features[drug.lower()][relation] = feature_vector[i]
-    with open(save_path / f"{datasets_name}_{node_types_names}_k={components}_drug_features.json", "w") as json_file:
+    with open(save_path / f"{datasets_name}_drug_features.json", "w") as json_file:
             json.dump(drug_features, json_file)
     logger.info(f"Saved {len(drug_features)} PCA feature vectors to {save_path}")
 
