@@ -24,7 +24,7 @@ class RGCN(nn.Module):
         super().__init__()
         self.graph = graph
         self.node_feature_dim = self.graph.node_feature.shape[1]
-        self.edge_feature_dim = self.graph.edge_feature_dim.shape[1]
+        self.edge_feature_dim = self.graph.edge_feature.shape[1]
         self.drug_conv = RelationalGraphConvolutionalNetwork(
             input_dim=self.node_feature_dim,
             hidden_dims=[*hidden_dims, last_dim_size],
@@ -33,9 +33,16 @@ class RGCN(nn.Module):
             batch_norm=batch_norm,
             activation=activation
         )
+        # MLP for cancer cell lines gene expression profiles
+        self.ccle_mlp = MLP(
+                input_dim=self.edge_feature_dim,
+                hidden_dims=[256, last_dim_size],
+                activation="relu"
+        )
+        # Final prediction head that takes node embddings of d
         self.final = nn.Sequential(
             MLP(
-                input_dim=last_dim_size*2,
+                input_dim=last_dim_size*3,
                 hidden_dims=[*fc_hidden_dims, 1],
                 dropout=dropout,
             )
@@ -44,7 +51,7 @@ class RGCN(nn.Module):
     def forward(
         self, inputs
     ) -> torch.FloatTensor:
-        """Run a forward pass of the GCN model.
+        """Run a forward pass of the R-GCN model.
 
         :returns: A vector of predicted synergy scores
         """
@@ -52,7 +59,8 @@ class RGCN(nn.Module):
         x = self.drug_conv(self.graph,self.graph.node_feature)['node_feature']
         x1 = x[drug_1_ids]
         x2 = x[drug_2_ids]
-        x = torch.cat([x1, x2], dim=1)
+        x3 = self.ccle_mlp(self.graph.edge_feature[context_ids])
+        x = torch.cat([x1, x2, x3], dim=1)
         x = self.final(x)
         return x
 

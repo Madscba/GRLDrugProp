@@ -145,7 +145,8 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
         config.model.deepdds.update(update_deepdds_args(config))
         config.model.rescal.update(update_shallow_embedding_args(dataset))
     elif model_name =="rgcn":
-        config.model.update(update_rgcn_args(config))
+        pass
+        #config.model.update(update_rgcn_args(config))
     else:
         config.model.update(update_shallow_embedding_args(dataset))
 
