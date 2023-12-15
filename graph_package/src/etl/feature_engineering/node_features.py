@@ -123,7 +123,7 @@ def fit_pca_node_feature(adjacency_matrix,components,node_type,relation):
 
     return pca_feature_vectors
 
-def make_node_features(datasets=["ONEIL","ALMANAC"], components=20, node_types="all"):
+def make_node_features(datasets=["ONEIL","ALMANAC"], components=10, node_types="all"):
     """ Function for generating PCA feature vectors based on Hetionet """
     # Defining paths
     datasets_name = "oneil_almanac" if datasets==["ONEIL","ALMANAC"] else 'oneil'
@@ -149,7 +149,6 @@ def make_node_features(datasets=["ONEIL","ALMANAC"], components=20, node_types="
 
     # For each node_type and relation, build adjacency matrix and get pca feature vectors
     node_types_list = ["Gene", "Disease", "Side Effect", "Pharmacologic Class"] if node_types == 'all' else node_types
-    node_types_names = "_".join([n[:2] for n in node_types_list])
     feature_vectors = []
     relations = []
     for i, node_type in enumerate(node_types_list):
@@ -175,4 +174,4 @@ def make_node_features(datasets=["ONEIL","ALMANAC"], components=20, node_types="
     logger.info(f"Saved {len(drug_features)} PCA feature vectors to {save_path}")
 
 if __name__ == "__main__":
-    make_node_features(components=10)
+    make_node_features()
