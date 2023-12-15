@@ -1,12 +1,12 @@
 /graph_package/scratch/scratch.py
-/data/bronze
-/data/silver
-/data/gold
+data/bronze
+data/silver
+data/gold
+data/features/cell_line_features/raw/
 .idea/
 .vscode/
 poetry.lock 
 .DS_Store
-data/**
 *.pyc
 *.egg-info
 /graph_package/logs/**
