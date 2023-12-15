@@ -144,7 +144,8 @@ def main(config):
         # e, k = K.shape[0], K.shape[2]
         # SZ = e * e * k
 
-        K = train_set.dataset.graph.edge_mask(dataset.indices).adjacency
+        # K = train_set.dataset.graph.edge_mask(dataset.indices).adjacency
+        K = train_set.dataset.graph.undirected().edge_mask(dataset.indices).adjacency
         e, k = K.shape[0], K.shape[2]
         SZ = e * e * k
 
@@ -169,9 +170,9 @@ def main(config):
         shuffle(IDX)
 
         fsz = int(SZ / FOLDS)
-        ranks = [1, 5, 10, 20, 35]
+        ranks = [1, 5, 7, 8, 9, 10, 15, 20]
         metrics = ["AUC_ROC_train", "AUC_ROC_test", "AUC_PR_train", "AUC_PR_test"]
-        reg_scales = [0, 1, 5, 10]
+        reg_scales = [0, 0.2, 0.5, 1, 5]
         index = pd.MultiIndex.from_product(
             [metrics, ranks, reg_scales], names=["metric", "rank", "reg_scale"]
         )
@@ -180,7 +181,7 @@ def main(config):
         for rank in ranks:
             for reg_scale in reg_scales:
                 offset = 0
-                conf = {"reg": reg_scale, "ran": rank}
+                conf = {"reg": reg_scale, "rank": rank}
 
                 AUC_PR_train = np.zeros(FOLDS)
                 AUC_ROC_train = np.zeros(FOLDS)

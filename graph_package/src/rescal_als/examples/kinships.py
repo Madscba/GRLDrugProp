@@ -18,7 +18,13 @@ from copy import deepcopy
 
 def predict_rescal_als(T, config={}):
     A, R, _, _, _ = rescal_als(
-        T, 10, init="nvecs", conv=1e-4, lambda_A=1, lambda_R=1, maxIter=1000
+        T,
+        config["rank"],
+        init="nvecs",
+        conv=1e-4,
+        lambda_A=config["reg"],
+        lambda_R=config["reg"],
+        maxIter=500,
     )
     n = A.shape[0]
     P = zeros((n, n, len(R)))
@@ -45,6 +51,8 @@ def innerfold(T, mask_idx, target_idx, e, k, sz, GROUND_TRUTH, config={}):
     # set values to be predicted to zero
     for i in range(len(mask_idx[0])):
         Tc[mask_idx[2][i]][mask_idx[0][i], mask_idx[1][i]] = 0
+        # inverse triplets should also be set to 0 to prevent data leakage
+        Tc[mask_idx[2][i]][mask_idx[1][i], mask_idx[0][i]] = 0
 
     # predict unknown values
     P = predict_rescal_als(Tc, config=config)
