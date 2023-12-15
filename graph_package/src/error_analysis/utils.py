@@ -1,17 +1,14 @@
-import hashlib
 import json
-import os
 import errno
 import os
 
-from matplotlib import pyplot as plt
 from scipy.special import expit
 
 from graph_package.configs.directories import Directories
 
 import matplotlib.pyplot as plt
 import pickle
-import pandas as pd, numpy as np
+import pandas as pd
 from sklearn.metrics import (
     roc_curve,
     auc,
@@ -24,6 +21,8 @@ from datetime import date
 from graph_package.src.main_utils import load_data
 import numpy as np
 import torch
+from pathlib import Path
+import typing as t
 
 
 def get_performance_curve(
@@ -158,7 +157,7 @@ def get_roc_visualization(y_true, y_pred_probability):
     plt.show()
 
 
-def get_model_pred_path(save_path, config={}):
+def get_model_pred_path(save_path: Path, config={}):
     """
     Dummy function to retrieve default save path if none is supplied
 
@@ -170,7 +169,7 @@ def get_model_pred_path(save_path, config={}):
     """
     today = date.today()
     today_str = today.strftime("%d_%m_%Y")
-    if not save_path:
+    if save_path == Path(""):
         task_target = "_".join([config.task, config.dataset.target])
         save_path = (
             Directories.OUTPUT_PATH / "model_predictions" / today_str / task_target
@@ -245,13 +244,15 @@ def save_model_pred(batch_idx, batch, preds, target, config, model_name, save_pa
         pickle.dump(output_dict, f)
 
 
-def get_model_pred_dict(file_name="rescal_model_pred_dict.pkl", save_path=""):
+def get_model_pred_dict(
+    file_name="rescal_model_pred_dict.pkl", save_path: Path = Path("")
+):
     """
     Save model predictions, alongside batch_idx, batch triplets
 
     Parameters:
         file_name (str): name of pickle file with model predictions
-        save_path (str): path to file folder
+        save_path (Path): path to file folder
 
     Returns:
         pred_dict (dict): prediction dictionary (batch_idx, batch, predictions, targets)
@@ -349,6 +350,8 @@ def barplot_aucroc_grouped_by_entity(
     xlabel_col_name,
     add_bar_info: bool = True,
     run_name: str = "",
+    metric_name: str = "MSE",
+    task: str = "reg",
 ):
     """
     Generate and save barplot
@@ -368,47 +371,51 @@ def barplot_aucroc_grouped_by_entity(
     grouped_dfs = []
     for i, df in enumerate(pred_dfs):
         if xlabel_col_name == "triplet_name":
-            # Cannot investigate AUC ROC curve when there is only 1 prediction, so goal is rather to understand which triplets are hard to correctly predict
             grouped_df = df.groupby(group_by_columns).agg(
-                {"correct_pred": "mean", xlabel_col_name: "max"}
+                {metric_name: "mean", xlabel_col_name: "max"}
             )
-            metric = "correct_pred"
             original_size, filtered_size = 1, 1
         else:
-            original_size = df.shape[0]
             # Goal is to say something about the difficulty of specific entities relative to others of the same kind
             grouped_df = df.groupby(group_by_columns)
-            # Ensure that we both have positive cases and negative cases for each group, and remove groups without
-            df["has_pos_and_neg_target"] = (
-                grouped_df["targets"].transform(lambda x: x.eq(0).any())
-            ) & (grouped_df["targets"].transform(lambda x: x.eq(1).any()))
-            df = df[df["has_pos_and_neg_target"] == 1]
-            filtered_size = df.shape[0]
+
+            if metric_name == "AUC_ROC":
+                # Ensure that we both have positive cases and negative cases for each group, and remove groups without
+                original_size = df.shape[0]
+                df["has_pos_and_neg_target"] = (
+                    grouped_df["targets"].transform(lambda x: x.eq(0).any())
+                ) & (grouped_df["targets"].transform(lambda x: x.eq(1).any()))
+                df = df[df["has_pos_and_neg_target"] == 1]
+                filtered_size = df.shape[0]
+                check_accepted_sample_ratio(
+                    original_size, filtered_size, group_by_columns
+                )
 
             x_labels = df.groupby(group_by_columns)[xlabel_col_name].max().reset_index()
-            auc_scores, n_exp, class_balance = {}, {}, {}
+            metric_scores, n_exp, mean_target = {}, {}, {}
             unique_groups = df.loc[:, group_by_columns[0]].unique()
             for group in unique_groups:
-                group_data = df[df[group_by_columns[0]] == group]
-                auc = roc_auc_score(group_data["targets"], group_data["pred_prob"])
-                auc_scores[group] = auc
-                n_exp[group] = group_data.shape[0]
-                class_balance[group] = (group_data["targets"]).mean()
+                group_df = df[df[group_by_columns[0]] == group]
+                metric_scores[group] = get_metric_from_pred_and_target(
+                    group_df, metric_name
+                )
+                n_exp[group] = group_df.shape[0]
+                mean_target[group] = (group_df["targets"]).mean()
 
             grouped_df = pd.concat(
                 [
                     pd.DataFrame(dict_.items())
-                    for dict_ in [auc_scores, n_exp, class_balance]
+                    for dict_ in [metric_scores, n_exp, mean_target]
                 ],
                 axis=1,
             )
             grouped_df.columns = [
                 group_by_columns[0],
-                "AUC_ROC",
+                metric_name,
                 group_by_columns[0] + "1",
                 "n_exp",
                 group_by_columns[0] + "2",
-                "class_balance",
+                "mean_target",
             ]
             grouped_df.drop(
                 columns=[group_by_columns[0] + "1", group_by_columns[0] + "2"],
@@ -416,14 +423,12 @@ def barplot_aucroc_grouped_by_entity(
             )
 
             grouped_df = grouped_df.merge(x_labels, on=group_by_columns[0])
-            metric = "AUC_ROC"
             grouped_dfs.append(grouped_df.copy())
 
-        check_accepted_sample_ratio(original_size, filtered_size, group_by_columns)
         generate_bar_plot(
             grouped_df,
             i,
-            metric,
+            metric_name,
             model_names,
             plt_colors,
             save_path,
@@ -431,16 +436,17 @@ def barplot_aucroc_grouped_by_entity(
             xlabel_col_name,
             add_bar_info,
             run_name,
+            task,
         )
 
     if len(pred_dfs) == 2 and xlabel_col_name != "triplet_name":
         df_diff = generate_difference_df(
-            group_by_columns, grouped_dfs, metric, model_names, x_labels
+            group_by_columns, grouped_dfs, metric_name, model_names, x_labels
         )
         generate_bar_plot(
             df_diff,
             0,
-            metric,
+            metric_name,
             ["absolute negative difference"],
             plt_colors,
             save_path,
@@ -448,11 +454,21 @@ def barplot_aucroc_grouped_by_entity(
             xlabel_col_name,
             add_bar_info,
             run_name,
+            task=task,
         )
 
 
+def get_metric_from_pred_and_target(df, metric_name):
+    """Error diagnostics function to find the metric of interest for a subset of the data"""
+    if metric_name == "AUC_ROC":
+        metric = roc_auc_score(df["targets"], df["pred_prob"])
+    elif metric_name == "MSE":
+        metric = ((df["targets"] - df["predictions"]) ** 2).values.mean()
+    return metric
+
+
 def generate_difference_df(
-    group_by_columns, grouped_dfs, metric, model_names, x_labels
+    group_by_columns, grouped_dfs, metric_name, model_names, x_labels
 ):
     df_diff = grouped_dfs[0].merge(
         grouped_dfs[1],
@@ -460,15 +476,18 @@ def generate_difference_df(
         suffixes=(f"_{model_names[0]}", f"_{model_names[1]}"),
         on=group_by_columns,
     )
-    metrics_columns = [f"{metric}_{model_names[i]}" for i in range(len(model_names))]
-    class_balance_columns = [
-        f"class_balance_{model_names[i]}" for i in range(len(model_names))
+    metrics_columns = [
+        f"{metric_name}_{model_names[i]}" for i in range(len(model_names))
+    ]
+    mean_target_columns = [
+        f"mean_target_{model_names[i]}" for i in range(len(model_names))
     ]
     n_exp_columns = [f"n_exp_{model_names[i]}" for i in range(len(model_names))]
-    df_diff[metric] = -abs(df_diff[metrics_columns[0]] - df_diff[metrics_columns[1]])
-    df_diff["class_balance"] = (
-        df_diff[class_balance_columns[0]].values
-        + df_diff[class_balance_columns[1]].values
+    df_diff[metric_name] = -abs(
+        df_diff[metrics_columns[0]] - df_diff[metrics_columns[1]]
+    )
+    df_diff["mean_target"] = (
+        df_diff[mean_target_columns[0]].values + df_diff[mean_target_columns[1]].values
     ) / 2
     df_diff["n_exp"] = (
         df_diff[n_exp_columns[0]].values + df_diff[n_exp_columns[1]].values
@@ -480,7 +499,7 @@ def generate_difference_df(
 def generate_bar_plot(
     grouped_df,
     i,
-    metric,
+    metric_name,
     model_names,
     plt_colors,
     save_path,
@@ -488,44 +507,46 @@ def generate_bar_plot(
     xlabel_col_name,
     add_bar_info,
     run_name,
+    task,
 ):
-    sorted_df = sort_df_by_metric(grouped_df, metric)
+    sorted_df = sort_df_by_metric(grouped_df, metric_name, task)
     top20_df = sorted_df.tail(20)
     top20_df.reset_index(inplace=True)
     plt.figure(figsize=(16, 10))
     plt.subplot(1, 2, 1)
     # sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-    sorted_df[metric].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
+    sorted_df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
     plt.gca().set_xticklabels([])
+    plt.gca().set_ylabel(metric_name)
     # plt.xticks(rotation=90)
     # plt.gca().set_xticks(range(len(sorted_df)))
     # plt.gca().set_xticklabels(sorted_df[xlabel_col_name])
     # todo add avg. aucroc, class balance and n_exp to title with all entitites
-    avg_exp_and_class_balance = [
+    avg_exp_and_mean_target = [
         np.round(np.mean(sorted_df[exp_data].values), 2)
-        for exp_data in ["n_exp", "class_balance"]
+        for exp_data in ["n_exp", "mean_target"]
     ]
-    avg_exp_and_class_balance_str = f"avg n_exp: {avg_exp_and_class_balance[0]}\navg cb: {avg_exp_and_class_balance[1]:.2f}"
+    avg_exp_and_mean_target_str = f"avg n_exp: {avg_exp_and_mean_target[0]}\navg mt: {avg_exp_and_mean_target[1]:.2f}"
     plt.text(
         sorted_df.shape[0] * 0.8,
-        sorted_df[metric].max() * 0.92,
-        avg_exp_and_class_balance_str,
+        sorted_df[metric_name].max() * 0.92,
+        avg_exp_and_mean_target_str,
         ha="center",
         va="bottom",
     )
-    plt.title(f"{title}\n {metric}")
+    plt.title(f"{title}\n {metric_name}")
     plt.legend([model_names[i]])
     plt.subplot(1, 2, 2)
-    top20_df[metric].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
+    top20_df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
     # plt.gca().set_ylim(0, 1)
     # plt.xticks(rotation=45)
     plt.gca().set_xticks(range(len(top20_df)))
     plt.gca().set_xticklabels(top20_df[xlabel_col_name])
-    plt.title(f"{title}\ntop 20 w. lowest {metric}")
+    plt.title(f"{title}\ntop 20 w. lowest {metric_name}")
     if add_bar_info:
-        for index, value in enumerate(top20_df[metric]):
-            cb = np.round(top20_df.loc[index, ["class_balance"]].values[0], 2)
-            bar_text = f"n:\n{top20_df.loc[index, ['n_exp']].values[0]}\ncb:\n{cb:.2f}"
+        for index, value in enumerate(top20_df[metric_name]):
+            mt = np.round(top20_df.loc[index, ["mean_target"]].values[0], 2)
+            bar_text = f"n:\n{top20_df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
             plt.text(index, value, bar_text, ha="center", va="bottom")
     plt.legend([model_names[i]])
     plt.tight_layout()
@@ -542,25 +563,49 @@ def check_accepted_sample_ratio(original_size, filtered_size, group_by_columns):
         )
 
 
-def sort_df_by_metric(df, metric):
-    return df.sort_values(by=metric, ascending=False)
-
-
-def map_to_index(row, cols):
+def sort_df_by_metric(df, metric_name, task):
     """
-    Function to generate unique hash index for a combination of rows. Meant to be applied to each row of a dataframe.
-
-    Parameters:
-        row (pd.DataFrame row):
-        cols (List[str]): Columns to map to id
+    Sort values by the metric given. Return sorted values with the tail containing performance on the worst entities.
+    Args:
+        df (pd.DataFrame):
+        metric_name (str):
+        task (str):
 
     Returns:
-        index (int): unique id
+        df (pd.DataFrame): sorted dataframe
     """
-    sorted_values = tuple(sorted([str(row[col]) for col in cols]))
-    value_string = ",".join(sorted_values)
-    index = int(hashlib.md5(value_string.encode("utf-8")).hexdigest(), 16)
-    return index
+    if task == "clf":
+        asc = False
+    else:
+        asc = True
+    return df.sort_values(by=metric_name, ascending=asc)
+
+
+def get_saved_pred(model_names: t.List[str], path_to_prediction_folder: Path("")):
+    """Err diagnostics function to get saved predictions given model names and path"""
+    pred_file_names = [f"{model}_model_pred_dict.pkl" for model in model_names]
+    pred_dfs = [
+        get_prediction_dataframe(pred_file, save_path=path_to_prediction_folder)
+        for pred_file in pred_file_names
+    ]
+    return pred_dfs
+
+
+# def map_to_index(row, cols):
+#     """
+#     Function to generate unique hash index for a combination of rows. Meant to be applied to each row of a dataframe.
+#
+#     Parameters:
+#         row (pd.DataFrame row):
+#         cols (List[str]): Columns to map to id
+#
+#     Returns:
+#         index (int): unique id
+#     """
+#     sorted_values = tuple(sorted([str(row[col]) for col in cols]))
+#     value_string = ",".join(sorted_values)
+#     index = int(hashlib.md5(value_string.encode("utf-8")).hexdigest(), 16)
+#     return index
 
 
 def load_json(filepath):
@@ -569,31 +614,23 @@ def load_json(filepath):
     return file
 
 
-def get_prediction_dataframe(file_name, save_path=""):
+def get_prediction_dataframe(file_name, save_path: Path):
     """
     Load prediction dictionary and turn into dataframe
     Parameters:
         file_name (str):
-        save_path (str):
+        save_path (Path):
 
     Returns:
         df (pd.DataFrame): dataframe with saved model predictions
     """
     pred_dict = get_model_pred_dict(file_name, save_path)
-    dataframes = format_and_return_as_dataframes(pred_dict)
-
-    df = pd.concat(dataframes, axis=1)
-    df.columns = [
-        "drug_molecules_left_id",
-        "drug_molecules_right_id",
-        "context_features_id",
-        "predictions",
-        "targets",
-    ]
+    df = format_and_return_as_dataframes(pred_dict)
     return df
 
 
 def format_and_return_as_dataframes(pred_dict):
+    """Error diagnostics function that unpacks the prediction dictionary that holds batch triplets, preductions and targets and was saved under trainer.Test() and returns it as a dataframe"""
     if len(pred_dict["batch"]) != 2:
         fold_triplets = torch.vstack(pred_dict["batch"][::2]).numpy()
         fold_predictions = torch.hstack(pred_dict["predictions"]).numpy()
@@ -615,15 +652,28 @@ def format_and_return_as_dataframes(pred_dict):
                 pred_dict["batch"][1],
             ]
         ]
-    return dataframes
+    df = pd.concat(dataframes, axis=1)
+    df.columns = [
+        "drug_molecules_left_id",
+        "drug_molecules_right_id",
+        "context_features_id",
+        "predictions",
+        "targets",
+    ]
+    return df
 
 
-def get_bce_loss(pred_dfs):
-    for df in pred_dfs:
+def get_task_loss(df, task):
+    """Error diagnostics function to retrieve the task relevant loss and calculate for each (target-pred) pair"""
+    if task == "clf":
         df["bce_loss"] = -(
             df["targets"] * np.log(df["pred_prob"])
             + (1 - df["targets"]) * np.log(1 - df["pred_prob"])
         )
+    else:
+        df["MSE"] = (
+            df["targets"] - df["predictions"]
+        ) ** 2  # technically it is just squared error, but for avoid naming confusion MSE will be used here.
 
 
 def generate_node_degree(file_name, save_path):
@@ -709,7 +759,7 @@ def merge_cell_line_and_drug_info(df, cell_line_meta_data, drug_meta_data):
     )
     df = df.drop(columns=["dname", "id"], inplace=False, axis=1)
     df = df.merge(cell_line_meta_data, how="left", left_on="rel_name", right_on="name")
-    df = df.rename(columns={"name": "tissue_name"})
+    df = df.rename(columns={"name": "tissue_name", "rel_name": "cancer_cell_name"})
     return df
 
 
@@ -747,6 +797,16 @@ def get_drug_info():
     return pd.DataFrame(load_json(bronze_root_path / "drug_dict.json")).T
 
 
+def get_evaluation_metric_name(task):
+    """Based on the specified task return the metrics that the error diagnostic plots should focus on"""
+    if task == "clf":
+        metric_name = "AUC_ROC"
+        triplet_metric_name = "correct_pred"  # There is only a single observation, so AUCROC cannot be used
+    else:
+        metric_name, triplet_metric_name = "MSE", "MSE"
+    return metric_name, triplet_metric_name
+
+
 def get_node_degree():
     """
     Retrieve node degree of each drug.
@@ -763,13 +823,13 @@ def get_node_degree():
     return node_degree
 
 
-def enrich_model_predictions(model_names, pred_dfs):
+def enrich_model_predictions(model_names, pred_dfs, task):
     """
     Enrich prediction dataframe with vocabulary and meta information on both drug and cancer cell line level.
     Parameters:
         model_names:
         pred_dfs:
-
+        task: classification "clf" or regression "reg". Value determines what loss is added.
     Returns:
         combined_df (pd.DataFrame): Dataframe with predictions from all models
         pred_dfs (List[pd.DataFrame]) List of dataframes each dataframe holding the prediction from one model.
@@ -781,63 +841,68 @@ def enrich_model_predictions(model_names, pred_dfs):
     drug_meta_data = get_drug_info()
     new_pred_dfs = []
     for idx, df in enumerate(pred_dfs):
-        df["pred_prob"] = df["predictions"].apply(expit)
-        df["pred_thresholded"] = df["pred_prob"].apply(lambda x: 1 if x > 0.5 else 0)
-        df["correct_pred"] = np.isclose(df["pred_thresholded"], df["targets"]).astype(
-            int
-        )
+        if task == "clf":
+            df["pred_prob"] = df["predictions"].apply(expit)
+            df["pred_thresholded"] = df["pred_prob"].apply(
+                lambda x: 1 if x > 0.5 else 0
+            )
+            df["correct_pred"] = np.isclose(
+                df["pred_thresholded"], df["targets"]
+            ).astype(int)
+        get_task_loss(df, task)
 
         df = merge_vocabs_with_predictions(df, df_ent_vocab, df_rel_vocab)
         df = merge_cell_line_and_drug_info(df, cell_line_meta_data, drug_meta_data)
         df["model_name"] = model_names[idx]
 
-        df["drug_pair_idx"] = df.groupby(
-            ["drug_molecules_left_id", "drug_molecules_right_id"]
-        ).ngroup()
-
-        df["triplet_idx"] = df.groupby(
-            [
-                "drug_molecules_left_id",
-                "drug_molecules_right_id",
-                "context_features_id",
-            ]
-        ).ngroup()
-
-        df["drug_targets_idx"] = df.groupby(
-            ["target_type", "target_type_right"]
-        ).ngroup()
-
-        df["disease_idx"] = df.groupby(["disease_id"]).ngroup()
-
-        df["triplet_name"] = df.apply(
-            lambda row: ",".join(
-                [
-                    str(row[key])
-                    for key in ["drug_name_left", "drug_name_right", "rel_name"]
-                ]
-            ),
-            axis=1,
-        )
-        df["drug_targets_name"] = df.apply(
-            lambda row: ",".join(
-                [str(row[key]) for key in ["target_type", "target_type_right"]]
-            ),
-            axis=1,
-        )
-        df["drug_pair_name"] = df.apply(
-            lambda row: ",".join(
-                [str(row[key]) for key in ["drug_name_left", "drug_name_right"]]
-            ),
-            axis=1,
-        )
+        generate_group_indices_and_names(df)
 
         # add triplet name
         # add drug pair name
         # add
         new_pred_dfs.append(df)
-    get_bce_loss(pred_dfs)
-    pred_dfs = new_pred_dfs
-    del new_pred_dfs
-    combined_df = pd.concat(pred_dfs)
+    combined_df = [pd.concat(new_pred_dfs)]
+    return combined_df, new_pred_dfs
 
-    return combined_df, pred_dfs
+
+def generate_group_indices_and_names(df: pd.DataFrame):
+    """Generate a unique idx and name for each drug_pair, triplet, drug_target & disease
+
+    Parameters:
+        df (pd.DataFrame)
+    Returns:
+        None
+    """
+    df["drug_pair_idx"] = df.groupby(
+        ["drug_molecules_left_id", "drug_molecules_right_id"]
+    ).ngroup()
+    df["triplet_idx"] = df.groupby(
+        [
+            "drug_molecules_left_id",
+            "drug_molecules_right_id",
+            "context_features_id",
+        ]
+    ).ngroup()
+    df["drug_targets_idx"] = df.groupby(["target_type", "target_type_right"]).ngroup()
+    df["disease_idx"] = df.groupby(["disease_id"]).ngroup()
+    df["triplet_name"] = df.apply(
+        lambda row: ",".join(
+            [
+                str(row[key])
+                for key in ["drug_name_left", "drug_name_right", "cancer_cell_name"]
+            ]
+        ),
+        axis=1,
+    )
+    df["drug_targets_name"] = df.apply(
+        lambda row: ",".join(
+            [str(row[key]) for key in ["target_type", "target_type_right"]]
+        ),
+        axis=1,
+    )
+    df["drug_pair_name"] = df.apply(
+        lambda row: ",".join(
+            [str(row[key]) for key in ["drug_name_left", "drug_name_right"]]
+        ),
+        axis=1,
+    )
