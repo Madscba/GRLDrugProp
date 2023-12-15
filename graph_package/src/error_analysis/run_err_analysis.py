@@ -7,18 +7,15 @@ from graph_package.src.main import (
 from graph_package.src.error_analysis.utils import (
     find_best_model_ckpt,
     barplot_aucroc_grouped_by_entity,
-    sort_df_by_metric,
-    map_to_index,
-    get_prediction_dataframe,
-    get_node_degree,
+    get_saved_pred,
     enrich_model_predictions,
+    get_evaluation_metric_name,
 )
 import hydra
 import numpy as np
 from graph_package.configs.definitions import model_dict
 from pytorch_lightning import Trainer
 import torch
-import matplotlib.pyplot as plt
 
 
 @hydra.main(
@@ -82,7 +79,7 @@ def main(config):
     error_diagnostics_plots()
 
 
-def error_diagnostics_plots(model_names, path_to_prediction_folder):
+def error_diagnostics_plots(model_names, path_to_prediction_folder, task):
     """
     Load predictions and provide diagnostics bar plots on entity level:
 
@@ -94,21 +91,17 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
         None
     """
     # load predictions from trained model(s)
-    pred_file_names = [f"{model}_model_pred_dict.pkl" for model in model_names]
-    pred_dfs = [
-        get_prediction_dataframe(pred_file, save_path=path_to_prediction_folder)
-        for pred_file in pred_file_names
-    ]
+    pred_dfs = get_saved_pred(model_names, path_to_prediction_folder)
     run_name = path_to_prediction_folder.name
 
     # enrich predictions with vocabularies and meta data
-    combined_legend = ["&".join(model_names)]
-
-    combined_df, pred_dfs = enrich_model_predictions(model_names, pred_dfs)
-    df_lists = [pred_dfs, [combined_df]]
+    combined_df, pred_dfs = enrich_model_predictions(model_names, pred_dfs, task)
+    df_lists = [pred_dfs, combined_df]
     title_suffix = ["single_model", "both"]
+    combined_legend = ["&".join(model_names)]
     legend_list = [model_names, combined_legend]
 
+    metric_name, triplet_metric = get_evaluation_metric_name(task)
     ##Investigate triplet (drug,drug, cell line), "triplet_name"
     # triplet_titles = [f"triplet_{title}" for title in title_suffix]
     # for idx, df_list in enumerate(df_lists):
@@ -120,6 +113,8 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
     #         "triplet_name",
     #         add_bar_info=False,
     #         run_name=run_name,
+    #         metric = triplet_metric
+    #         task = task
     #     )
 
     ##Investigate drug pairs, "drug_pair_name"
@@ -132,9 +127,11 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
             drug_pair_titles[idx],
             "drug_pair_name",
             run_name=run_name,
+            metric_name=metric_name,
+            task=task,
         )
 
-    ##Investigate cancer cell line, "rel_name"
+    ##Investigate cancer cell line, "cancer_cell_name"
     cancer_cell_line_titles = [f"cancer_cell_{title}" for title in title_suffix]
     for idx, df_list in enumerate(df_lists):
         barplot_aucroc_grouped_by_entity(
@@ -142,8 +139,10 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
             legend_list[idx],
             ["context_features_id"],
             cancer_cell_line_titles[idx],
-            "rel_name",
+            "cancer_cell_name",
             run_name=run_name,
+            metric_name=metric_name,
+            task=task,
         )
 
     ##Investigate drug target, "drug_targets_name"
@@ -156,6 +155,8 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
             drug_targets_titles[idx],
             "drug_targets_name",
             run_name=run_name,
+            metric_name=metric_name,
+            task=task,
         )
 
     # Investigate disease id, "disease_id"
@@ -168,6 +169,8 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
             disease_titles[idx],
             "disease_id",
             run_name=run_name,
+            metric_name=metric_name,
+            task=task,
         )
 
     # Investigate tissue, "name"
@@ -180,6 +183,8 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
             tissue_titles[idx],
             "tissue_name",
             run_name=run_name,
+            metric_name=metric_name,
+            task=task,
         )
 
     ##Investigate single drug
@@ -188,10 +193,10 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
     for idx, df_list in enumerate(df_lists):
         if len(df_list) > 1:
             df_drug_without_dupl = [
-                get_drug_level_df([df_list[i]]) for i in range(len(df_list))
+                get_drug_level_df([df_list[i]], task) for i in range(len(df_list))
             ]
         else:
-            df_drug_without_dupl = [get_drug_level_df(df_list)]
+            df_drug_without_dupl = [get_drug_level_df(df_list, task)]
         barplot_aucroc_grouped_by_entity(
             df_drug_without_dupl,
             legend_list[idx],
@@ -199,10 +204,16 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder):
             drug_titles[idx],
             "drug_name_left",
             run_name=run_name,
+            metric_name=metric_name,
+            task=task,
         )
 
 
-def get_drug_level_df(df_list):
+def get_drug_level_df(df_list, task):
+    if task == "clf":
+        additional_cols = ["pred_prob", "correct_pred"]
+    else:
+        additional_cols = ["MSE"]
     df = df_list[0]
     df_sub = df.loc[
         :,
@@ -211,15 +222,14 @@ def get_drug_level_df(df_list):
             "drug_molecules_right_id",
             "context_features_id",
             "predictions",
-            "correct_pred",
             "model_name",
             "drug_name_left",
             "drug_name_right",
-            "rel_name",
-            "pred_prob",
+            "cancer_cell_name",
             "targets",
             "drug_pair_idx",
-        ],
+        ]
+        + additional_cols,
     ]
     df_sub = pd.concat(
         (
@@ -242,12 +252,12 @@ if __name__ == "__main__":
     # load_dotenv(".env")
     # main()
 
-    task = "clf"
+    task = "reg"
     target = "zip_mean"
-    day_of_prediction = "03_12_2023"
+    day_of_prediction = "10_12_2023"
     task_target = "_".join([task, target])
     path_to_prediction_folder = (
         Directories.OUTPUT_PATH / "model_predictions" / day_of_prediction / task_target
     )
     models = ["rescal", "deepdds"]
-    error_diagnostics_plots(models, path_to_prediction_folder)
+    error_diagnostics_plots(models, path_to_prediction_folder, task)
