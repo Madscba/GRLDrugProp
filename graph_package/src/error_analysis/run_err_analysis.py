@@ -252,9 +252,9 @@ if __name__ == "__main__":
     # load_dotenv(".env")
     # main()
 
-    task = "clf"
+    task = "reg"
     target = "zip_mean"
-    day_of_prediction = "03_12_2023"
+    day_of_prediction = "10_12_2023"
     task_target = "_".join([task, target])
     path_to_prediction_folder = (
         Directories.OUTPUT_PATH / "model_predictions" / day_of_prediction / task_target
