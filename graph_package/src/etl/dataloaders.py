@@ -1,4 +1,5 @@
 import json
+import torch
 import pandas as pd
 from graph_package.configs.directories import Directories
 from graph_package.src.etl.medallion.gold import (
@@ -18,6 +19,7 @@ target_dict = {
     "clf": {"zip_mean": "mean_label", "zip_max": "max_label", "loewe": "label"},
 }
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class KnowledgeGraphDataset(Dataset):
     def __init__(
@@ -41,6 +43,7 @@ class KnowledgeGraphDataset(Dataset):
         self.target = target
         self.task = task
         self.dataset_path = dataset_path
+        self.device = device
         self.use_node_features = use_node_features
         self.use_edge_features = use_edge_features
         self.label = target_dict[task][target]
@@ -78,6 +81,7 @@ class KnowledgeGraphDataset(Dataset):
         self.num_nodes = len(
             set(self.data_df["drug_1_id"]).union(set(self.data_df["drug_2_id"]))
         )
+        triplets = torch.as_tensor(triplets, dtype=torch.long, device=self.device)
         graph = Graph(
             triplets, 
             num_node=self.num_nodes, 
