@@ -18,13 +18,13 @@ def generate_oneil_dataset():
     """
     Generate the Oniel dataset from the DrugComb dataset.
     """
+    oneil_path = Directories.DATA_PATH / "silver" / "oneil"
+    oneil_path.mkdir(exist_ok=True,parents=True)
     df = load_drugcomb()
     df_oneil = df[df["study_name"] == "ONEIL"]
     df_oneil_cleaned = df_oneil.dropna(subset=["drug_row", "drug_col", "synergy_loewe"])   
     unique_block_ids = df_oneil_cleaned["block_id"].unique().tolist()
     download_response_info_oneil(unique_block_ids,overwrite=False)
-    oneil_path = Directories.DATA_PATH / "silver" / "oneil"
-    oneil_path.mkdir(exist_ok=True,parents=True)
     df_oneil_cleaned = df_oneil_cleaned.loc[
         :, ~df_oneil_cleaned.columns.str.startswith("Unnamed")
     ]
@@ -38,6 +38,7 @@ def download_response_info_oneil(list_entities, overwrite=False):
     if (not (data_path / "block_dict.json").exists()) | overwrite:
         if (data_path / "block_dict.json").exists():
               os.remove(data_path / "block_dict.json")
+        (data_path / "block_dict.json").touch()
         while list_entities:
             logger.info("Downloading block info from DrugComb API.")
             asyncio.run(

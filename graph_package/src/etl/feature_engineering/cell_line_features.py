@@ -10,14 +10,14 @@ def make_cell_line_features():
     """Generate cell line features from the CCLE gene expressions."""
     save_path = Directories.DATA_PATH / "features" / "cell_line_features"
     save_path.mkdir(parents=True, exist_ok=True)
-    if not (save_path / "raw" / "CRISPRGeneEffect.csv").exists():
+    if not (save_path / "raw" / "OmicsCNGene.csv").exists():
         logger.error(
-            "Please download the file CRISPRGeneEffect.csv gene expressions from https://depmap.org/portal/download/all/.\n \
+            "Please download the file OmicsCNGene.csv.csv gene expressions from https://depmap.org/portal/download/all/.\n \
                 Store it in ~/data/features/cell_line_features/raw"
         )
         raise FileNotFoundError
     gene_expressions = pd.read_csv(
-        save_path / "raw" / "CRISPRGeneEffect.csv", index_col=0
+        save_path / "raw" / "OmicsCNGene.csv.csv", index_col=0
     )
     gene_expressions = pd.read_csv('OmicsCNGene.csv', index_col=0)
     if not (save_path / "ncbi_ids.csv").exists():
