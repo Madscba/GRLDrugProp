@@ -143,12 +143,35 @@ def main(config):
         # K = np.array(mat['Rs'], np.float32)
         # e, k = K.shape[0], K.shape[2]
         # SZ = e * e * k
+        # todo extract train and test from adjacency idx such that we have the same test and train set.
 
         # K = train_set.dataset.graph.edge_mask(dataset.indices).adjacency
-        K = train_set.dataset.graph.undirected().edge_mask(dataset.indices).adjacency
+        K = (
+            train_set.dataset.graph.undirected()
+            .edge_mask(np.append(train_set.indices, test_set.indices))
+            .adjacency
+        )
         e, k = K.shape[0], K.shape[2]
         SZ = e * e * k
 
+        K_train = (
+            train_set.dataset.graph.undirected()
+            .edge_mask(train_set.indices)
+            .adjacency.to_dense()
+            .numpy()
+        )
+        K_test = (
+            train_set.dataset.graph.undirected()
+            .edge_mask(test_set.indices)
+            .adjacency.to_dense()
+            .numpy()
+        )
+
+        train_idx = np.nonzero(K_train.flatten())[0]
+        test_idx = np.nonzero(K_test.flatten())[0]
+
+        check_strat_train = train_idx.shape[0] / K_train.size
+        check_strat_test = test_idx.shape[0] / K_train.size
         # copy ground truth before preprocessing
         # GROUND_TRUTH = K.copy()
 
