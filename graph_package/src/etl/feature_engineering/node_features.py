@@ -7,7 +7,6 @@ from tqdm import tqdm
 from graph_package.utils.helpers import logger
 from graph_package.src.etl.medallion.silver import download_hetionet, get_drug_info, filter_from_hetionet
 from graph_package.configs.directories import Directories
-
 from sklearn.decomposition import PCA
 
 def add_connected_node(edge, r, nodes_connected_to_drugs,filtered_edges, target_id):

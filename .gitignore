@@ -27,3 +27,4 @@ graph_package/outputs
 plots/*
 scrapbook.py
 graph_package/src/outputs/*
+venv
