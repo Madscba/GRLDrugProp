@@ -509,9 +509,9 @@ def generate_bar_plot(
     run_name,
     task,
 ):
-    sorted_df = sort_df_by_metric(grouped_df, metric_name, task)
-    top20_df = sorted_df.tail(20)
-    top20_df.reset_index(inplace=True)
+    sorted_df, top10_df = sort_df_by_metric(grouped_df, metric_name, task)
+
+    top10_df.reset_index(inplace=True)
     plt.figure(figsize=(16, 10))
     plt.subplot(1, 2, 1)
     # sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
@@ -526,7 +526,16 @@ def generate_bar_plot(
         np.round(np.mean(sorted_df[exp_data].values), 2)
         for exp_data in ["n_exp", "mean_target"]
     ]
+    df_corr = get_err_correlations(sorted_df, metric_name, avg_exp_and_mean_target)
+    corr_str = f"corr: MSE/n_exp {df_corr.iloc[0,1]}\ncorr: MSE/mt {df_corr.iloc[0,2]}\ncorr: MSE/abs_dev_mt {df_corr.iloc[0,3]}\ncorr: mt/n_exp {df_corr.iloc[2,1]}\ncorr: mt/abs_dev_mt {df_corr.iloc[2,3]}"
     avg_exp_and_mean_target_str = f"avg n_exp: {avg_exp_and_mean_target[0]}\navg mt: {avg_exp_and_mean_target[1]:.2f}"
+    plt.text(
+        sorted_df.shape[0] * 0.5,
+        sorted_df[metric_name].max() * 0.92,
+        corr_str,
+        ha="center",
+        va="bottom",
+    )
     plt.text(
         sorted_df.shape[0] * 0.8,
         sorted_df[metric_name].max() * 0.92,
@@ -537,16 +546,16 @@ def generate_bar_plot(
     plt.title(f"{title}\n {metric_name}")
     plt.legend([model_names[i]])
     plt.subplot(1, 2, 2)
-    top20_df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
+    top10_df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
     # plt.gca().set_ylim(0, 1)
     # plt.xticks(rotation=45)
-    plt.gca().set_xticks(range(len(top20_df)))
-    plt.gca().set_xticklabels(top20_df[xlabel_col_name])
-    plt.title(f"{title}\ntop 20 w. lowest {metric_name}")
+    plt.gca().set_xticks(range(len(top10_df)))
+    plt.gca().set_xticklabels(top10_df[xlabel_col_name])
+    plt.title(f"{title}\ntop 10 w. lowest {metric_name}")
     if add_bar_info:
-        for index, value in enumerate(top20_df[metric_name]):
-            mt = np.round(top20_df.loc[index, ["mean_target"]].values[0], 2)
-            bar_text = f"n:\n{top20_df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
+        for index, value in enumerate(top10_df[metric_name]):
+            mt = np.round(top10_df.loc[index, ["mean_target"]].values[0], 2)
+            bar_text = f"n:\n{top10_df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
             plt.text(index, value, bar_text, ha="center", va="bottom")
     plt.legend([model_names[i]])
     plt.tight_layout()
@@ -578,7 +587,13 @@ def sort_df_by_metric(df, metric_name, task):
         asc = False
     else:
         asc = True
-    return df.sort_values(by=metric_name, ascending=asc)
+    df = df.sort_values(by=metric_name, ascending=asc)
+    # Get entitities with top 10 worst performance
+    if task == "clf":
+        top10_df = df.tail(10)
+    else:
+        top10_df = df.head(10)
+    return df, top10_df
 
 
 def get_saved_pred(model_names: t.List[str], path_to_prediction_folder: Path("")):
@@ -591,21 +606,15 @@ def get_saved_pred(model_names: t.List[str], path_to_prediction_folder: Path("")
     return pred_dfs
 
 
-# def map_to_index(row, cols):
-#     """
-#     Function to generate unique hash index for a combination of rows. Meant to be applied to each row of a dataframe.
-#
-#     Parameters:
-#         row (pd.DataFrame row):
-#         cols (List[str]): Columns to map to id
-#
-#     Returns:
-#         index (int): unique id
-#     """
-#     sorted_values = tuple(sorted([str(row[col]) for col in cols]))
-#     value_string = ",".join(sorted_values)
-#     index = int(hashlib.md5(value_string.encode("utf-8")).hexdigest(), 16)
-#     return index
+def get_err_correlations(df, metric_name, avg_exp_and_mean_target) -> t.Dict:
+    metric_val = df[metric_name]
+    n_exp = df["n_exp"]
+    mt = df["mean_target"]
+    abs_mt_deviation_from_avg_mt = abs(df["mean_target"] - avg_exp_and_mean_target[1])
+    df_corr = pd.DataFrame(
+        [metric_val, n_exp, mt, abs_mt_deviation_from_avg_mt]
+    ).T.corr()
+    return round(df_corr, 2)
 
 
 def load_json(filepath):
