@@ -45,6 +45,7 @@ def filter_drugs_in_graph(drug_info):
 
     # Load Hetionet from json
     data_path = Directories.DATA_PATH / "hetionet"
+    data_path.mkdir(exist_ok=True,parents=True)
     if not os.path.exists(data_path / "hetionet-v1.0.json"):
         download_hetionet(data_path)
     with open(data_path / "hetionet-v1.0.json") as f:

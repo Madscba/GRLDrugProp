@@ -221,7 +221,7 @@ def filter_cell_lines(data_df):
         all_edge_features = json.load(f)
     cell_lines = [cl for cl in list(all_edge_features.keys())]
     data_df = data_df[
-        (data_df['context'].str.isin(cell_lines))
+        (data_df['context'].isin(cell_lines))
     ]
     return data_df
 
