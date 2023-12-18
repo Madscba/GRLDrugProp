@@ -77,15 +77,15 @@ class KnowledgeGraphDataset(Dataset):
     def _init_graph(self, triplets):
         node_features = self._get_node_features() if self.use_node_features else None
         edge_features = self._get_edge_features() if self.use_edge_features else None
-        self.num_relations = len(set(self.data_df["context"]))
-        self.num_nodes = len(
+        num_relations = len(set(self.data_df["context"]))
+        num_nodes = len(
             set(self.data_df["drug_1_id"]).union(set(self.data_df["drug_2_id"]))
         )
         triplets = torch.as_tensor(triplets, dtype=torch.long, device=self.device)
         graph = Graph(
             triplets, 
-            num_node=self.num_nodes, 
-            num_relation=self.num_relations, 
+            num_node=num_nodes, 
+            num_relation=num_relations, 
             node_feature=node_features,
             edge_feature=edge_features
         )
@@ -121,7 +121,7 @@ class KnowledgeGraphDataset(Dataset):
         with open(feature_path) as f:
             all_edge_features = json.load(f)
         edge_df = self.data_df['context'].map(all_edge_features)
-        edge_features = [edge_df[i] for i in edge_df.index]
+        edge_features = edge_df['context'].to_list()
         return edge_features
 
     def make_inv_triplets(self,indices):

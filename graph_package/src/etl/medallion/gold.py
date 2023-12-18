@@ -219,12 +219,10 @@ def filter_cell_lines(data_df):
         make_cell_line_features()
     with open(feature_path) as f:
         all_edge_features = json.load(f)
-    cell_lines = [cl.lower() for cl in list(all_edge_features.keys())]
+    cell_lines = [cl for cl in list(all_edge_features.keys())]
     data_df = data_df[
-        (data_df['context'].str.lower().isin(cell_lines))
+        (data_df['context'].str.isin(cell_lines))
     ]
-    data_df, _ = create_drug_id_vocabs(data_df)
-    data_df, _ = create_cell_line_id_vocabs(data_df)
     return data_df
 
 def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):

@@ -64,15 +64,19 @@ def filter_drugs_in_graph(drug_info):
     filtered_drug_dict = {}
     logger.info("Filtering drugs in Hetionet..")
     for drug_name, identifiers in drug_info.items():
-        for identifier_key, identifier_value in identifiers.items():
-            for graph_drug_name, graph_identifiers in drugs_in_graph.items():
-                if graph_drug_name.lower() in drug_name.lower() or graph_drug_name in drug_name.title():
-                    filtered_drug_dict[drug_name] = graph_identifiers
-                elif identifier_key =='synonyms':
-                    if graph_drug_name in identifier_value:
+        for graph_drug_name, graph_identifiers in drugs_in_graph.items():
+            # Match on drug names
+            if graph_drug_name.lower() in drug_name.lower() or graph_drug_name in drug_name.title():
+                filtered_drug_dict[drug_name] = graph_identifiers
+            else:
+                 for identifier_key, identifier_value in identifiers.items():
+                    # Match on drug synonyms
+                    if identifier_key =='synonyms':
+                        if graph_drug_name in identifier_value:
+                            filtered_drug_dict[drug_name] = graph_identifiers
+                    # Match on drugbank ID or inchikey
+                    elif graph_identifiers.get(identifier_key) == identifier_value:
                         filtered_drug_dict[drug_name] = graph_identifiers
-                elif graph_identifiers.get(identifier_key) == identifier_value:
-                    filtered_drug_dict[drug_name] = graph_identifiers
 
     drug_ids = [filtered_drug_dict[drug]['DB'] for drug in filtered_drug_dict.keys()]
     logger.info(f"{len(drug_ids)} of {len(drug_info)} drugs found in Hetionet")

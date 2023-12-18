@@ -10,16 +10,16 @@ from graph_package.configs.directories import Directories
 from sklearn.decomposition import PCA
 
 def add_connected_node(edge, r, nodes_connected_to_drugs,filtered_edges, target_id):
-    if not r in nodes_connected_to_drugs:
-        nodes_connected_to_drugs[r] = {}
-        filtered_edges[r] = []
-    filtered_edges[r].append(edge)
+    # Check if r is a key in nodes_connected_to_drugs
+    if r not in nodes_connected_to_drugs:
+        nodes_connected_to_drugs[r] = {} 
+        filtered_edges[r] = [] 
     # Check if a drug is already connected to this node
     if target_id in nodes_connected_to_drugs[r]:
         nodes_connected_to_drugs[r][target_id] += 1
     else:
         nodes_connected_to_drugs[r][target_id] = 1
-    return nodes_connected_to_drugs, filtered_edges
+    filtered_edges[r].append(edge)
 
 def get_connected_nodes_ids(nodes_connected_to_drugs, min_degree):
     nodes_connected_to_at_least_one_drugs = [
@@ -48,7 +48,7 @@ def filter_drug_node_graph(drug_ids, edges, node='Gene', min_degree=2):
         if r != 'palliates':
              # Case where a drug is connected to the specified node through the relation r as source/head
             if (source_type == 'Compound' and target_type == node and source_id in drug_ids):
-                nodes_connected_to_drugs, filtered_edges = add_connected_node(
+                add_connected_node(
                     edge,
                     r,
                     nodes_connected_to_drugs,
@@ -57,7 +57,7 @@ def filter_drug_node_graph(drug_ids, edges, node='Gene', min_degree=2):
                 )
             # Case where a drug is connected to the specified node through the relation r as target/tail
             elif source_type == node and target_type == 'Compound'  and target_id in drug_ids:
-                nodes_connected_to_drugs, filtered_edges = add_connected_node(
+                add_connected_node(
                     edge,
                     r,
                     nodes_connected_to_drugs,
@@ -151,10 +151,12 @@ def make_node_features(datasets=["ONEIL","ALMANAC"], components=10, node_types="
     feature_vectors = []
     relations = []
     for i, node_type in enumerate(node_types_list):
+        # Creates a list of node id's and filtered edges for each relation type 
         node_ids, filtered_edges = filter_drug_node_graph(drug_ids=drug_ids,edges=edges,node=node_type)
-        for node_id, relation in zip(node_ids,filtered_edges):
+        # Loop through relation types and build adjacency matrix per relation
+        for node_indicies, relation in zip(node_ids,filtered_edges):
             filtered_edge = filtered_edges[relation]
-            adjacency_matrix = build_adjacency_matrix(drug_ids,node_id,filtered_edge)
+            adjacency_matrix = build_adjacency_matrix(drug_ids,node_indicies,filtered_edge)
             degree = [adjacency_matrix[i,:].sum() for i in range(adjacency_matrix.shape[0])]
             logger.info(f"Avg degree of drug nodes to {node_type} - {relation}: {sum(degree)/len(degree)} (max is {adjacency_matrix.shape[1]})")
             
