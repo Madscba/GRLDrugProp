@@ -96,7 +96,7 @@ def main(config):
         if (model_name == "hybridmodel") and config.model.pretrain_model:
             check_point = pretrain_single_model(config, data_loaders, k)
             config.model.update({"ckpt_path": check_point})
-
+        dataset.graph
         model = init_model(
             model=model_name,
             task=config.task,

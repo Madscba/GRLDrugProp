@@ -121,7 +121,7 @@ class KnowledgeGraphDataset(Dataset):
         with open(feature_path) as f:
             all_edge_features = json.load(f)
         edge_df = self.data_df['context'].map(all_edge_features)
-        edge_features = edge_df['context'].to_list()
+        edge_features = edge_df.tolist()
         return edge_features
 
     def make_inv_triplets(self,indices):

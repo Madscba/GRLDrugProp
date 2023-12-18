@@ -18,8 +18,8 @@ from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 def get_drug_split(dataset, config, n_drugs_per_fold=3):
     splits = []
     df = dataset.data_df
-    for i in range(0, dataset.num_nodes, n_drugs_per_fold):
-        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.num_nodes)))
+    for i in range(0, dataset.graph.num_node, n_drugs_per_fold):
+        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.graph.num_node)))
         drug_1_idx = df[df["drug_1_id"].isin(drug_ids)].index
         drug_2_idx = df[df["drug_2_id"].isin(drug_ids)].index
         test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
