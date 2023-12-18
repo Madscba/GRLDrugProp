@@ -27,6 +27,5 @@ dependencies:
   - scipy
   - scikit-learn
   - seaborn
-
   - pip:
     - -r requirements.txt

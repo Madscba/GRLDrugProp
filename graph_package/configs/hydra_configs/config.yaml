@@ -15,8 +15,10 @@ remove_old_checkpoints: True
 task: 'reg' #clf (does not work for css)
 
 dataset:  
-  name: 'oneil' # deepdds_original, oneil_legacy
+  name: 'oneil' # deepdds_original, oneil_legacy, oneil_almanac
   target: 'zip_mean' # zip_max, css, loewe (legacy)
+  use_node_features: False
+  use_edge_features: False
 
 checkpoint_callback:
   mode: 'max'
