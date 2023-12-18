@@ -45,6 +45,7 @@ class KnowledgeGraphDataset(Dataset):
         self.graph = Graph(
             triplets, num_node=self.num_nodes, num_relation=self.num_relations
         )
+        
         self.indices = list(range(len(self.data_df)))
 
     def get_labels(self, indices=None):
