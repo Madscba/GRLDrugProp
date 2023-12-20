@@ -118,74 +118,74 @@ def error_diagnostics_plots(model_names, path_to_prediction_folder, task):
     #     )
 
     ##Investigate drug pairs, "drug_pair_name"
-    drug_pair_titles = [f"drug_pair_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["drug_pair_idx"],
-            drug_pair_titles[idx],
-            "drug_pair_name",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
+    # drug_pair_titles = [f"drug_pair_{title}" for title in title_suffix]
+    # for idx, df_list in enumerate(df_lists):
+    #     barplot_aucroc_grouped_by_entity(
+    #         df_list,
+    #         legend_list[idx],
+    #         ["drug_pair_idx"],
+    #         drug_pair_titles[idx],
+    #         "drug_pair_name",
+    #         run_name=run_name,
+    #         metric_name=metric_name,
+    #         task=task,
+    #     )
 
     ##Investigate cancer cell line, "cancer_cell_name"
-    cancer_cell_line_titles = [f"cancer_cell_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["context_features_id"],
-            cancer_cell_line_titles[idx],
-            "cancer_cell_name",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
+    # cancer_cell_line_titles = [f"cancer_cell_{title}" for title in title_suffix]
+    # for idx, df_list in enumerate(df_lists):
+    #     barplot_aucroc_grouped_by_entity(
+    #         df_list,
+    #         legend_list[idx],
+    #         ["context_features_id"],
+    #         cancer_cell_line_titles[idx],
+    #         "cancer_cell_name",
+    #         run_name=run_name,
+    #         metric_name=metric_name,
+    #         task=task,
+    #     )
 
     ##Investigate drug target, "drug_targets_name"
-    drug_targets_titles = [f"drug_targets_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["drug_targets_idx"],
-            drug_targets_titles[idx],
-            "drug_targets_name",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
+    # drug_targets_titles = [f"drug_targets_{title}" for title in title_suffix]
+    # for idx, df_list in enumerate(df_lists):
+    #     barplot_aucroc_grouped_by_entity(
+    #         df_list,
+    #         legend_list[idx],
+    #         ["drug_targets_idx"],
+    #         drug_targets_titles[idx],
+    #         "drug_targets_name",
+    #         run_name=run_name,
+    #         metric_name=metric_name,
+    #         task=task,
+    #     )
 
     # Investigate disease id, "disease_id"
-    disease_titles = [f"disease_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["disease_idx"],
-            disease_titles[idx],
-            "disease_id",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
+    # disease_titles = [f"disease_{title}" for title in title_suffix]
+    # for idx, df_list in enumerate(df_lists):
+    #     barplot_aucroc_grouped_by_entity(
+    #         df_list,
+    #         legend_list[idx],
+    #         ["disease_idx"],
+    #         disease_titles[idx],
+    #         "disease_id",
+    #         run_name=run_name,
+    #         metric_name=metric_name,
+    #         task=task,
+    #     )
 
     # Investigate tissue, "name"
-    tissue_titles = [f"tissue_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["tissue_id"],
-            tissue_titles[idx],
-            "tissue_name",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
+    # tissue_titles = [f"tissue_{title}" for title in title_suffix]
+    # for idx, df_list in enumerate(df_lists):
+    #     barplot_aucroc_grouped_by_entity(
+    #         df_list,
+    #         legend_list[idx],
+    #         ["tissue_id"],
+    #         tissue_titles[idx],
+    #         "tissue_name",
+    #         run_name=run_name,
+    #         metric_name=metric_name,
+    #         task=task,
+    #     )
 
     ##Investigate single drug
     drug_titles = [f"drug_{title}" for title in title_suffix]
