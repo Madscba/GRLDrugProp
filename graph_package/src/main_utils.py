@@ -127,8 +127,8 @@ def get_model_name(config: dict, sys_args: List[str]):
 
 def update_shallow_embedding_args(dataset):
     update_dict = {
-        "ent_tot": dataset.num_nodes,
-        "rel_tot": int(dataset.num_relations),
+        "ent_tot": dataset.graph.num_node.tolist(),
+        "rel_tot": dataset.graph.num_relation.tolist(),
     }
     return update_dict
 
