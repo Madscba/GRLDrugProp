@@ -28,6 +28,7 @@ class KnowledgeGraphDataset(Dataset):
         target: str = "zip_mean", 
         task: str = "reg", 
         use_node_features: bool = False,
+        neighbors: str = 'None',
         use_edge_features: bool = False 
     ):
         """
@@ -38,6 +39,14 @@ class KnowledgeGraphDataset(Dataset):
         - target (str, optional): The target variable for the task.
         - task (str, optional): The type of task ("reg" for regression, "clf" for classification).
         - use_node_features (bool, optional): Whether to use node features and load them into the KG.
+        - neighbors (list, optional): Which neighbors in Hetionet to include as PCA node features:
+            Options:
+                - 'None' - only drug features are used as node features then (Default)
+                - 'Gene'
+                - 'Side Effect'
+                - 'Disease'
+                - 'Pharmacological Class'
+                - 'All' for including all possible nearest neighbors 
         - use_edge_features (bool, optional): Whether to use edge features and load them into the KG.
         """
         self.target = target
@@ -45,6 +54,7 @@ class KnowledgeGraphDataset(Dataset):
         self.dataset_path = dataset_path
         self.device = device
         self.use_node_features = use_node_features
+        self.neighbors = neighbors
         self.use_edge_features = use_edge_features
         self.label = target_dict[task][target]
         self.data_df = pd.read_csv(
@@ -99,20 +109,46 @@ class KnowledgeGraphDataset(Dataset):
         self.graph = self._init_graph(triplets)
     
     def _get_node_features(self):
-        feature_path = Directories.DATA_PATH / "features" / "node_features" / f"{self.dataset_path.parts[-2]}_drug_features.json"
-        with open(feature_path) as f:
-            node_features = json.load(f)
+        # Load drug features and vocab with graph node IDs
+        drug_feature_path = Directories.DATA_PATH / "features" / "drug_features" / "drug_ECFP_fp_2D.csv"
+        drug_features = pd.read_csv(drug_feature_path,index_col=0)
         with open(self.dataset_path.parent / "entity_vocab.json") as f:
             drug_vocab = json.load(f)
-        feature_dict = {}
-        for node, feature in node_features.items():
-            concatenated_features = []
-            for value in feature.values():
-                concatenated_features.extend(value)
-            feature_dict[node] = concatenated_features
+        node_feature_dict = {}
+        # In case only drug features are used
+        if self.neighbors == 'None':
+            for drug in drug_features.index:
+                node_feature_dict[drug] = drug_features.loc[drug].to_list()
+
+        # Load PCA nearest neighbor features
+        else: 
+            pca_feature_path = Directories.DATA_PATH / "features" / "node_features" / "oneil_almanac_drug_features.json"
+            with open(pca_feature_path) as f:
+                pca_features = json.load(f)
+            relation_dict = {
+                'Gene': ['binds', 'downregulates','upregulates'],
+                'Side Effect': ['causes'],
+                'Disease': ['treats'],
+                'Pharmacologic Class': ['includes']
+            }
+            if self.neighbors[0] == 'All':
+                self.neighbors = ['Gene', 'Side Effect', 'Disease', 'Pharmacologic Class'] 
+            relations_to_include = [
+                item for entity, rel_list in relation_dict.items() 
+                if entity in self.neighbors for item in rel_list
+            ]
+            # Concat drug and PCA features 
+            for node, feature in pca_features.items():
+                concatenated_pca_features = []
+                for relation, value in feature.items():
+                    if relation in relations_to_include:
+                        concatenated_pca_features.extend(value)
+                node_feature_dict[node] = drug_features.loc[node].to_list() + concatenated_pca_features
+
+        # Convert to a list in correct order determined by graph node ID
         node_features = [
-            feature_dict[name.lower()] for name in drug_vocab.keys() 
-            if name.lower() in feature_dict.keys()
+            node_feature_dict[name] for name in drug_vocab.keys() 
+            if name in node_feature_dict.keys()
         ]
         return node_features
 

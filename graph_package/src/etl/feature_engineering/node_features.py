@@ -6,9 +6,8 @@ import pandas as pd
 from tqdm import tqdm
 from graph_package.utils.helpers import logger
 from graph_package.src.etl.medallion.silver import (
-    download_hetionet,
     get_drug_info,
-    filter_from_hetionet,
+    filter_drugs_in_graph
 )
 from graph_package.configs.directories import Directories
 from sklearn.decomposition import PCA
@@ -47,7 +46,7 @@ def get_connected_nodes_ids(nodes_connected_to_drugs, min_degree):
     return nodes_connected_to_at_least_one_drugs, node_ids, avg_node_degree
 
 
-def filter_drug_node_graph(drug_ids, edges, node="Gene", min_degree=2):
+def filter_drug_node_graph(drug_ids, edges, node="Gene", min_degree=4):
     """Function for retrieving neigboring node ID's in Hetionet for drugs in DrugComb"""
 
     # Filter on nodes related to drugs
@@ -145,7 +144,7 @@ def fit_pca_node_feature(adjacency_matrix, components, node_type, relation):
     return pca_feature_vectors
 
 
-def make_node_features(datasets=["ONEIL", "ALMANAC"], components=10, node_types="all"):
+def make_node_features(datasets=["ONEIL", "ALMANAC"], components=16, min_degree=4, node_types="all"):
     """Function for generating PCA feature vectors based on Hetionet"""
     # Defining paths
     datasets_name = "oneil_almanac" if datasets == ["ONEIL", "ALMANAC"] else "oneil"
@@ -157,23 +156,8 @@ def make_node_features(datasets=["ONEIL", "ALMANAC"], components=10, node_types=
         Directories.DATA_PATH / "silver" / datasets_name / f"{datasets_name}.csv"
     )
     drugs = pd.read_csv(data_path)
-    if datasets_name == "oneil":
-        drugs = filter_from_hetionet(drugs)
     drug_info = get_drug_info(drugs)
-    drug_ids = [drug_info[drug]["DB"] for drug in drug_info.keys()]
-
-    # Load Hetionet from json and filter edges
-    het_path = Directories.DATA_PATH / "hetionet"
-    if not os.path.exists(het_path / "hetionet-v1.0.json"):
-        download_hetionet(het_path)
-    with open(het_path / "hetionet-v1.0.json") as f:
-        graph = json.load(f)
-    edges = graph["edges"]
-    edges = [
-        e
-        for e in edges
-        if (e["target_id"][0] == "Compound") or (e["source_id"][0] == "Compound")
-    ]
+    drug_ids, filtered_drug_dict, edges = filter_drugs_in_graph(drug_info)
 
     # For each node_type and relation, build adjacency matrix and get pca feature vectors
     node_types_list = (
@@ -186,7 +170,7 @@ def make_node_features(datasets=["ONEIL", "ALMANAC"], components=10, node_types=
     for i, node_type in enumerate(node_types_list):
         # Creates a list of node id's and filtered edges for each relation type
         node_ids, filtered_edges = filter_drug_node_graph(
-            drug_ids=drug_ids, edges=edges, node=node_type
+            drug_ids=drug_ids, edges=edges, node=node_type,min_degree=min_degree
         )
         # Loop through relation types and build adjacency matrix per relation
         for node_indicies, relation in zip(node_ids, filtered_edges):
@@ -209,10 +193,10 @@ def make_node_features(datasets=["ONEIL", "ALMANAC"], components=10, node_types=
             relations.append(relation)
 
     # Save pca features to data/node_features as json/csv (name,relation,feature)
-    drug_features = {drug.lower(): {} for drug in drug_info.keys()}
+    drug_features = {drug: {} for drug in filtered_drug_dict.keys()}
     for feature_vector, relation in zip(feature_vectors, relations):
-        for i, drug in enumerate(drug_info.keys()):
-            drug_features[drug.lower()][relation] = feature_vector[i]
+        for i, drug in enumerate(filtered_drug_dict.keys()):
+            drug_features[drug][relation] = feature_vector[i]
     with open(save_path / f"{datasets_name}_drug_features.json", "w") as json_file:
         json.dump(drug_features, json_file)
     logger.info(f"Saved {len(drug_features)} PCA feature vectors to {save_path}")
