@@ -28,7 +28,7 @@ class KnowledgeGraphDataset(Dataset):
         target: str = "zip_mean", 
         task: str = "reg", 
         use_node_features: bool = False,
-        neighbors: str = 'None',
+        modalities: str = 'None',
         use_edge_features: bool = False 
     ):
         """
@@ -39,14 +39,14 @@ class KnowledgeGraphDataset(Dataset):
         - target (str, optional): The target variable for the task.
         - task (str, optional): The type of task ("reg" for regression, "clf" for classification).
         - use_node_features (bool, optional): Whether to use node features and load them into the KG.
-        - neighbors (list, optional): Which neighbors in Hetionet to include as PCA node features:
+        - modalities (list, optional): Which modalities in Hetionet to include as PCA node features:
             Options:
                 - 'None' - only drug features are used as node features then (Default)
                 - 'Gene'
                 - 'Side Effect'
                 - 'Disease'
                 - 'Pharmacological Class'
-                - 'All' for including all possible nearest neighbors 
+                - 'All' for including all possible nearest modalities 
         - use_edge_features (bool, optional): Whether to use edge features and load them into the KG.
         """
         self.target = target
@@ -54,7 +54,7 @@ class KnowledgeGraphDataset(Dataset):
         self.dataset_path = dataset_path
         self.device = device
         self.use_node_features = use_node_features
-        self.neighbors = neighbors
+        self.modalities = modalities
         self.use_edge_features = use_edge_features
         self.label = target_dict[task][target]
         self.data_df = pd.read_csv(
@@ -116,7 +116,7 @@ class KnowledgeGraphDataset(Dataset):
             drug_vocab = json.load(f)
         node_feature_dict = {}
         # In case only drug features are used
-        if self.neighbors == 'None':
+        if self.modalities == 'None':
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
 
@@ -131,11 +131,11 @@ class KnowledgeGraphDataset(Dataset):
                 'Disease': ['treats'],
                 'Pharmacologic Class': ['includes']
             }
-            if self.neighbors[0] == 'All':
-                self.neighbors = ['Gene', 'Side Effect', 'Disease', 'Pharmacologic Class'] 
+            if self.modalities[0] == 'All':
+                self.modalities = ['Gene', 'Side Effect', 'Disease', 'Pharmacologic Class'] 
             relations_to_include = [
                 item for entity, rel_list in relation_dict.items() 
-                if entity in self.neighbors for item in rel_list
+                if entity in self.modalities for item in rel_list
             ]
             # Concat drug and PCA features 
             for node, feature in pca_features.items():
