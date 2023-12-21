@@ -4,10 +4,15 @@ import argparse
 from graph_package.src.etl.medallion.gold import (
     make_oneil_legacy_dataset,
     make_original_deepdds_dataset,
-    make_oneil_almanac_dataset
+    make_oneil_almanac_dataset,
 )
-from graph_package.src.etl.feature_engineering.cell_line_features import make_cell_line_features
+from graph_package.src.etl.feature_engineering.cell_line_features import (
+    make_cell_line_features,
+)
 from graph_package.src.etl.feature_engineering.node_features import make_node_features
+from graph_package.src.etl.feature_engineering.drug_features import (
+    make_drug_fingerprint_features,
+)
 
 
 def main():
@@ -21,11 +26,13 @@ def main():
     if (args.update == "feature") | (args.update == "full"):
         make_cell_line_features()
         make_node_features()
+        make_drug_fingerprint_features()
+
     if (args.update == "gold") | (args.update == "full"):
         make_oneil_legacy_dataset()
-        make_original_deepdds_dataset()  
+        make_original_deepdds_dataset()
         make_oneil_almanac_dataset()
 
-if __name__ == "__main__":
-    main() 
 
+if __name__ == "__main__":
+    main()
