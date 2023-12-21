@@ -21,11 +21,7 @@ def get_feature_path() -> Path:
 
 
 def make_drug_fingerprint_features(get_extended_repr: bool = False):
-    """10.1093/bioinformatics/btt105:
-    #requirements
-    conda install openbabel mopac -c conda-forge
-    pip install chemopy2
-
+    """Function takes drugs from oneil_almanack
 
     We could consider a more advanced fingerprint method:
     Smiles string as input
@@ -33,7 +29,7 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False):
     Returns:
 
     """
-    drug_SMILES, drug_drug_names = get_drug_SMILES_repr()
+    drug_SMILES, drug_names = get_drug_SMILES_repr()
     mols = get_molecules_from_SMILES(drug_SMILES)
     save_path = get_feature_path()
 
@@ -43,7 +39,9 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False):
         drug_2d_morgan_fingerprint.append(
             Fingerprint.calculate_morgan_fp(mol, radius=6, nbits=300)
         )  # Settings from SOTA paper we are implementing
-    pd.DataFrame(drug_2d_morgan_fingerprint).to_csv(save_path / "drug_ECFP_fp_2D.csv")
+    pd.DataFrame(drug_2d_morgan_fingerprint, index=drug_names).to_csv(
+        save_path / "drug_ECFP_fp_2D.csv"
+    )
 
     # calculate_minhash_atompair_fp
     drug_2d_minhash_fingerprint = []
@@ -51,7 +49,7 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False):
         drug_2d_minhash_fingerprint.append(
             Fingerprint.calculate_minhash_atompair_fp(mol)
         )  # Settings from SOTA paper we are implementing
-    pd.DataFrame(drug_2d_minhash_fingerprint).to_csv(
+    pd.DataFrame(drug_2d_minhash_fingerprint, index=drug_names).to_csv(
         save_path / "drug_MINHASH_fp_2D.csv"
     )
 
@@ -60,7 +58,9 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False):
         drug_2d_fingerprint = []
         for mol in mols:
             drug_2d_fingerprint.append(Fingerprint.get_all_fps(mol))
-        pd.DataFrame(drug_2d_fingerprint).to_csv(save_path / "drug_all_fp_2D.csv")
+        pd.DataFrame(drug_2d_fingerprint, index=drug_names).to_csv(
+            save_path / "drug_all_fp_2D.csv"
+        )
 
 
 def get_drug_SMILES_repr():
