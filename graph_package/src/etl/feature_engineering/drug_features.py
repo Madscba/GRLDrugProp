@@ -62,46 +62,6 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False):
             drug_2d_fingerprint.append(Fingerprint.get_all_fps(mol))
         pd.DataFrame(drug_2d_fingerprint).to_csv(save_path / "drug_all_fp_2D.csv")
 
-        ## 2D molecular descriptors and fingerprints
-        cmp = ChemoPy(include_fps=True)
-        drug_2d_desc_and_fingerprint = cmp.calculate(mols)
-
-        # The script beneath calculates 632 two - dimensional(2D) molecular descriptors.
-        drug_2d_desc_path = "2d_desc.csv"
-        if os.path.exists(drug_2d_desc_path):
-            drug_2d_desc = pd.read_csv(drug_2d_desc_path, index_col=0)
-        else:
-            drug_2d_desc = pd.DataFrame()
-
-        cmp = ChemoPy()
-        ## Obtain details for all descriptors and fingerprints
-        desc_fing_details = cmp.get_details()
-
-        for idx, mol in tqdm(enumerate(mols), desc="2D desc"):
-            drug_n = drug_drug_names[idx]
-            print("DRUG: ", drug_n)
-            if drug_n not in drug_2d_desc.index:
-                drug_desc = cmp.calculate([mol])
-                if not drug_2d_desc.empty:
-                    drug_2d_desc.loc[drug_n] = drug_desc.iloc[0]
-                else:
-                    drug_2d_desc = drug_desc
-                    drug_2d_desc.index = [drug_n]
-                drug_2d_desc.to_csv(drug_2d_desc_path)
-                print("saved drug")
-        # todo: for each molecule generate 2D & 3D molecular descriptors and save
-
-        # The additional 552 three-dimensional (3D) molecular descriptors can be computed as follows:
-        # Ensure molecules have 3D conformations
-        for mol in mols:
-            _ = AllChem.EmbedMolecule(mol)
-
-        cmp = ChemoPy(ignore_3D=False)
-        # print(cmp.calculate(mols))
-        start = t.time()
-        drug_2d_and_3d_desc = cmp.calculate(mols)
-        print("time for 2d & 3d desc", t.time() - start)
-
 
 def get_drug_SMILES_repr():
     datasets_name = "oneil_almanac"
