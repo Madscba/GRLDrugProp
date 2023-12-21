@@ -1,11 +1,11 @@
 from graph_package.configs.directories import Directories
-from graph_package.src.etl.medallion.silver import get_drug_info, filter_from_hetionet
+from graph_package.src.etl.medallion.silver import get_drug_info
 import pandas as pd
 from graph_package.src.error_analysis.utils import get_drug_info as get_drug_info_full
 from rdkit.Chem import inchi
 
 from rdkit import Chem
-from chemopy import ChemoPy, Fingerprint, Fingerprint3D
+from chemopy import Fingerprint
 from rdkit.Chem import AllChem
 import os
 import time as t
@@ -72,8 +72,6 @@ def get_drug_SMILES_repr():
         Directories.DATA_PATH / "silver" / datasets_name / f"{datasets_name}.csv"
     )
     drugs = pd.read_csv(data_path)
-    if datasets_name == "oneil":
-        drugs = filter_from_hetionet(drugs)
     drug_info = get_drug_info(drugs, add_SMILES=True)
     df_drug_info = pd.DataFrame(drug_info).T.reset_index()
     df_drug_info = df_drug_info.rename(columns={"index": "drug_name"})

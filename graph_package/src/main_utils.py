@@ -95,6 +95,7 @@ def load_data(dataset_config: dict, task="reg"):
     data_loader = KnowledgeGraphDataset(
         dataset_path, task=task, target=dataset_config.target,
         use_node_features=dataset_config.use_node_features,
+        neighbors=dataset_config.neighbors,
         use_edge_features=dataset_config.use_edge_features
     )
     return data_loader

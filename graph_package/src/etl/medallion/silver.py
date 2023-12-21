@@ -117,23 +117,23 @@ def get_drug_info(drugs: pd.DataFrame, add_SMILES: bool = False):
     with open(dict_path) as f:
         drug_dict = json.load(f)
 
-    unique_drug_names = list(
-        set(drugs["drug_row"].tolist() + drugs["drug_col"].tolist())
+    unique_drug_names = sorted(
+        list(set(drugs["drug_row"].tolist() + drugs["drug_col"].tolist()))
     )
     # Make info dict with drug name, DrugBank ID and inchikey for each drug
     drug_info = {}
     for drug in unique_drug_names:
-        # Check for different name conventions and edge cases
-        drug_name = drug.capitalize() if not drug[0].isupper() else drug
-        drug_name = drug_name.title() if not drug_name[0].isalpha() else drug_name
-        if drug == "mitomycin C":
-            drug_name = "mitomycin C"
-        drug_info[drug_name] = {}
-        drug_info[drug_name]["synonyms"] = drug_dict[drug]["synonyms"].split(";")
-        drug_info[drug_name]["inchikey"] = drug_dict[drug]["inchikey"]
-        drug_info[drug_name]["DB"] = drug_dict[drug]["drugbank_id"]
         if add_SMILES:
-            drug_info[drug_name]["SMILES"] = drug_dict[drug]["smiles"]
+            drug_info[drug] = {}
+            drug_info[drug]["SMILES"] = drug_dict[drug]["smiles"]
+        else:
+            # Check for different name conventions and edge cases
+            drug_name_v1 = drug.capitalize() if not drug[0].isupper() else drug
+            drug_name_v2 = drug_name_v1.title() if not drug_name_v1[0].isalpha() else drug
+            drug_info[drug] = {}
+            drug_info[drug]["synonyms"] = drug_dict[drug]["synonyms"].split(";") + [drug_name_v1, drug_name_v2]
+            drug_info[drug]["inchikey"] = drug_dict[drug]["inchikey"]
+            drug_info[drug]["DB"] = drug_dict[drug]["drugbank_id"]
 
     return drug_info
 
@@ -205,4 +205,4 @@ def download_response_info(list_entities, study_names="oneil", overwrite=False):
 
 
 if __name__ == "__main__":
-    generate_oneil_almanac_dataset(studies=["oneil"])
+    generate_oneil_almanac_dataset(studies=["oneil_almanac"])
