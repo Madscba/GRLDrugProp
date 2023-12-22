@@ -136,10 +136,12 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
             product(unique_drugs, unique_cell_lines), names=("drug", "cell_line")
         )
         df_mono = pd.DataFrame(0, index=multi_index, columns=["min", ",median", "max"])
+        
         for drug in tqdm(unique_drugs, desc="creating mono response dict"):
             drug_included = df_block["drug_row"].isin([drug]) | df_block[
                 "drug_col"
             ].isin([drug])
+
             df_block_sub = df_block[drug_included]
             df_block_sub["conc"] = np.where(
                 df_block_sub["drug_row"] == drug,
@@ -149,7 +151,7 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
                 ),
             )
             df_block_sub["drug"] = drug
-            
+
             df_block_sub = df_block_sub[df_block_sub["conc"] > 0]
             df_block_sub_grouped = (
                 df_block_sub.groupby(["drug", "cell_line_name", "conc"])["inhibition"]
@@ -161,10 +163,12 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
                 values="inhibition",
                 columns="conc",
             ).reset_index()
+
             conc_cols = cl_inhi_pr_conc.columns[2:]
             stat_array = np.array(
                 cl_inhi_pr_conc[conc_cols].agg(["min", "median", "max"], axis=1)
             )
+
             idx = list(
                 zip(
                     cl_inhi_pr_conc["drug"].values,
