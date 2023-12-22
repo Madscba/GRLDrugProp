@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MLP(nn.Module):
-    def __init_(self, drug_input_dim, use_mono_response: bool = False):
+    def __init__(self, drug_input_dim, use_mono_response: bool = False):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.ccle = self._load_ccle()
@@ -41,6 +41,12 @@ class MLP(nn.Module):
         mono_response_path = path = gold_oneil_alm / "mono_response.csv"
         mono_response = pd.read_csv(mono_response_path)
         vocab_path = gold_oneil_alm / "entity_vocab.json"
+        
+    def _load_ccle(self):
+        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express_pca.json"
+        with open(feature_path) as f:
+            all_edge_features = json.load(f)
+        vocab_path = Directories.DATA_PATH / "gold" / "oneil_almanac" / "relation_vocab.json"
         with open(vocab_path) as f:
             entity_vocab = json.load(f)
         vocab_reverse = {v: k for k, v in entity_vocab.items()}

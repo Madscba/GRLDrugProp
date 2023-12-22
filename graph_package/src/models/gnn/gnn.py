@@ -60,7 +60,7 @@ class GNN(nn.Module, core.Configurable):
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
         self.prediction_head = prediction_head_dict[prediction_head](
-            self.output_dim
+            self.output_dim, **ph_kwargs
         )
         self.short_cut = short_cut
         self.concat_hidden = concat_hidden

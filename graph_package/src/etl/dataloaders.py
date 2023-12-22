@@ -122,6 +122,7 @@ class KnowledgeGraphDataset(Dataset):
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
 
+
         # Load PCA nearest neighbor features
         else: 
             pca_feature_path = Directories.DATA_PATH / "features" / "node_features" / "oneil_almanac_drug_features.json"
@@ -152,6 +153,7 @@ class KnowledgeGraphDataset(Dataset):
             node_feature_dict[name] for name in drug_vocab.keys() 
             if name in node_feature_dict.keys()
         ]
+        # Conver to 
         return node_features
 
     def _get_edge_features(self):
