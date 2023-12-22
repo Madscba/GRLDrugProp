@@ -5,9 +5,10 @@ from graph_package.configs.directories import Directories
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class MLP_PredictionHead(nn.Module):
-    def __init_(self, drug_input_dim):
-        super(MLP_PredictionHead, self).__init__()
+class MLP(nn.Module):
+    
+    def __init__(self, drug_input_dim):
+        super(MLP, self).__init__()
         self.ccle = self._load_ccle()
         cell_line_input_dim = self.ccle.shape[1]
         self.cell_line_mlp = nn.Sequential(
@@ -27,7 +28,7 @@ class MLP_PredictionHead(nn.Module):
             nn.Linear(64,1)
         )
     def _load_ccle(self):
-        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express.json"
+        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express_pca.json"
         with open(feature_path) as f:
             all_edge_features = json.load(f)
         vocab_path = Directories.DATA_PATH / "gold" / "oneil_almanac" / "relation_vocab.json"
@@ -45,7 +46,7 @@ class MLP_PredictionHead(nn.Module):
         return output
 
 
-class DistMult():
+class DistMult(nn.Module):
     """
     DistMult embedding proposed in `Embedding Entities and Relations for Learning and Inference in Knowledge Bases`_.
 
@@ -74,9 +75,7 @@ class DistMult():
         self.num_entity = ent_tot
         self.num_relation = rel_tot
 
-        self.entity = nn.Parameter(torch.empty(ent_tot, dim))
         self.relation = nn.Parameter(torch.empty(rel_tot, dim))
-
         self.max_score = max_score
         nn.init.xavier_uniform_(self.relation)
 

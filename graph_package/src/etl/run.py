@@ -8,6 +8,7 @@ from graph_package.src.etl.feature_engineering.node_features import make_node_fe
 from graph_package.src.etl.feature_engineering.drug_features import (
     make_drug_fingerprint_features,
 )
+from .feature_engineering.cell_line_features import make_cell_line_features 
 
 
 def main():

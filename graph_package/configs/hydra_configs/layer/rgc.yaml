@@ -1,0 +1,5 @@
+# @package _global_
+model:
+  layer: 'rgc'
+  enc_kwargs: 
+    num_relation: ''

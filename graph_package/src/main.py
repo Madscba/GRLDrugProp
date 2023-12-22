@@ -3,7 +3,6 @@
 from pytorch_lightning.loggers import WandbLogger
 from graph_package.src.main_utils import (
     reset_wandb_env,
-    load_data,
     init_model,
     get_model_name,
     get_checkpoint_path,
@@ -43,7 +42,11 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    dataset = load_data(dataset_config=config.dataset, task=config.task)
+    if model_name=="gnn":
+        config.dataset.update({"use_node_features": True})
+        
+    dataset = KnowledgeGraphDataset(**config.dataset
+    )
     update_model_kwargs(config, model_name, dataset)
 
     splits = get_cv_splits(dataset, config)

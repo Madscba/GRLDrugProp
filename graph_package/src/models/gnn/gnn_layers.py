@@ -175,7 +175,7 @@ class GraphConv(MessagePassingBase):
 
 
     def _load_ccle(self):
-        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express.json"
+        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express_pca.json"
         with open(feature_path) as f:
             all_edge_features = json.load(f)
         vocab_path = Directories.DATA_PATH / "gold" / "oneil_almanac" / "relation_vocab.json"
