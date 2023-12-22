@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MLP(nn.Module):
-    def __init__(self, dim:int, dataset:str, use_mono_response: bool = False):
+    def __init__(self, dim: int, dataset: str, use_mono_response: bool = False):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.dataset = dataset
@@ -22,7 +22,7 @@ class MLP(nn.Module):
         )
 
         if self.use_mono_response:
-            self.mono_r_index, self.mono_r = self._load_mono_response(self.study_name)
+            self.mono_r_index, self.mono_r = self._load_mono_response()
             global_mlp_input_dim = 2 * dim + 64 + 3 * 2
         else:
             global_mlp_input_dim = 2 * dim + 64
@@ -36,8 +36,6 @@ class MLP(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 1),
         )
-
-
 
     def _load_ccle(self):
         feature_path = (
@@ -56,16 +54,19 @@ class MLP(nn.Module):
         vocab_reverse = {v: k for k, v in entity_vocab.items()}
         ids = sorted(list(vocab_reverse.keys()))
         ccle = torch.tensor(
-            [all_edge_features[vocab_reverse[id]] for id in ids], device=device)
+            [all_edge_features[vocab_reverse[id]] for id in ids], device=device
+        )
         return ccle
 
-    def _load_mono_response(self, study_name):
-        d_path = Directories.DATA_PATH / "gold" / study_name
+    def _load_mono_response(self):
+        d_path = Directories.DATA_PATH / "gold" / self.dataset
         mono_response = pd.read_csv(d_path / "mono_response.csv")
         mono_response = self._enrich_mono_response_with_ids_and_drop_na_and_col(
             mono_response, d_path
         )
-        mono_response_tensor = torch.tensor(mono_response.values, device=device)
+        mono_response_tensor = torch.tensor(
+            mono_response.values, device=device, dtype=torch.float32
+        )
         return mono_response.index, mono_response_tensor
 
     def _enrich_mono_response_with_ids_and_drop_na_and_col(self, mono_response, d_path):
@@ -81,12 +82,10 @@ class MLP(nn.Module):
         mono_response.set_index(["drug_id", "context_id"], inplace=True)
         return mono_response
 
-
     def _get_mono_response(self, drug_ids, context_ids):
-        sample_ids = list(zip(drug_ids, context_ids))
-        batch_mono_val = [
-            self.mono_r[self.mono_r_index.get_loc(ids)] for ids in sample_ids
-        ]
+        sample_ids = list(zip(drug_ids.cpu().numpy(), context_ids.cpu().numpy()))
+        idx = [self.mono_r_index.get_loc(ids) for ids in sample_ids]
+        batch_mono_val = self.mono_r[idx]
         return batch_mono_val
 
     def forward(
@@ -99,8 +98,8 @@ class MLP(nn.Module):
     ) -> torch.FloatTensor:
         c = self.cell_line_mlp(self.ccle[context_ids])
         if self.use_mono_response:
-            d1_mono = self._get_mono_response(self, drug_1_ids, context_ids)
-            d2_mono = self._get_mono_response(self, drug_2_ids, context_ids)
+            d1_mono = self._get_mono_response(drug_1_ids, context_ids)
+            d2_mono = self._get_mono_response(drug_2_ids, context_ids)
             input = torch.concat([d1_embd, d2_embd, c, d1_mono, d2_mono], dim=1)
         else:
             input = torch.concat([d1_embd, d2_embd, c], dim=1)
