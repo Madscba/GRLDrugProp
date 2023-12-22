@@ -148,16 +148,8 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
                     df_block_sub["drug_col"] == drug, df_block_sub["conc_c"], np.nan
                 ),
             )
-            df_block_sub["drug"] = np.where(
-                df_block_sub["drug_row"] == drug,
-                df_block_sub["drug_row"],
-                np.where(
-                    df_block_sub["drug_col"] == drug,
-                    df_block_sub["drug_col"],
-                    np.nan,
-                ),
-            )
-
+            df_block_sub["drug"] = drug
+            
             df_block_sub = df_block_sub[df_block_sub["conc"] > 0]
             df_block_sub_grouped = (
                 df_block_sub.groupby(["drug", "cell_line_name", "conc"])["inhibition"]
