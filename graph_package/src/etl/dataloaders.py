@@ -2,6 +2,7 @@ import json
 import torch
 import pandas as pd
 from graph_package.configs.directories import Directories
+from graph_package.configs.definitions import dataset_dict
 from graph_package.src.etl.medallion.gold import (
     create_drug_id_vocabs, 
     create_cell_line_id_vocabs
@@ -9,6 +10,7 @@ from graph_package.src.etl.medallion.gold import (
 from torch.utils.data import Dataset
 from torchdrug.data import Graph
 import numpy as np
+
 
 target_dict = {
     "reg": {
@@ -24,7 +26,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class KnowledgeGraphDataset(Dataset):
     def __init__(
         self, 
-        dataset_path, 
+        name: str="oneil_almanac", 
         target: str = "zip_mean", 
         task: str = "reg", 
         use_node_features: bool = False,
@@ -51,7 +53,7 @@ class KnowledgeGraphDataset(Dataset):
         """
         self.target = target
         self.task = task
-        self.dataset_path = dataset_path
+        self.dataset_path = dataset_dict[name.lower()]
         self.device = device
         self.use_node_features = use_node_features
         self.modalities = modalities
@@ -153,7 +155,7 @@ class KnowledgeGraphDataset(Dataset):
         return node_features
 
     def _get_edge_features(self):
-        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express.json"
+        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express_pca.json"
         with open(feature_path) as f:
             all_edge_features = json.load(f)
         edge_df = self.data_df['context'].map(all_edge_features)

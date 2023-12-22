@@ -1,5 +1,5 @@
 from graph_package.configs.directories import Directories
-from .load import load_jsonl
+from graph_package.src.etl.medallion.load import load_jsonl
 import pandas as pd
 import numpy as np
 import os
@@ -8,13 +8,13 @@ from graph_package.src.etl.feature_engineering.cell_line_features import (
     make_cell_line_features,
 )
 import json
-import requests
-import re
+from itertools import product
 from tqdm import tqdm
-from .load import (
+from graph_package.src.etl.medallion.load import (
     load_oneil,
     load_oneil_almanac,
-    load_block_as_df
+    load_block_as_df,
+    load_mono_response,
 )
 
 logger = init_logger()
@@ -46,8 +46,6 @@ def create_cell_line_id_vocabs(df: pd.DataFrame):
     cell_line_mapping = {drug: idx for idx, drug in enumerate(unique_contexts)}
     df["context_id"] = df["context"].map(cell_line_mapping)
     return df, cell_line_mapping
-
-
 
 
 def get_drug_cell_line_ids(df: pd.DataFrame):
@@ -101,32 +99,6 @@ def filter_cell_lines(data_df):
     return data_df
 
 
-def insert_inhibition_and_concentration_into_dict(
-    df: pd.DataFrame, mono_response_dict: dict
-):
-    for index, row in df.iterrows():
-        cell_line = row["cell_line_name"]
-        drug = row["drug"]
-
-        # Check if drug exists, if not, create an empty dictionary for it
-        if drug not in mono_response_dict:
-            mono_response_dict[drug] = {}
-
-        # Check if cell line exists for the drug, if not, create an empty dictionary for it
-        if cell_line not in mono_response_dict[drug]:
-            mono_response_dict[drug][cell_line] = {}
-
-        concentrations = [
-            c for c in df.columns if re.match("[-+]?\d*\.\d+|\d+ ", str(c))
-        ]
-        for c in concentrations:
-            if not np.isnan(row[c]):
-                mono_response_dict[drug][cell_line][c] = row[c]
-            else:
-                print("nan here:", row[c])
-    return mono_response_dict
-
-
 def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool = False):
     """From the relevant block dict from data/silver/<study_name>/block_dict.json fetch mono responses
     and per drug and cell line and aggregate inhibition per concentration.
@@ -139,7 +111,7 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
     """
     data_path = Directories.DATA_PATH / "gold" / study_name
     data_path.mkdir(exist_ok=True, parents=True)
-    m_file_name = "mono_response.json"
+    m_file_name = "mono_response.csv"
     if (not (data_path / m_file_name).exists()) | overwrite:
         if (data_path / m_file_name).exists():
             os.remove(data_path / m_file_name)
@@ -158,12 +130,18 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
         df_block = df_block[~(filter_both | filter_zero)]
 
         unique_drugs = set(df_block["drug_row"]).union(set(df_block["drug_col"]))
+        unique_cell_lines = set(df_block["cell_line_name"])
         mono_response_dict = {}
-
+        multi_index = pd.MultiIndex.from_tuples(
+            product(unique_drugs, unique_cell_lines), names=("drug", "cell_line")
+        )
+        df_mono = pd.DataFrame(0, index=multi_index, columns=["min", ",median", "max"])
+        
         for drug in tqdm(unique_drugs, desc="creating mono response dict"):
             drug_included = df_block["drug_row"].isin([drug]) | df_block[
                 "drug_col"
             ].isin([drug])
+
             df_block_sub = df_block[drug_included]
             df_block_sub["conc"] = np.where(
                 df_block_sub["drug_row"] == drug,
@@ -172,15 +150,7 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
                     df_block_sub["drug_col"] == drug, df_block_sub["conc_c"], np.nan
                 ),
             )
-            df_block_sub["drug"] = np.where(
-                df_block_sub["drug_row"] == drug,
-                df_block_sub["drug_row"],
-                np.where(
-                    df_block_sub["drug_col"] == drug,
-                    df_block_sub["drug_col"],
-                    np.nan,
-                ),
-            )
+            df_block_sub["drug"] = drug
 
             df_block_sub = df_block_sub[df_block_sub["conc"] > 0]
             df_block_sub_grouped = (
@@ -188,17 +158,25 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
                 .mean()
                 .reset_index()
             )
-            cell_line_inhibition_per_conc = df_block_sub_grouped.pivot_table(
+            cl_inhi_pr_conc = df_block_sub_grouped.pivot_table(
                 index=["cell_line_name", "drug"],
                 values="inhibition",
                 columns="conc",
             ).reset_index()
-            mono_response_dict = insert_inhibition_and_concentration_into_dict(
-                cell_line_inhibition_per_conc, mono_response_dict
+
+            conc_cols = cl_inhi_pr_conc.columns[2:]
+            stat_array = np.array(
+                cl_inhi_pr_conc[conc_cols].agg(["min", "median", "max"], axis=1)
             )
 
-        with open(data_path / m_file_name, "w") as json_file:
-            json.dump(mono_response_dict, json_file)
+            idx = list(
+                zip(
+                    cl_inhi_pr_conc["drug"].values,
+                    cl_inhi_pr_conc["cell_line_name"].values,
+                )
+            )
+            df_mono.loc[idx] = stat_array
+        df_mono.to_csv(data_path / m_file_name, index=True)
 
 
 def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):

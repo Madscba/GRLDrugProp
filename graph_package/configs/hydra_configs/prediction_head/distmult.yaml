@@ -1,0 +1,3 @@
+# @package _global_
+qprediction_head: 'distmult'
+ph_kwargs: {}

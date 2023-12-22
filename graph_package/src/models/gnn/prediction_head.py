@@ -7,9 +7,9 @@ import pandas as pd
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class MLP_PredictionHead(nn.Module):
+class MLP(nn.Module):
     def __init_(self, drug_input_dim, use_mono_response: bool = False):
-        super(MLP_PredictionHead, self).__init__()
+        super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.ccle = self._load_ccle()
         cell_line_input_dim = self.ccle.shape[1]
@@ -82,7 +82,7 @@ class MLP_PredictionHead(nn.Module):
         return output
 
 
-class DistMult:
+class DistMult(nn.Module):
     """
     DistMult embedding proposed in `Embedding Entities and Relations for Learning and Inference in Knowledge Bases`_.
 
@@ -101,9 +101,7 @@ class DistMult:
         self.num_entity = ent_tot
         self.num_relation = rel_tot
 
-        self.entity = nn.Parameter(torch.empty(ent_tot, dim))
         self.relation = nn.Parameter(torch.empty(rel_tot, dim))
-
         self.max_score = max_score
         nn.init.xavier_uniform_(self.relation)
 

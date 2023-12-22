@@ -89,17 +89,6 @@ def reset_wandb_env():
             del os.environ[k]
 
 
-def load_data(dataset_config: dict, task="reg"):
-    """Fetch formatted data depending on modelling task"""
-    dataset_path = dataset_dict[dataset_config.name.lower()]
-    data_loader = KnowledgeGraphDataset(
-        dataset_path, task=task, target=dataset_config.target,
-        use_node_features=dataset_config.use_node_features,
-        neighbors=dataset_config.neighbors,
-        use_edge_features=dataset_config.use_edge_features
-    )
-    return data_loader
-
 
 def init_model(
     model: str = "deepdds",
@@ -145,7 +134,7 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
         config.model.rescal.update(update_shallow_embedding_args(dataset))
-    elif model_name =="rgcn":
+    elif model_name =="gnn":
         pass
         #config.model.update(update_rgcn_args(config))
     else:

@@ -1,12 +1,12 @@
 from graph_package.src.models import (
     DeepDDS, RESCAL, HybridModel,
-    TransE, DistMult, ComplEx, RotatE
+    TransE, DistMult, ComplEx, RotatE, GNN
 )
 from graph_package.configs.directories import Directories  
 
 
 model_dict = {"deepdds": DeepDDS, "rescal": RESCAL, "hybridmodel": HybridModel, "transe": TransE, "distmult": DistMult, 
-              "complex": ComplEx, "rotate": RotatE}
+              "complex": ComplEx, "rotate": RotatE, "gnn": GNN}
 
 dataset_dict = {"oneil_legacy": Directories.DATA_PATH / "gold" / "oneil_legacy" / "oneil.csv",
                 "oneil": Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv",

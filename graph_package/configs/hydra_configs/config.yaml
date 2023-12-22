@@ -18,8 +18,8 @@ dataset:
   name: 'oneil' # deepdds_original, oneil_legacy, oneil_almanac
   target: 'zip_mean' # zip_max, css, loewe (legacy)
   use_node_features: False
-  modalities: 'None' # All, Gene, Side Effect, Disease, Pharmacologic Class
   use_edge_features: False
+  modalities: 'None' # All, Gene, Side Effect, Disease, Pharmacologic Class
 
 checkpoint_callback:
   mode: 'max'
