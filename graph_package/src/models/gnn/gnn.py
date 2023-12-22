@@ -67,6 +67,7 @@ class GNN(nn.Module, core.Configurable):
         elif prediction_head == "mlp":
             ph_kwargs.update({"dataset": dataset})
 
+        self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
         self.gnn_layers = self._init_gnn_layers(
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
@@ -82,6 +83,8 @@ class GNN(nn.Module, core.Configurable):
     ):
         self.layers = nn.ModuleList()
         dims = input_dim + hidden_dims
+        if layer == "rgc":
+            enc_kwargs.update({"num_relation": self.graph.num_relation.item()})
         for i in range(len(dims) - 1):
             self.layers.append(layer_dict[layer](dims[i], dims[i + 1], self.graph.num_relation, **enc_kwargs))
 
@@ -129,5 +132,5 @@ class GNN(nn.Module, core.Configurable):
         drug_embeddings = self.encode(self.graph, self.graph.node_feature)
         d1 = drug_embeddings[drug_1_ids]
         d2 = drug_embeddings[drug_2_ids]
-        out = self.prediction_head(d1, d2, context_ids)
+        out = self.prediction_head(d1, d2, context_ids, drug_1_ids, drug_2_ids)
         return out
