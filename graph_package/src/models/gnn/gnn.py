@@ -83,8 +83,7 @@ class GNN(nn.Module, core.Configurable):
     ):
         self.layers = nn.ModuleList()
         dims = input_dim + hidden_dims
-        if layer == "rgc":
-            enc_kwargs.update({"num_relation": self.graph.num_relation.item()})
+        
         for i in range(len(dims) - 1):
             self.layers.append(layer_dict[layer](dims[i], dims[i + 1], self.graph.num_relation, **enc_kwargs))
 
