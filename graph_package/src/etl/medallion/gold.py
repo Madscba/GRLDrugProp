@@ -47,7 +47,7 @@ def load_block_as_df(study_name: str):
     return df_block
 
 
-def load_mono_response_drugcomb(study_name: str):
+def load_mono_response(study_name: str):
     data_path = Directories.DATA_PATH / "gold" / study_name / "mono_response.json"
     with open(data_path) as f:
         mono_response_dict = json.load(f)
@@ -280,7 +280,7 @@ def insert_inhibition_and_concentration_into_dict(
     return mono_response_dict
 
 
-def get_mono_responses(study_name: str = "oneil_almanac", overwrite: bool = False):
+def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool = False):
     """From the relevant block dict from data/silver/<study_name>/block_dict.json fetch mono responses
     and per drug and cell line and aggregate inhibition per concentration.
     Params:
@@ -391,7 +391,7 @@ def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
             with open(save_path / name, "w") as json_file:
                 json.dump(vocab, json_file)
         df.to_csv(save_path / f"{study}.csv", index=False)
-        get_mono_responses(study_name=study)
+        generate_mono_responses(study_name=study)
 
 
 if __name__ == "__main__":
