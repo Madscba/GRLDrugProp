@@ -48,10 +48,9 @@ def load_block_as_df(study_name: str):
 
 
 def load_mono_response(study_name: str):
-    data_path = Directories.DATA_PATH / "gold" / study_name / "mono_response.json"
-    with open(data_path) as f:
-        mono_response_dict = json.load(f)
-    return mono_response_dict
+    data_path = Directories.DATA_PATH / "gold" / study_name / "mono_response.csv"
+    df_mono_response = pd.read_csv(data_path, index_col=[0, 1])
+    return df_mono_response
 
 
 def load_jsonl(file_path):
