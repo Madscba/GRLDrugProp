@@ -1,3 +1,5 @@
 # @package _global_
-qprediction_head: 'distmult'
-ph_kwargs: {}
+model:
+  prediction_head: 'distmult'
+  ph_kwargs:
+    rel_tot: ''

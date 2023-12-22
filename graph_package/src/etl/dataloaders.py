@@ -117,6 +117,7 @@ class KnowledgeGraphDataset(Dataset):
         with open(self.dataset_path.parent / "entity_vocab.json") as f:
             drug_vocab = json.load(f)
         node_feature_dict = {}
+        
         # In case only drug features are used
         if self.modalities == 'None':
             for drug in drug_features.index:
@@ -153,7 +154,8 @@ class KnowledgeGraphDataset(Dataset):
             node_feature_dict[name] for name in drug_vocab.keys() 
             if name in node_feature_dict.keys()
         ]
-        # Conver to 
+        # Convert to float arraylike 
+        node_features = np.array(node_features).astype(np.float32)
         return node_features
 
     def _get_edge_features(self):

@@ -123,6 +123,9 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
             how="left",
             on=["block_id"],
         )
+
+        df_block = df_block.dropna(subset=["drug_row", "drug_col", "cell_line_name"])
+
         del df
         filter_both = (df_block["conc_r"] > 0) & (df_block["conc_c"] > 0)
         filter_zero = (df_block["conc_r"] == 0) & (df_block["conc_c"] == 0)
@@ -138,10 +141,9 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
         df_mono = pd.DataFrame(0, index=multi_index, columns=["min", ",median", "max"])
         
         for drug in tqdm(unique_drugs, desc="creating mono response dict"):
-            drug_included = df_block["drug_row"].isin([drug]) | df_block[
-                "drug_col"
-            ].isin([drug])
-
+            drug_included = ((df_block["drug_row"]==drug) | (df_block[
+                "drug_col"]==drug))
+        
             df_block_sub = df_block[drug_included]
             df_block_sub["conc"] = np.where(
                 df_block_sub["drug_row"] == drug,
@@ -200,12 +202,10 @@ def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
 
         df = get_max_zip_response(df, study)
 
-        generate_mono_responses(study_name=study)
-
         df["css"] = (df["css_col"] + df["css_row"]) / 2
 
-        if study == "oneil_almanac":
-            df = filter_cell_lines(df)
+  
+        df = filter_cell_lines(df)
 
         df, drug_vocab = create_drug_id_vocabs(df)
         df, cell_line_vocab = create_cell_line_id_vocabs(df)
@@ -215,6 +215,8 @@ def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
             with open(save_path / name, "w") as json_file:
                 json.dump(vocab, json_file)
         df.to_csv(save_path / f"{study}.csv", index=False)
+        
+        generate_mono_responses(study_name=study)
 
 
 if __name__ == "__main__":

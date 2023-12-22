@@ -8,9 +8,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MLP(nn.Module):
-    def __init__(self, drug_input_dim, use_mono_response: bool = False):
+    def __init__(self, dim:int, dataset:str, use_mono_response: bool = False):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
+        self.dataset = dataset
         self.ccle = self._load_ccle()
         cell_line_input_dim = self.ccle.shape[1]
         self.cell_line_mlp = nn.Sequential(
@@ -22,9 +23,9 @@ class MLP(nn.Module):
 
         if self.use_mono_response:
             self.mono_r = self._load_mono_response()
-            global_mlp_input_dim = 2 * drug_input_dim + 64 + 3 * 2
+            global_mlp_input_dim = 2 * dim + 64 + 3 * 2
         else:
-            global_mlp_input_dim = 2 * drug_input_dim + 64
+            global_mlp_input_dim = 2 * dim + 64
 
         self.global_mlp = nn.Sequential(
             nn.Linear(global_mlp_input_dim, 256),
@@ -37,16 +38,23 @@ class MLP(nn.Module):
         )
 
     def _load_mono_response(self):
-        gold_oneil_alm = Directories.DATA_PATH / "gold" / "oneil_almanac"
+        gold_oneil_alm = Directories.DATA_PATH / "gold" / self.dataset
         mono_response_path = path = gold_oneil_alm / "mono_response.csv"
         mono_response = pd.read_csv(mono_response_path)
         vocab_path = gold_oneil_alm / "entity_vocab.json"
-        
+
     def _load_ccle(self):
-        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express_pca.json"
+        feature_path = (
+            Directories.DATA_PATH
+            / "features"
+            / "cell_line_features"
+            / "CCLE_954_gene_express_pca.json"
+        )
         with open(feature_path) as f:
             all_edge_features = json.load(f)
-        vocab_path = Directories.DATA_PATH / "gold" / "oneil_almanac" / "relation_vocab.json"
+        vocab_path = (
+            Directories.DATA_PATH / "gold" / self.dataset / "relation_vocab.json"
+        )
         with open(vocab_path) as f:
             entity_vocab = json.load(f)
         vocab_reverse = {v: k for k, v in entity_vocab.items()}
@@ -56,26 +64,6 @@ class MLP(nn.Module):
         )
         return ccle
 
-    def _load_ccle(self):
-        feature_path = (
-            Directories.DATA_PATH
-            / "features"
-            / "cell_line_features"
-            / "CCLE_954_gene_express.json"
-        )
-        with open(feature_path) as f:
-            all_edge_features = json.load(f)
-        vocab_path = (
-            Directories.DATA_PATH / "gold" / "oneil_almanac" / "relation_vocab.json"
-        )
-        with open(vocab_path) as f:
-            relation_vocab = json.load(f)
-        vocab_reverse = {v: k for k, v in relation_vocab.items()}
-        ids = sorted(list(vocab_reverse.keys()))
-        ccle = torch.tensor(
-            [all_edge_features[vocab_reverse[id]] for id in ids], device=device
-        )
-        return ccle
 
     def forward(
         self, d1_embd: torch.Tensor, d2_embd: torch.Tensor, context_ids: torch.Tensor
@@ -102,11 +90,9 @@ class DistMult(nn.Module):
         l3_regularization (float, optional): weight for l3 regularization
     """
 
-    def __init__(self, ent_tot, rel_tot, dim, max_score=30):
-        super().__init__(num_entity=ent_tot, num_relation=rel_tot, embedding_dim=dim)
-        self.num_entity = ent_tot
+    def __init__(self, rel_tot, dim, max_score=30):
+        super(DistMult, self).__init__()
         self.num_relation = rel_tot
-
         self.relation = nn.Parameter(torch.empty(rel_tot, dim))
         self.max_score = max_score
         nn.init.xavier_uniform_(self.relation)
@@ -130,7 +116,7 @@ class DistMult(nn.Module):
         return score
 
     def forward(self, d1_emb, d2_emb, context_ids):
-        score = self.score_triplet(context_ids, d1_emb, d2_emb)
+        score = self.score_triplet(d1_emb, d2_emb, context_ids)
         return score
 
     def predict(self, data):

@@ -102,9 +102,7 @@ def main(config):
         dataset.graph
         model = init_model(
             model=model_name,
-            task=config.task,
-            model_kwargs=config.model,
-            target=config.dataset.target,
+            config=config,
             graph=train_set.dataset.graph.edge_mask(train_set.indices)
         )
 

@@ -155,13 +155,21 @@ class RelationalGraphConv(MessagePassingBase):
         update = torch.sparse.mm(adjacency.t(), input)
         return update.view(graph.num_node, self.num_relation * self.input_dim)
 
+    def combine(self, input, update):
+        output = self.linear(update) + self.self_loop(input)
+        if self.batch_norm:
+            output = self.batch_norm(output)
+        output = self.activation(output)
+        return output
+
     
 class GraphConv(MessagePassingBase):
-    
-    def __init__(self, input_dim, output_dim, batch_norm=False):
+    def __init__(self, input_dim, output_dim, num_relation, dataset, batch_norm=False):
         super(GraphConv, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
+        self.num_relation = num_relation
+        self.dataset = dataset
 
         if batch_norm:
             self.batch_norm = nn.BatchNorm1d(output_dim)
@@ -178,7 +186,7 @@ class GraphConv(MessagePassingBase):
         feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express_pca.json"
         with open(feature_path) as f:
             all_edge_features = json.load(f)
-        vocab_path = Directories.DATA_PATH / "gold" / "oneil_almanac" / "relation_vocab.json"
+        vocab_path = Directories.DATA_PATH / "gold" / self.dataset / "relation_vocab.json"
         with open(vocab_path) as f:
             relation_vocab = json.load(f)
         vocab_reverse = {v:k for k,v in relation_vocab.items()}
@@ -187,7 +195,7 @@ class GraphConv(MessagePassingBase):
         return ccle
 
     def transform_input(self,input: torch.Tensor):
-        ccle = self.ccle.copy()
+        ccle = self.ccle
         input_reshaped = input.unsqueeze(1).expand(-1, self.ccle.shape[0], -1)
         ccle_reshaped = ccle.unsqueeze(0).expand(input.shape[0], -1, -1)
         combined = torch.cat((input_reshaped, ccle_reshaped), dim=2)
@@ -206,7 +214,7 @@ class GraphConv(MessagePassingBase):
                                             (graph.num_node, graph.num_node * graph.num_relation))
         transform_input = self.transform_input(input)
         update = torch.sparse.mm(adjacency, transform_input)
-        return update.view(graph.num_node, self.num_relation * self.input_dim)
+        return update.view(graph.num_node, self.input_dim + self.ccle.shape[1] )
     
     def combine(self, input, update):
         output = self.linear(update) + self.self_loop(input)

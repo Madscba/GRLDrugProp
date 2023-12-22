@@ -1,4 +1,5 @@
 # @package _global_
 model:
   prediction_head: mlp
-  ph_kwargs: {}
+  ph_kwargs: 
+      dataset: ''

@@ -1,3 +1,5 @@
 # @package _global_
-layer: 'gc'
-enc_kwargs: {}
+model:
+  layer: 'gc'
+  enc_kwargs: 
+    dataset: ''

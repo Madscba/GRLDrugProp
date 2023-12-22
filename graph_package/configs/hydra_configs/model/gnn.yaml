@@ -1,6 +1,5 @@
 
-hidden_dims: [128,64]
-
-enc_kwargs: 
+hidden_dims: [256]
+enc_kwargs:
 ph_kwargs:
 

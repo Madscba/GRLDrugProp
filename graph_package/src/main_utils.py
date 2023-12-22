@@ -92,18 +92,17 @@ def reset_wandb_env():
 
 def init_model(
     model: str = "deepdds",
-    task: str = "clf",
-    target: str = "zip_mean",
-    model_kwargs: dict = {},
+    config: dict = None,
     graph: Optional[KnowledgeGraphDataset] = None,
     logger_enabled: bool = True,
 ):
     """Load model from registry"""
+
     if model == "gnn":
-        model = model_dict[model.lower()](graph,**model_kwargs)
+        model = model_dict[model.lower()](graph=graph,dataset=config.dataset.name,**config.model)
     else:
-        model = model_dict[model.lower()](**model_kwargs)
-    pl_module = BasePL(model, task=task, logger_enabled=logger_enabled, target=target)
+        model = model_dict[model.lower()](**config.model)
+    pl_module = BasePL(model, task=config.task, logger_enabled=logger_enabled, target=config.dataset.target)
     return pl_module
 
 
