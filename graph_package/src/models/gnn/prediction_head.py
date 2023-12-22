@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MLP(nn.Module):
-    def __init_(self, drug_input_dim, use_mono_response: bool = False):
+    def __init__(self, drug_input_dim, use_mono_response: bool = False):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.ccle = self._load_ccle()
@@ -21,7 +21,7 @@ class MLP(nn.Module):
         )
 
         if self.use_mono_response:
-            self.mono_r = self._load_mono_response()
+            self.mono_r_index, self.mono_r = self._load_mono_response(self.study_name)
             global_mlp_input_dim = 2 * drug_input_dim + 64 + 3 * 2
         else:
             global_mlp_input_dim = 2 * drug_input_dim + 64
@@ -36,19 +36,27 @@ class MLP(nn.Module):
             nn.Linear(64, 1),
         )
 
-    def _load_mono_response(self):
-        gold_oneil_alm = Directories.DATA_PATH / "gold" / "oneil_almanac"
-        mono_response_path = path = gold_oneil_alm / "mono_response.csv"
-        mono_response = pd.read_csv(mono_response_path)
-        vocab_path = gold_oneil_alm / "entity_vocab.json"
-        with open(vocab_path) as f:
-            entity_vocab = json.load(f)
-        vocab_reverse = {v: k for k, v in entity_vocab.items()}
-        ids = sorted(list(vocab_reverse.keys()))
-        ccle = torch.tensor(
-            [all_edge_features[vocab_reverse[id]] for id in ids], device=device
+    def _load_mono_response(self, study_name):
+        d_path = Directories.DATA_PATH / "gold" / study_name
+        mono_response = pd.read_csv(d_path / "mono_response.csv")
+        mono_response = self._enrich_mono_response_with_ids_and_drop_na_and_col(
+            mono_response, d_path
         )
-        return ccle
+        mono_response_tensor = torch.tensor(mono_response.values, device=device)
+        return mono_response.index, mono_response_tensor
+
+    def _enrich_mono_response_with_ids_and_drop_na_and_col(self, mono_response, d_path):
+        with open(d_path / "entity_vocab.json") as f:
+            entity_vocab = json.load(f)
+        mono_response["drug_id"] = mono_response["drug"].map(entity_vocab)
+
+        with open(d_path / "relation_vocab.json") as f:
+            relation_vocab = json.load(f)
+        mono_response["context_id"] = mono_response["cell_line"].map(relation_vocab)
+
+        mono_response = mono_response.dropna().drop(columns=["drug", "cell_line"])
+        mono_response.set_index(["drug_id", "context_id"], inplace=True)
+        return mono_response
 
     def _load_ccle(self):
         feature_path = (
@@ -71,13 +79,28 @@ class MLP(nn.Module):
         )
         return ccle
 
+    def _get_mono_response(self, drug_ids, context_ids):
+        sample_ids = list(zip(drug_ids, context_ids))
+        batch_mono_val = [
+            self.mono_r[self.mono_r_index.get_loc(ids)] for ids in sample_ids
+        ]
+        return batch_mono_val
+
     def forward(
-        self, d1_embd: torch.Tensor, d2_embd: torch.Tensor, context_ids: torch.Tensor
+        self,
+        d1_embd: torch.Tensor,
+        d2_embd: torch.Tensor,
+        context_ids: torch.Tensor,
+        drug_1_ids: torch.Tensor,
+        drug_2_ids: torch.Tensor,
     ) -> torch.FloatTensor:
         c = self.cell_line_mlp(self.ccle[context_ids])
         if self.use_mono_response:
-            pass
-        input = torch.concat([d1_embd, d2_embd, c], dim=1)
+            d1_mono = self._get_mono_response(self, drug_1_ids, context_ids)
+            d2_mono = self._get_mono_response(self, drug_2_ids, context_ids)
+            input = torch.concat([d1_embd, d2_embd, c, d1_mono, d2_mono], dim=1)
+        else:
+            input = torch.concat([d1_embd, d2_embd, c], dim=1)
         output = self.global_mlp(input)
         return output
 
@@ -123,8 +146,15 @@ class DistMult(nn.Module):
         score = (h * r * t).sum(dim=-1)
         return score
 
-    def forward(self, d1_emb, d2_emb, context_ids):
-        score = self.score_triplet(context_ids, d1_emb, d2_emb)
+    def forward(
+        self,
+        d1_embd: torch.Tensor,
+        d2_embd: torch.Tensor,
+        context_ids: torch.Tensor,
+        drug_1_ids: torch.Tensor,
+        drug_2_ids: torch.Tensor,
+    ) -> torch.FloatTensor:
+        score = self.score_triplet(context_ids, d1_embd, d2_embd)
         return score
 
     def predict(self, data):

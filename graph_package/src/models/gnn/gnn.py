@@ -7,11 +7,12 @@ from torchdrug.data import Graph
 import torch
 from torch import nn
 from torchdrug import core, layers
-from graph_package.src.models.gnn.gnn_layers import RelationalGraphConv
+from graph_package.src.models.gnn.gnn_layers import RelationalGraphConv, GraphConv
 from torchdrug.core import Registry as R
 from graph_package.src.models.gnn.prediction_head import MLP
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-layer_dict = {"rgc": RelationalGraphConv}
+layer_dict = {"rgc": RelationalGraphConv, "gc": GraphConv}
 
 prediction_head_dict = {
     "mlp": MLP,
@@ -53,14 +54,12 @@ class GNN(nn.Module, core.Configurable):
         self.graph = graph
         input_dim_gnn = [graph.node_feature.shape[1]]
         self.enc_kwargs = enc_kwargs
-        self.output_dim = hidden_dims[-1] * (
-            len(hidden_dims) if concat_hidden else 1
-        )
+        self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
         self.gnn_layers = self._init_gnn_layers(
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
         self.prediction_head = prediction_head_dict[prediction_head](
-            self.output_dim
+            self.output_dim, **ph_kwargs
         )
         self.short_cut = short_cut
         self.concat_hidden = concat_hidden
@@ -70,8 +69,8 @@ class GNN(nn.Module, core.Configurable):
     ):
         self.layers = nn.ModuleList()
         dims = input_dim + hidden_dims
-        if layer=="rgc":
-            enc_kwargs.update({"num_relation": self.graph.num_relation.item()}) 
+        if layer == "rgc":
+            enc_kwargs.update({"num_relation": self.graph.num_relation.item()})
         for i in range(len(dims) - 1):
             self.layers.append(layer_dict[layer](dims[i], dims[i + 1], **enc_kwargs))
 
@@ -119,5 +118,5 @@ class GNN(nn.Module, core.Configurable):
         drug_embeddings = self.encode(self.graph, self.graph.node_feature)
         d1 = drug_embeddings[drug_1_ids]
         d2 = drug_embeddings[drug_2_ids]
-        out = self.prediction_head(d1, d2, context_ids)
+        out = self.prediction_head(d1, d2, context_ids, drug_1_ids, drug_2_ids)
         return out
