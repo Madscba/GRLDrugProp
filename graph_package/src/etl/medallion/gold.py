@@ -243,7 +243,7 @@ def insert_inhibition_and_concentration_into_dict(
     return mono_response_dict
 
 
-def get_mono_responses(study_name: str = "oneil_almanac", overwrite: bool = False):
+def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool = False):
     """From the relevant block dict from data/silver/<study_name>/block_dict.json fetch mono responses
     and per drug and cell line and aggregate inhibition per concentration.
     Params:
