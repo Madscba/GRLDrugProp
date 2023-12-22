@@ -95,6 +95,7 @@ def load_data(dataset_config: dict, task="reg"):
     data_loader = KnowledgeGraphDataset(
         dataset_path, task=task, target=dataset_config.target,
         use_node_features=dataset_config.use_node_features,
+        neighbors=dataset_config.neighbors,
         use_edge_features=dataset_config.use_edge_features
     )
     return data_loader
@@ -127,8 +128,8 @@ def get_model_name(config: dict, sys_args: List[str]):
 
 def update_shallow_embedding_args(dataset):
     update_dict = {
-        "ent_tot": dataset.num_nodes,
-        "rel_tot": int(dataset.num_relations),
+        "ent_tot": dataset.graph.num_node.tolist(),
+        "rel_tot": dataset.graph.num_relation.tolist(),
     }
     return update_dict
 
