@@ -8,8 +8,11 @@ from torch.utils import checkpoint
 from torch_scatter import scatter_mean, scatter_add, scatter_max
 
 from torchdrug import data, layers, utils
+from graph_package.configs.directories import Directories
 from torchdrug.layers import functional
+import json
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class MessagePassingBase(nn.Module):
     """
@@ -110,28 +113,21 @@ class RelationalGraphConv(MessagePassingBase):
     """
     eps = 1e-10
 
-    def __init__(self, input_dim, output_dim, num_relation, edge_input_dim=None, batch_norm=False, activation="relu"):
+    def __init__(self, input_dim, output_dim, num_relation, batch_norm=False):
         super(RelationalGraphConv, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.num_relation = num_relation
-        self.edge_input_dim = edge_input_dim
 
         if batch_norm:
             self.batch_norm = nn.BatchNorm1d(output_dim)
         else:
             self.batch_norm = None
-        if isinstance(activation, str):
-            self.activation = getattr(F, activation)
-        else:
-            self.activation = activation
-
+        
+        self.activation = F.relu
         self.self_loop = nn.Linear(input_dim, output_dim)
         self.linear = nn.Linear(num_relation * input_dim, output_dim)
-        if edge_input_dim:
-            self.edge_linear = nn.Linear(edge_input_dim, input_dim)
-        else:
-            self.edge_linear = None
+
 
     def message(self, graph, input):
         node_in = graph.edge_list[:, 0]
@@ -142,7 +138,6 @@ class RelationalGraphConv(MessagePassingBase):
     
     def aggregate(self, graph, message):
         assert graph.num_relation == self.num_relation
-
         node_out = graph.edge_list[:, 1] * self.num_relation + graph.edge_list[:, 2]
         edge_weight = graph.edge_weight.unsqueeze(-1)
         update = scatter_add(message * edge_weight, node_out, dim=0, dim_size=graph.num_node * self.num_relation) / \
@@ -151,7 +146,6 @@ class RelationalGraphConv(MessagePassingBase):
 
     def message_and_aggregate(self, graph, input):
         assert graph.num_relation == self.num_relation
-
         node_in, node_out, relation = graph.edge_list.t()
         node_out = node_out * self.num_relation + relation
         degree_out = scatter_add(graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation)
@@ -159,20 +153,64 @@ class RelationalGraphConv(MessagePassingBase):
         adjacency = utils.sparse_coo_tensor(torch.stack([node_in, node_out]), edge_weight,
                                             (graph.num_node, graph.num_node * graph.num_relation))
         update = torch.sparse.mm(adjacency.t(), input)
-        if self.edge_linear:
-            edge_input = graph.edge_feature.float()
-            edge_input = self.edge_linear(edge_input)
-            edge_weight = edge_weight.unsqueeze(-1)
-            edge_update = scatter_add(edge_input * edge_weight, node_out, dim=0,
-                                      dim_size=graph.num_node * graph.num_relation)
-            update += edge_update
-
         return update.view(graph.num_node, self.num_relation * self.input_dim)
 
+    
+class GraphConv(MessagePassingBase):
+    
+    def __init__(self, input_dim, output_dim, batch_norm=False):
+        super(GraphConv, self).__init__()
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+
+        if batch_norm:
+            self.batch_norm = nn.BatchNorm1d(output_dim)
+        else:
+            self.batch_norm = None
+        self.ccle = self._load_ccle()
+        cell_feature_size = self.ccle.shape[1]
+        self.activation = F.relu
+        self.self_loop = nn.Linear(input_dim, output_dim)
+        self.linear = nn.Linear(input_dim+cell_feature_size, output_dim)
+
+
+    def _load_ccle(self):
+        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express.json"
+        with open(feature_path) as f:
+            all_edge_features = json.load(f)
+        vocab_path = Directories.DATA_PATH / "gold" / "oneil_almanac" / "relation_vocab.json"
+        with open(vocab_path) as f:
+            relation_vocab = json.load(f)
+        vocab_reverse = {v:k for k,v in relation_vocab.items()}
+        ids = sorted(list(vocab_reverse.keys()))
+        ccle = torch.tensor([all_edge_features[vocab_reverse[id]] for id in ids], device=device)
+        return ccle
+
+    def transform_input(self,input: torch.Tensor):
+        ccle = self.ccle.copy()
+        input_reshaped = input.unsqueeze(1).expand(-1, self.ccle.shape[0], -1)
+        ccle_reshaped = ccle.unsqueeze(0).expand(input.shape[0], -1, -1)
+        combined = torch.cat((input_reshaped, ccle_reshaped), dim=2)
+
+        # Reshape the combined tensor to the desired shape
+        combined = combined.reshape(-1, input.shape[1] + ccle.shape[1])
+        return combined    
+    
+    def message_and_aggregate(self, graph, input):
+        assert graph.num_relation == self.num_relation
+        node_in, node_out, relation = graph.edge_list.t()
+        node_out = node_out * self.num_relation + relation
+        degree_out = scatter_add(graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation)
+        edge_weight = graph.edge_weight / degree_out[node_out]
+        adjacency = utils.sparse_coo_tensor(torch.stack([node_in, node_out]), edge_weight,
+                                            (graph.num_node, graph.num_node * graph.num_relation))
+        transform_input = self.transform_input(input)
+        update = torch.sparse.mm(adjacency, transform_input)
+        return update.view(graph.num_node, self.num_relation * self.input_dim)
+    
     def combine(self, input, update):
         output = self.linear(update) + self.self_loop(input)
         if self.batch_norm:
             output = self.batch_norm(output)
-        if self.activation:
-            output = self.activation(output)
+        output = self.activation(output)
         return output

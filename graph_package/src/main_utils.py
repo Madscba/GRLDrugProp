@@ -109,7 +109,7 @@ def init_model(
     logger_enabled: bool = True,
 ):
     """Load model from registry"""
-    if model == "rgcn":
+    if model == "gnn":
         model = model_dict[model.lower()](graph,**model_kwargs)
     else:
         model = model_dict[model.lower()](**model_kwargs)

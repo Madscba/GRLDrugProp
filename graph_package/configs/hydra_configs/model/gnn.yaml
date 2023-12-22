@@ -1,0 +1,5 @@
+layer: rgcn
+prediction_head: mlp 
+hidden_dim: [128,64]
+enc_kwargs: 
+ph_kwargs:
