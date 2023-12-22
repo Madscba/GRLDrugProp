@@ -11,47 +11,10 @@ import json
 import requests
 import re
 from tqdm import tqdm
+from graph_package.src.etl..medallion.load
 
 logger = init_logger()
 
-
-def load_oneil():
-    data_path = Directories.DATA_PATH / "silver" / "oneil" / "oneil.csv"
-    return pd.read_csv(data_path)
-
-
-def load_oneil_almanac():
-    data_path = Directories.DATA_PATH / "silver" / "oneil_almanac" / "oneil_almanac.csv"
-    return pd.read_csv(data_path)
-
-
-def load_drug_info_drugcomb():
-    data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "drug_dict.json"
-    with open(data_path) as f:
-        drug_dict = json.load(f)
-    return drug_dict
-
-
-def load_cell_info_drugcomb():
-    data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "cell_line_dict.json"
-    with open(data_path) as f:
-        cell_line_dict = json.load(f)
-    return cell_line_dict
-
-
-def load_block_as_df(study_name: str):
-    data_path = Directories.DATA_PATH / "silver" / study_name / "block_dict.json"
-    block_dict_json = load_jsonl(data_path)
-    df_block = pd.DataFrame(block_dict_json)
-    df_block = df_block.loc[:, ["conc_r", "conc_c", "inhibition", "block_id"]]
-    return df_block
-
-
-def load_mono_response_drugcomb(study_name: str):
-    data_path = Directories.DATA_PATH / "gold" / study_name / "mono_response.json"
-    with open(data_path) as f:
-        mono_response_dict = json.load(f)
-    return mono_response_dict
 
 
 def agg_loewe_and_make_binary(df: pd.DataFrame):
@@ -296,68 +259,64 @@ def get_mono_responses(study_name: str = "oneil_almanac", overwrite: bool = Fals
     if (not (data_path / m_file_name).exists()) | overwrite:
         if (data_path / m_file_name).exists():
             os.remove(data_path / m_file_name)
-        else:
-            df_block = load_block_as_df(study_name)
-            df = load_oneil() if study_name == "oneil" else load_oneil_almanac()
-            df_block = df_block.merge(
-                df.loc[:, ["drug_row", "drug_col", "cell_line_name", "block_id"]],
-                how="left",
-                on=["block_id"],
+
+        df_block = load_block_as_df(study_name)
+        df = load_oneil() if study_name == "oneil" else load_oneil_almanac()
+        df_block = df_block.merge(
+            df.loc[:, ["drug_row", "drug_col", "cell_line_name", "block_id"]],
+            how="left",
+            on=["block_id"],
+        )
+        del df
+        filter_both = (df_block["conc_r"] > 0) & (df_block["conc_c"] > 0)
+        filter_zero = (df_block["conc_r"] == 0) & (df_block["conc_c"] == 0)
+
+        df_block = df_block[~(filter_both | filter_zero)]
+
+        unique_drugs = set(df_block["drug_row"]).union(set(df_block["drug_col"]))
+        mono_response_dict = {}
+
+        for drug in tqdm(unique_drugs, desc="creating mono response dict"):
+            drug_included = df_block["drug_row"].isin([drug]) | df_block[
+                "drug_col"
+            ].isin([drug])
+            df_block_sub = df_block[drug_included]
+            df_block_sub["conc"] = np.where(
+                df_block_sub["drug_row"] == drug,
+                df_block_sub["conc_r"],
+                np.where(
+                    df_block_sub["drug_col"] == drug, df_block_sub["conc_c"], np.nan
+                ),
             )
-            del df
-            filter_both = (df_block["conc_r"] > 0) & (df_block["conc_c"] > 0)
-            filter_zero = (df_block["conc_r"] == 0) & (df_block["conc_c"] == 0)
-            df_block = df_block[~(filter_both | filter_zero)]
-            unique_drugs = list(
-                set(
-                    np.append(
-                        df_block["drug_row"].unique(), df_block["drug_col"].unique()
-                    )
-                )
+            df_block_sub["drug"] = np.where(
+                df_block_sub["drug_row"] == drug,
+                df_block_sub["drug_row"],
+                np.where(
+                    df_block_sub["drug_col"] == drug,
+                    df_block_sub["drug_col"],
+                    np.nan,
+                ),
             )
-            mono_response_dict = {}
 
-            for drug in tqdm(unique_drugs, desc="creating mono response dict"):
-                drug_included = df_block["drug_row"].isin([drug]) | df_block[
-                    "drug_col"
-                ].isin([drug])
-                df_block_sub = df_block[drug_included]
-                df_block_sub["conc"] = np.where(
-                    df_block_sub["drug_row"] == drug,
-                    df_block_sub["conc_r"],
-                    np.where(
-                        df_block_sub["drug_col"] == drug, df_block_sub["conc_c"], np.nan
-                    ),
-                )
-                df_block_sub["drug"] = np.where(
-                    df_block_sub["drug_row"] == drug,
-                    df_block_sub["drug_row"],
-                    np.where(
-                        df_block_sub["drug_col"] == drug,
-                        df_block_sub["drug_col"],
-                        np.nan,
-                    ),
-                )
+            df_block_sub = df_block_sub[df_block_sub["conc"] > 0]
+            df_block_sub_grouped = (
+                df_block_sub.groupby(["drug", "cell_line_name", "conc"])[
+                    "inhibition"
+                ]
+                .mean()
+                .reset_index()
+            )
+            cell_line_inhibition_per_conc = df_block_sub_grouped.pivot_table(
+                index=["cell_line_name", "drug"],
+                values="inhibition",
+                columns="conc",
+            ).reset_index()
+            mono_response_dict = insert_inhibition_and_concentration_into_dict(
+                cell_line_inhibition_per_conc, mono_response_dict
+            )
 
-                df_block_sub = df_block_sub[df_block_sub["conc"] > 0]
-                df_block_sub_grouped = (
-                    df_block_sub.groupby(["drug", "cell_line_name", "conc"])[
-                        "inhibition"
-                    ]
-                    .mean()
-                    .reset_index()
-                )
-                cell_line_inhibition_per_conc = df_block_sub_grouped.pivot_table(
-                    index=["cell_line_name", "drug"],
-                    values="inhibition",
-                    columns="conc",
-                ).reset_index()
-                mono_response_dict = insert_inhibition_and_concentration_into_dict(
-                    cell_line_inhibition_per_conc, mono_response_dict
-                )
-
-            with open(data_path / m_file_name, "w") as json_file:
-                json.dump(mono_response_dict, json_file)
+        with open(data_path / m_file_name, "w") as json_file:
+            json.dump(mono_response_dict, json_file)
 
 
 def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
@@ -380,9 +339,14 @@ def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
         df = df[columns_to_keep]
 
         df = get_max_zip_response(df, study)
+
+        get_mono_responses(study_name=study)
+
         df["css"] = (df["css_col"] + df["css_row"]) / 2
+        
         if study == "oneil_almanac":
             df = filter_cell_lines(df)
+        
         df, drug_vocab = create_drug_id_vocabs(df)
         df, cell_line_vocab = create_cell_line_id_vocabs(df)
         for vocab, name in zip(
@@ -391,7 +355,7 @@ def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
             with open(save_path / name, "w") as json_file:
                 json.dump(vocab, json_file)
         df.to_csv(save_path / f"{study}.csv", index=False)
-        get_mono_responses(study_name=study)
+        
 
 
 if __name__ == "__main__":
