@@ -20,21 +20,6 @@ def write_jsonl(file_path, data):
         for item in data:
             writer.write(item)
 
-
-def load_jsonl(file_path):
-    data = []
-    with jsonlines.open(file_path) as reader:
-        for item in reader:
-            data.append(item)
-    return data
-
-def load_block_ids(file_path):
-    data = []
-    with jsonlines.open(file_path) as reader:
-        for item in reader:
-            data.append(item['block_id'])
-    return data
-
 def download_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
     if not data_path.exists():

@@ -6,7 +6,8 @@ import json
 import os
 import requests
 import bz2
-from graph_package.src.etl.medallion.bronze import download_response_info_drugcomb, load_block_ids
+from .bronze import download_response_info_drugcomb
+from .load import load_block_ids
 
 def load_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"

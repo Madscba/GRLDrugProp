@@ -1,5 +1,4 @@
 from graph_package.configs.directories import Directories
-from graph_package.src.etl.medallion.bronze import load_jsonl
 import pandas as pd
 import numpy as np
 import os
@@ -11,6 +10,7 @@ import json
 import requests
 import re
 from tqdm import tqdm
+import jsonlines
 
 logger = init_logger()
 
@@ -52,3 +52,19 @@ def load_mono_response_drugcomb(study_name: str):
     with open(data_path) as f:
         mono_response_dict = json.load(f)
     return mono_response_dict
+
+
+
+def load_jsonl(file_path):
+    data = []
+    with jsonlines.open(file_path) as reader:
+        for item in reader:
+            data.append(item)
+    return data
+
+def load_block_ids(file_path):
+    data = []
+    with jsonlines.open(file_path) as reader:
+        for item in reader:
+            data.append(item['block_id'])
+    return data
