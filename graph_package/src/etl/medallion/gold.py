@@ -1,5 +1,5 @@
 from graph_package.configs.directories import Directories
-from .load import load_jsonl
+from graph_package.src.etl.medallion.load import load_jsonl
 import pandas as pd
 import numpy as np
 import os
@@ -11,10 +11,11 @@ import json
 import requests
 import re
 from tqdm import tqdm
-from .load import (
+from graph_package.src.etl.medallion.load import (
     load_oneil,
     load_oneil_almanac,
-    load_block_as_df
+    load_block_as_df,
+    load_mono_response,
 )
 
 logger = init_logger()
@@ -46,8 +47,6 @@ def create_cell_line_id_vocabs(df: pd.DataFrame):
     cell_line_mapping = {drug: idx for idx, drug in enumerate(unique_contexts)}
     df["context_id"] = df["context"].map(cell_line_mapping)
     return df, cell_line_mapping
-
-
 
 
 def get_drug_cell_line_ids(df: pd.DataFrame):
@@ -117,7 +116,9 @@ def insert_inhibition_and_concentration_into_dict(
             mono_response_dict[drug][cell_line] = {}
 
         concentrations = [
-            c for c in df.columns if re.match("[-+]?\d*\.\d+|\d+ ", str(c))
+            c
+            for c in df.columns
+            if re.match("[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?", str(c))
         ]
         for c in concentrations:
             if not np.isnan(row[c]):
@@ -240,4 +241,16 @@ def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
 
 
 if __name__ == "__main__":
-    make_oneil_almanac_dataset()
+    # generate_mono_responses("oneil_almanac")
+    a = load_mono_response("oneil_almanac")
+
+    lengths = {}
+    for drug, cell_lines in a.items():
+        for celL_line, conc_inhi in cell_lines.items():
+            length = len(conc_inhi.items())
+            if length not in lengths.keys():
+                lengths[length] = 0
+            lengths[length] = lengths[length] + 1
+
+    abc = 2
+    # make_oneil_almanac_dataset()

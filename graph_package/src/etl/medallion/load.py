@@ -47,12 +47,11 @@ def load_block_as_df(study_name: str):
     return df_block
 
 
-def load_mono_response_drugcomb(study_name: str):
+def load_mono_response(study_name: str):
     data_path = Directories.DATA_PATH / "gold" / study_name / "mono_response.json"
     with open(data_path) as f:
         mono_response_dict = json.load(f)
     return mono_response_dict
-
 
 
 def load_jsonl(file_path):
@@ -62,9 +61,10 @@ def load_jsonl(file_path):
             data.append(item)
     return data
 
+
 def load_block_ids(file_path):
     data = []
     with jsonlines.open(file_path) as reader:
         for item in reader:
-            data.append(item['block_id'])
+            data.append(item["block_id"])
     return data
