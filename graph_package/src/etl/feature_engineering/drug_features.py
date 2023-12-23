@@ -1,3 +1,4 @@
+import torch_geometric
 from graph_package.configs.directories import Directories
 from graph_package.src.etl.medallion.silver import get_drug_info
 import pandas as pd

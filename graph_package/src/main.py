@@ -1,10 +1,13 @@
 """main module."""
-
+import torch_geometric
 from pytorch_lightning.loggers import WandbLogger
 from graph_package.src.main_utils import (
     reset_wandb_env,
     load_data,
     init_model,
+    transform_hetero_data,
+    init_explainer,
+    get_explaination,
     get_model_name,
     get_checkpoint_path,
     get_dataloaders,
@@ -26,6 +29,8 @@ from pytorch_lightning import Trainer
 import sys
 import wandb
 import warnings
+import torch
+from captum.attr import IntegratedGradients
 
 warnings.filterwarnings("ignore", category=UserWarning, module="hydra")
 warnings.filterwarnings(
@@ -104,20 +109,34 @@ def main(config):
             target=config.dataset.target,
             graph=train_set.dataset.graph.edge_mask(train_set.indices)
         )
-
+        
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
 
-        trainer.validate(model, dataloaders=data_loaders["val"])
-
+        #trainer.validate(model, dataloaders=data_loaders["val"])
+        hetero_data = transform_hetero_data(train_set.dataset.graph)
+        data_loaders["train"].dataset.dataset.graph = hetero_data
         trainer.fit(
             model,
             train_dataloaders=data_loaders["train"],
             val_dataloaders=data_loaders["val"],
         )
+        #input = (hetero_data.x_dict)
+        #ig = IntegratedGradients(model)
+        #attributions, delta = ig.attribute(input, baseline, target=0, return_convergence_delta=True)
+        #print('IG Attributions:', attributions)
+        #print('Convergence Delta:', delta)
+        explain = True
+        if explain:
+            model.eval()
+            explainer = init_explainer(
+                model=model,
+                explainer_algorithm='IG'
+            )
+            explaination = get_explaination(explainer, data_loaders["train"].dataset.dataset.graph)
 
         trainer.test(
             model,

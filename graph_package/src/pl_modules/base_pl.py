@@ -1,5 +1,8 @@
 from pytorch_lightning import LightningModule
 from graph_package.src.pl_modules.metrics import RegMetrics, ClfMetrics
+from graph_package.src.pl_modules.explainer import Explainer
+from typing import List, Tuple, Dict, Optional, Union
+from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from torchmetrics import MeanSquaredError
 from torch.optim import Adam
 from torch.nn import ModuleDict, BCEWithLogitsLoss, MSELoss
@@ -13,10 +16,11 @@ class BasePL(LightningModule):
     def __init__(
         self,
         model,
+        graph,
         lr: float = 0.001,
         task: str = "clf",
         logger_enabled: bool = True,
-        target: str = "zip_mean",
+        target: str = "zip_mean"
     ):
         super().__init__()
         self.lr = lr
@@ -27,9 +31,21 @@ class BasePL(LightningModule):
         self.test_metrics = metric("test", target)
         self.model = model
         self.logger_enabled = logger_enabled
+        self.graph = graph
 
-    def forward(self, inputs):
-        return self.model(inputs)
+    def forward(self, inputs, *explainer_node_ids, **explainer_edge_ids):
+        node_features = self.graph.node_feature
+        if isinstance(inputs, dict):
+            # Construct the explainer inputs to fit the model
+            drug_1_ids = explainer_node_ids[0]['drug', 'interacts_with', 'drug'][0]
+            drug_2_ids = explainer_node_ids[0]['drug', 'interacts_with', 'drug'][1]
+            node_features = inputs['drug']
+            if not explainer_edge_ids:
+                context_ids = explainer_node_ids[1]
+            else:
+                context_ids = explainer_edge_ids['edge_label_index']
+            inputs = torch.stack([drug_1_ids, drug_2_ids, context_ids], dim=1)
+        return self.model(inputs, node_features)
 
     def _step(self, batch):
         inputs = batch[0]

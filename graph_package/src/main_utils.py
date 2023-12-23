@@ -1,6 +1,6 @@
 from graph_package.configs.directories import Directories
 import torch
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Union
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from graph_package.configs.directories import Directories
@@ -13,6 +13,9 @@ from sklearn.model_selection import StratifiedGroupKFold
 import numpy as np
 import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+from torch_geometric.explain import Explainer, CaptumExplainer
+from torch_geometric.data import HeteroData
+
 
 
 def get_drug_split(dataset, config, n_drugs_per_fold=3):
@@ -95,7 +98,7 @@ def load_data(dataset_config: dict, task="reg"):
     data_loader = KnowledgeGraphDataset(
         dataset_path, task=task, target=dataset_config.target,
         use_node_features=dataset_config.use_node_features,
-        neighbors=dataset_config.neighbors,
+        modalities=dataset_config.modalities,
         use_edge_features=dataset_config.use_edge_features
     )
     return data_loader
@@ -114,8 +117,78 @@ def init_model(
         model = model_dict[model.lower()](graph,**model_kwargs)
     else:
         model = model_dict[model.lower()](**model_kwargs)
-    pl_module = BasePL(model, task=task, logger_enabled=logger_enabled, target=target)
+    pl_module = BasePL(model, task=task, logger_enabled=logger_enabled, target=target, graph=graph)
     return pl_module
+
+def transform_hetero_data(graph: KnowledgeGraphDataset):
+    edge_list = graph.edge_list
+    drug_ids = torch.unique(edge_list[:, [0, 1]])
+    hetero_data = HeteroData({
+        'drug': {'x': graph.node_feature[[drug_ids]]}
+    })
+    # Create edge_index for the 'drug', 'interacts_with', 'drug' edge type
+    edge_index = torch.stack([edge_list[:, 0], edge_list[:, 1]])
+    edge_attr = edge_list[:, 2]  # Assign unique attributes to edges
+
+    # Add edge_index information to the HeteroData object
+    hetero_data['drug', 'interacts_with', 'drug'].edge_index = edge_index
+    hetero_data['drug', 'interacts_with', 'drug'].edge_attr = edge_attr
+    hetero_data.edge_list = edge_list
+
+    return hetero_data
+
+def init_explainer(
+    model: torch.nn.Module,
+    explainer_algorithm: str,
+    explainer_args: dict = None
+    ):
+    default_explainer_args = {
+        'explanation_type': 'model',
+        'model_config': {
+            'mode': 'regression',
+            'task_level': 'edge',
+            'return_type': 'raw',
+        },
+        'node_mask_type': 'attributes',
+        'edge_mask_type': 'object',
+        'threshold_config': {
+            'threshold_type': 'topk',
+            'value': 200,
+        },
+    }
+    # Merge the default arguments with the optional provided arguments
+    explainer_args = explainer_args or {}
+    explainer_args = {**default_explainer_args, **explainer_args}
+    if explainer_algorithm == 'IG':
+        algorithm = CaptumExplainer(
+            'IntegratedGradients',
+        )
+    else:
+        raise ValueError("Passed explainer algorithm is not supported")
+    explainer = Explainer(
+        model=model,
+        algorithm=algorithm,
+        **explainer_args
+    )
+    return explainer 
+
+def get_explaination(explainer: Explainer, hetero_data: HeteroData):
+    """ Silly example with the first 10 triplets (2 drugs, 10 cell lines)"""
+
+    index = torch.tensor([2, 5]) # Explain edge labels with index 2 and 10.
+
+    explanation = explainer(
+        x=hetero_data.x_dict,
+        edge_index=hetero_data.edge_index_dict,
+        index=index,
+        edge_label_index=hetero_data['drug','drug'].edge_attr
+    )
+    print(f'Generated explanations in {explanation.available_explanations}')
+
+    path = 'feature_importance.png'
+    explanation.visualize_feature_importance(path, top_k=10)
+    print(f"Feature importance plot has been saved to '{path}'")
+    return
 
 
 def get_model_name(config: dict, sys_args: List[str]):
