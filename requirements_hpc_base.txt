@@ -117,5 +117,6 @@ wcwidth==0.2.12
 yarl==1.9.2
 zipp==3.17.0
 gget==0.28.2
+openbabel==3.1.0
 # local package
 -e .

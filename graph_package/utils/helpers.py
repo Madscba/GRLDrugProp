@@ -46,9 +46,9 @@ def init_logger():
             },
         )
     )
-
     # Add the handlers to the logger
     logger.addHandler(stream_handler)
+    logger.propagate = False
     return logger
 
 logger = init_logger()
