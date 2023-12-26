@@ -23,7 +23,6 @@ def main():
         make_cell_line_features()
         make_node_features()
         make_drug_fingerprint_features()
-
     if (args.update == "gold") | (args.update == "full"):
         make_oneil_almanac_dataset()
 
