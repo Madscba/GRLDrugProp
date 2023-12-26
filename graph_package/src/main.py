@@ -25,6 +25,7 @@ from pytorch_lightning import Trainer
 import sys
 import wandb
 import warnings
+import os
 
 warnings.filterwarnings("ignore", category=UserWarning, module="hydra")
 warnings.filterwarnings(
@@ -129,6 +130,8 @@ def main(config):
             wandb.finish()
 
         dataset.del_inv_triplets()
+        os.remove(checkpoint_callback.best_model_path)
+        wandb.finish()
 
 
 if __name__ == "__main__":
