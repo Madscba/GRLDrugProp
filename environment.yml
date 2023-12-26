@@ -17,6 +17,8 @@ dependencies:
   - requests
   - pip
   - pandas
+  - openbabel
+  - mopac 
   - tqdm
   - wandb
   - python-dotenv
@@ -27,6 +29,5 @@ dependencies:
   - scipy
   - scikit-learn
   - seaborn
-
   - pip:
     - -r requirements.txt

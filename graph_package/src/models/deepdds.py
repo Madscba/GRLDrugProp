@@ -15,6 +15,7 @@ from torchdrug.data import Graph, Molecule
 import json 
 import numpy as np
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 TORCHDRUG_NODE_FEATURES = len(atom_default(Molecule.dummy_mol.GetAtomWithIdx(0)))
 
@@ -30,7 +31,7 @@ class DeepDDS(nn.Module):
         drug_gcn_hidden_dims: List[int] = [1024, 512, 156],  # same as paper
         drug_mlp_hidden_dims: List[int] = None,  # not in paper, only for cx
         context_output_size: int = 156,  # same as paper, based on figure 1 of paper
-        fc_hidden_dims: List[int] = [1024, 512, 128],  # s ame as paper
+        fc_hidden_dims: List[int] = [1024, 512, 128],  # same as paper
         dropout: float = 0.2,  # same as paper
     ):
 

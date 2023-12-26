@@ -69,7 +69,6 @@ def main(config):
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
         )
 
-
         train_idx, val_idx = train_val_split(
             train_set.indices,
             test_size=0.1,
@@ -103,6 +102,7 @@ def main(config):
             task=config.task,
             model_kwargs=config.model,
             target=config.dataset.target,
+            graph=train_set.dataset.graph.edge_mask(train_set.indices)
         )
 
         trainer = Trainer(

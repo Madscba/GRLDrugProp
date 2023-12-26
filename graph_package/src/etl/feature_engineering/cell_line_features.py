@@ -15,11 +15,11 @@ def make_cell_line_features():
             "Please download the file OmicsCNGene.csv.csv gene expressions from https://depmap.org/portal/download/all/ .\n \
                 Store it in ~/data/features/cell_line_features/raw"
         )
+
         raise FileNotFoundError
     gene_expressions = pd.read_csv(
-        save_path / "raw" / "OmicsCNGene.csv.csv", index_col=0
+        save_path / "raw" / "OmicsCNGene.csv", index_col=0
     )
-    gene_expressions = pd.read_csv('OmicsCNGene.csv', index_col=0)
     if not (save_path / "ncbi_ids.csv").exists():
         # This is not used since landmark genes are uploaded to github, it is only here for reference.
         url = "https://raw.githubusercontent.com/Sinwang404/DeepDDs/master/data/CCLE_RNAseq_rsem_transcripts_tpm_20180929/CCLE_RNAseq_rsem_transcripts_tpm_20180929_954.csv"

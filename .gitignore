@@ -2,6 +2,8 @@
 data/bronze
 data/silver
 data/gold
+data/hetionet
+data/features/node_features
 data/features/cell_line_features/raw/
 .idea/
 .vscode/
@@ -24,3 +26,5 @@ graph_package/outputs
 *.out
 plots/*
 scrapbook.py
+graph_package/src/outputs/*
+venv

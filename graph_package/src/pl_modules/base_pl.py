@@ -10,15 +10,22 @@ loss_func_dict = {"clf": BCEWithLogitsLoss(), "reg": MSELoss()}
 
 
 class BasePL(LightningModule):
-    def __init__(self, model, lr: float = 0.001, task: str = "clf", logger_enabled: bool = True, target: str = 'zip_mean'):
+    def __init__(
+        self,
+        model,
+        lr: float = 0.001,
+        task: str = "clf",
+        logger_enabled: bool = True,
+        target: str = "zip_mean",
+    ):
         super().__init__()
         self.lr = lr
         self.task = task
         self.loss_func = loss_func_dict[task]
-        metric  = ClfMetrics if task == "clf" else RegMetrics
-        self.val_metrics = metric("val",target)
+        metric = ClfMetrics if task == "clf" else RegMetrics
+        self.val_metrics = metric("val", target)
         self.test_metrics = metric("test", target)
-        self.model =  model
+        self.model = model
         self.logger_enabled = logger_enabled
 
     def forward(self, inputs):
@@ -35,17 +42,38 @@ class BasePL(LightningModule):
     def training_step(self, batch, batch_idx):
         loss, target, preds = self._step(batch)
         self.log(
-            "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=self.logger_enabled
+            "train_loss",
+            loss,
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=self.logger_enabled,
         )
         if str(self.model) == "hybridmodel":
-            self.log("deepdds_weight", self.model.deepdds_weight.item(), on_step=True, on_epoch=True, prog_bar=True, logger=self.logger_enabled)
-            self.log("rescal_weight", self.model.rescal_weight.item(), on_step=True, on_epoch=True, prog_bar=True, logger=self.logger_enabled)
+            self.log(
+                "deepdds_weight",
+                self.model.deepdds_weight.item(),
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=self.logger_enabled,
+            )
+            self.log(
+                "rescal_weight",
+                self.model.rescal_weight.item(),
+                on_step=True,
+                on_epoch=True,
+                prog_bar=True,
+                logger=self.logger_enabled,
+            )
         return loss
 
     def validation_step(self, batch, batch_idx):
         loss, target, preds = self._step(batch)
         metrics = self.val_metrics(preds, target)
-        self.log("val_loss", loss, on_epoch=True, prog_bar=True, logger=self.logger_enabled)
+        self.log(
+            "val_loss", loss, on_epoch=True, prog_bar=True, logger=self.logger_enabled
+        )
         for key, val in metrics.items():
             self.log(
                 f"{key}",
@@ -88,6 +116,3 @@ class BasePL(LightningModule):
 
     def configure_optimizers(self):
         return Adam(self.model.parameters(), lr=self.lr)
-
-
-
