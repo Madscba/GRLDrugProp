@@ -22,9 +22,9 @@ dataset:
   modalities: 'None' # All, Gene, Side Effect, Disease, Pharmacologic Class
 
 checkpoint_callback:
-  mode: 'max'
-  filename: '{epoch:02d}-{val_auroc:.4f}'
-  monitor: 'val_auroc'
+  mode: 'min'
+  filename: '{epoch:02d}-{val_mse:.4f}'
+  monitor: 'val_mse'
   save_top_k: 1
 
 trainer:  
