@@ -18,10 +18,9 @@ layer_dict = {"rgc": RelationalGraphConv,
               "gc": GraphConv,
               "dummy": DummyLayer}
 
-prediction_head_dict = {
-    "mlp": MLP,
-     "distmult": DistMult
-}
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+prediction_head_dict = {"mlp": MLP, "distmult": DistMult}
 
 
 class GNN(nn.Module, core.Configurable):
@@ -59,15 +58,13 @@ class GNN(nn.Module, core.Configurable):
         self.graph = graph
         input_dim_gnn = [graph.node_feature.shape[1]]
         self.enc_kwargs = enc_kwargs
-        self.output_dim = hidden_dims[-1] * (
-            len(hidden_dims) if concat_hidden else 1
-        )
+        self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
         if layer == "gc":
             self.enc_kwargs.update({"dataset": dataset})
-        
+
         if prediction_head == "distmult":
             ph_kwargs.update({"rel_tot": graph.num_relation.item()})
-            
+
         elif prediction_head == "mlp":
             ph_kwargs.update({"dataset": dataset})
 
@@ -75,7 +72,7 @@ class GNN(nn.Module, core.Configurable):
         self.gnn_layers = self._init_gnn_layers(
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
-    
+
         self.prediction_head = prediction_head_dict[prediction_head](
             dim=self.output_dim, **ph_kwargs
         )
@@ -85,11 +82,16 @@ class GNN(nn.Module, core.Configurable):
     def _init_gnn_layers(
         self, layer: str, input_dim: list, hidden_dims: list, enc_kwargs: dict
     ):
-        self.layers = nn.ModuleList()
+        layers = nn.ModuleList()
         dims = input_dim + hidden_dims
-        
+
         for i in range(len(dims) - 1):
-            self.layers.append(layer_dict[layer](dims[i], dims[i + 1], self.graph.num_relation, **enc_kwargs))
+            layers.append(
+                layer_dict[layer](
+                    dims[i], dims[i + 1], self.graph.num_relation, **enc_kwargs
+                )
+            )
+        return layers
 
     def encode(self, graph, input, all_loss=None, metric=None):
         """
@@ -110,7 +112,7 @@ class GNN(nn.Module, core.Configurable):
         hiddens = []
         layer_input = input
 
-        for layer in self.layers:
+        for layer in self.gnn_layers:
             hidden = layer(graph, layer_input)
             if self.short_cut and hidden.shape == layer_input.shape:
                 hidden = hidden + layer_input

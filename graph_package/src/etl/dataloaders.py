@@ -71,9 +71,11 @@ class KnowledgeGraphDataset(Dataset):
                 self.label: float,
             },
         )
+        
         triplets = self.data_df.loc[
             :, ["drug_1_id", "drug_2_id", "context_id"]
         ].to_numpy()
+
         self.graph = self._init_graph(triplets)
         self.indices = list(range(len(self.data_df)))
 
