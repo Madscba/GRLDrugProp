@@ -1,16 +1,9 @@
 from graph_package.configs.directories import Directories
 from graph_package.src.etl.medallion.silver import get_drug_info
 import pandas as pd
-from graph_package.src.error_analysis.utils import get_drug_info as get_drug_info_full
-from rdkit.Chem import inchi
 
 from rdkit import Chem
 from chemopy import Fingerprint
-from rdkit.Chem import AllChem
-import os
-import time as t
-from tqdm import tqdm
-import json
 from pathlib import Path
 
 

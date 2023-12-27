@@ -1,10 +1,13 @@
-from graph_package.src.error_analysis.utils import (
-    save_performance_plots,
+from graph_package.src.error_analysis.err_utils.err_utils import (
     save_model_pred,
+)
+from graph_package.src.error_analysis.err_utils.err_callback_utils import (
+    save_performance_plots,
 )
 from pytorch_lightning.callbacks import Callback
 from omegaconf import DictConfig
 from pathlib import Path
+
 
 class TestDiagnosticCallback(Callback):
     def __init__(self, model_name, config: DictConfig) -> None:
@@ -25,9 +28,21 @@ class TestDiagnosticCallback(Callback):
         print("conf_matrix:\n", df_cm)
 
         save_performance_plots(
-            df_cm, metrics, preds, target, self.config, self.model_name, save_path=Path("")
+            df_cm,
+            metrics,
+            preds,
+            target,
+            self.config,
+            self.model_name,
+            save_path=Path(""),
         )
         save_model_pred(
-            batch_idx, batch, preds, target, self.config, self.model_name, save_path=Path("")
+            batch_idx,
+            batch,
+            preds,
+            target,
+            self.config,
+            self.model_name,
+            save_path=Path(""),
         )
         pl_module.test_step_outputs.clear()
