@@ -17,6 +17,7 @@ class BasePL(LightningModule):
         task: str = "clf",
         logger_enabled: bool = True,
         target: str = "zip_mean",
+        model_config: dict = {},
     ):
         super().__init__()
         self.lr = lr
@@ -27,6 +28,7 @@ class BasePL(LightningModule):
         self.test_metrics = metric("test", target)
         self.model = model
         self.logger_enabled = logger_enabled
+        self.model_config = model_config
 
     def forward(self, inputs):
         return self.model(inputs)
@@ -115,4 +117,29 @@ class BasePL(LightningModule):
         return
 
     def configure_optimizers(self):
-        return Adam(self.model.parameters(), lr=self.lr)
+        if "ph_kwargs" in self.model_config:
+            if self.model.prediction_head.__class__.__name__ == "MLP":
+                pk_kwargs = self.model_config.ph_kwargs
+                self.custom_lr_setup = pk_kwargs.custom_lr_setup.value
+                if self.custom_lr_setup:
+                    lr_setup = pk_kwargs.custom_lr_setup
+                    return Adam(
+                        [
+                            {
+                                "params": self.model.gnn_layers.parameters(),
+                                "lr": self.lr,
+                            },
+                            {
+                                "params": self.model.prediction_head.cell_line_mlp.parameters(),
+                                "lr": lr_setup.lr_ph_cell_mlp,
+                            },
+                            {
+                                "params": self.model.prediction_head.global_mlp.parameters(),
+                                "lr": lr_setup.lr_ph_global_mlp,
+                            },
+                        ]
+                    )
+            return Adam(self.model.parameters(), lr=self.lr)
+
+        else:
+            return Adam(self.model.parameters(), lr=self.lr)

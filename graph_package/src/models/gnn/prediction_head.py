@@ -8,7 +8,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MLP(nn.Module):
-    def __init__(self, dim: int, dataset: str, use_mono_response: bool = False):
+    def __init__(
+        self,
+        dim: int,
+        dataset: str,
+        use_mono_response: bool = False,
+        custom_lr_setup: bool = False,
+    ):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.dataset = dataset
@@ -37,7 +43,6 @@ class MLP(nn.Module):
         #     nn.Linear(64, 1),
         # )
         self.global_mlp = nn.Linear(global_mlp_input_dim, 1)
-
 
     def _load_ccle(self):
         feature_path = (
