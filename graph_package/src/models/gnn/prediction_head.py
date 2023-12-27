@@ -82,9 +82,10 @@ class MLP(nn.Module):
 
     def _get_mono_response(self, drug_ids, context_ids):
         sample_ids = list(zip(drug_ids.cpu().numpy(), context_ids.cpu().numpy()))
-        batch_mono_val = [
-            self.mono_r[self.mono_r_index.get_loc(ids)] for ids in sample_ids
-        ]
+        batch_mono_val = torch.vstack(
+            [self.mono_r[self.mono_r_index.get_loc(ids)] for ids in sample_ids]
+        )
+        batch_mono_val = batch_mono_val.to(torch.float32)
         return batch_mono_val
 
     def forward(
