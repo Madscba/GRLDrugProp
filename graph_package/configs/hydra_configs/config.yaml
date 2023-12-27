@@ -20,6 +20,7 @@ dataset:
   use_node_features: False
   use_edge_features: False
   modalities: 'None' # All, Gene, Side Effect, Disease, Pharmacologic Class
+  discrete_edge_weights: False
 
 checkpoint_callback:
   mode: 'min'
