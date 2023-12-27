@@ -162,7 +162,16 @@ class RelationalGraphConv(MessagePassingBase):
         output = self.activation(output)
         return output
 
+class DummyLayer(MessagePassingBase):
+    def __init__(self, input_dim, output_dim, num_relation, dataset, batch_norm=False):
+        super(DummyLayer, self).__init__()
+
+    def message_and_aggregate(self, graph, input):
+        return input
     
+    def combine(self, input, update):
+        return input
+
 class GraphConv(MessagePassingBase):
     def __init__(self, input_dim, output_dim, num_relation, dataset, batch_norm=False):
         super(GraphConv, self).__init__()
