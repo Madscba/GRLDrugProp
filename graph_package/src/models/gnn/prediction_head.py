@@ -4,6 +4,7 @@ import json
 from graph_package.configs.directories import Directories
 import pandas as pd
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -14,18 +15,23 @@ class MLP(nn.Module):
         dataset: str,
         use_mono_response: bool = False,
         custom_lr_setup: bool = False,
+        batch_norm: bool = False,
+        feature_dropout: float = 0.0,
     ):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.dataset = dataset
         self.ccle = self._load_ccle()
         cell_line_input_dim = self.ccle.shape[1]
-        self.cell_line_mlp = nn.Sequential(
+        cell_layers = [
             nn.Linear(cell_line_input_dim, 128),
+            nn.BatchNorm1d(128) if batch_norm else nn.Identity(),
             nn.ReLU(),
             nn.Linear(128, 64),
+            nn.BatchNorm1d(64) if batch_norm else nn.Identity(),
             nn.ReLU(),
-        )
+        ]
+        self.cell_line_mlp = nn.Sequential(*cell_layers)
 
         if self.use_mono_response:
             self.mono_r_index, self.mono_r = self._load_mono_response(self.dataset)
@@ -33,16 +39,21 @@ class MLP(nn.Module):
         else:
             global_mlp_input_dim = 2 * dim + 64
 
-        # self.global_mlp = nn.Sequential(
-        #     nn.Linear(global_mlp_input_dim, 256),
-        #     nn.ReLU(),
-        #     nn.Linear(256, 128),
-        #     nn.ReLU(),
-        #     nn.Linear(128, 64),
-        #     nn.ReLU(),
-        #     nn.Linear(64, 1),
-        # )
-        self.global_mlp = nn.Linear(global_mlp_input_dim, 1)
+        global_layers = [
+            nn.Linear(global_mlp_input_dim, 256),
+            nn.BatchNorm1d(256) if batch_norm else nn.Identity(),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.BatchNorm1d(128) if batch_norm else nn.Identity(),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.BatchNorm1d(64) if batch_norm else nn.Identity(),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        ]
+
+        self.global_mlp = nn.Sequential(*global_layers)
+        # self.global_mlp = nn.Linear(global_mlp_input_dim, 1)
 
     def _load_ccle(self):
         feature_path = (

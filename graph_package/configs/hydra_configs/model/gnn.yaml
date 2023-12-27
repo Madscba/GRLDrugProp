@@ -1,5 +1,9 @@
 
 hidden_dims: [256]
 enc_kwargs:
+  batch_norm: False
+  feature_dropout: 0.0
 ph_kwargs:
+batch_norm: False #this value overwrites enc_kwargs.batch_norm
+feature_dropout: 0.0 #this value overwrites enc_kwargs.feature_dropout
 

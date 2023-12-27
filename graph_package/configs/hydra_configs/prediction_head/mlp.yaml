@@ -5,6 +5,8 @@ model:
       dataset: ''
       use_mono_response: False
       custom_lr_setup:
-        value: True
+        value: False
         lr_ph_cell_mlp: 0.001
         lr_ph_global_mlp: 0.0001
+      batch_norm: False #this value overwrites enc_kwargs.batch_norm in gnn.yaml
+      feature_dropout: 0.0 #this value overwrites enc_kwargs.feature_dropout in gnn.yaml

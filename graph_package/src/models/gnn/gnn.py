@@ -7,16 +7,18 @@ from torchdrug.data import Graph
 import torch
 from torch import nn
 from torchdrug import core
-from graph_package.src.models.gnn.gnn_layers import RelationalGraphConv, GraphConv, DummyLayer
+from graph_package.src.models.gnn.gnn_layers import (
+    RelationalGraphConv,
+    GraphConv,
+    DummyLayer,
+)
 from torchdrug.core import Registry as R
 from graph_package.src.models.gnn.prediction_head import MLP, DistMult
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-layer_dict = {"rgc": RelationalGraphConv,
-              "gc": GraphConv,
-              "dummy": DummyLayer}
+layer_dict = {"rgc": RelationalGraphConv, "gc": GraphConv, "dummy": DummyLayer}
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -51,6 +53,8 @@ class GNN(nn.Module, core.Configurable):
         dataset: str,
         concat_hidden: bool = False,
         short_cut: bool = False,
+        batch_norm: bool = False,
+        feature_dropout: float = 0.0,
         enc_kwargs: dict = {},
         ph_kwargs: dict = {},
     ):
@@ -59,6 +63,10 @@ class GNN(nn.Module, core.Configurable):
         input_dim_gnn = [graph.node_feature.shape[1]]
         self.enc_kwargs = enc_kwargs
         self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
+        self.enc_kwargs.update(
+            {"batch_norm": batch_norm, "feature_dropout": feature_dropout}
+        )
+
         if layer == "gc":
             self.enc_kwargs.update({"dataset": dataset})
 
@@ -67,6 +75,9 @@ class GNN(nn.Module, core.Configurable):
 
         elif prediction_head == "mlp":
             ph_kwargs.update({"dataset": dataset})
+            ph_kwargs.update(
+                {"batch_norm": batch_norm, "feature_dropout": feature_dropout}
+            )
 
         self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
         self.gnn_layers = self._init_gnn_layers(
