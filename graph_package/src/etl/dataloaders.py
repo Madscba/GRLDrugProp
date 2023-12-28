@@ -32,6 +32,7 @@ class KnowledgeGraphDataset(Dataset):
         task: str = "reg", 
         use_node_features: bool = False,
         modalities: str = 'None',
+        drug_representation: str = 'morgan',
         use_edge_features: bool = False 
     ):
         """
@@ -60,6 +61,7 @@ class KnowledgeGraphDataset(Dataset):
         self.dataset_path = dataset_dict[name.lower()]
         self.use_node_features = use_node_features
         self.modalities = modalities
+        self.drug_representation = drug_representation
         self.use_edge_features = use_edge_features
         self.label = target_dict[task][target]
         self.data_df = pd.read_csv(
@@ -119,26 +121,25 @@ class KnowledgeGraphDataset(Dataset):
     
     def _get_node_features(self):
         # Load drug features and vocab with graph node IDs
-        drug_feature_path = Directories.DATA_PATH / "features" / "drug_features" / "drug_ECFP_fp_2D.csv"
-        drug_features = pd.read_csv(drug_feature_path,index_col=0)
         with open(self.dataset_path.parent / "entity_vocab.json") as f:
             drug_vocab = json.load(f)
         node_feature_dict = {}
-        
         # In case only drug features are used
-        if self.modalities == 'None':
+        if self.drug_representation == 'morgan':
+            drug_feature_path = Directories.DATA_PATH / "features" / "drug_features" / "drug_ECFP_fp_2D.csv"
+            drug_features = pd.read_csv(drug_feature_path,index_col=0)
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
-
-        
-        elif self.modalities == 'onehot':
-            for i, drug in enumerate(drug_features.index):
-                 one_hot = np.zeros(len(drug_features))
+    
+        else:
+            for i, (drug, drug_id) in enumerate(drug_vocab.items()):
+                 one_hot = np.zeros(len(drug_vocab))
                  one_hot[i] = 1 
                  node_feature_dict[drug] = list(one_hot)
 
+    
         # Load PCA nearest neighbor features
-        else: 
+        if not self.modalities == 'None':
             pca_feature_path = Directories.DATA_PATH / "features" / "node_features" / "oneil_almanac_drug_features.json"
             with open(pca_feature_path) as f:
                 pca_features = json.load(f)
@@ -160,7 +161,7 @@ class KnowledgeGraphDataset(Dataset):
                 for relation, value in feature.items():
                     if relation in relations_to_include:
                         concatenated_pca_features.extend(value)
-                node_feature_dict[node] = drug_features.loc[node].to_list() + concatenated_pca_features
+                node_feature_dict[node].extend(concatenated_pca_features)
 
         # Convert to a list in correct order determined by graph node ID
         node_features = [

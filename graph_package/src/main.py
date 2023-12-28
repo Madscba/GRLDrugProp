@@ -45,7 +45,7 @@ def main(config):
     model_name = get_model_name(config, sys_args=sys.argv)
     if model_name == "gnn":
         config.dataset.update({"use_node_features": True})
-
+    
     dataset = KnowledgeGraphDataset(**config.dataset)
     update_model_kwargs(config, model_name, dataset)
 
