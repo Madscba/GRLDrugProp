@@ -39,7 +39,7 @@ class KnowledgeGraphDataset(Dataset):
 
         Parameters:
         - name (str): The name of the dataset.
-        - discrete_edge_weights (bool): Whether to discretize the edge weights to -1, 0 and 1.
+        - edge_weights (bool): Whether to discretize the edge weights to -1, 0 and 1.
         - dataset_path (str): The path to the dataset.
         - target (str, optional): The target variable for the task.
         - task (str, optional): The type of task ("reg" for regression, "clf" for classification).
@@ -96,7 +96,7 @@ class KnowledgeGraphDataset(Dataset):
         if self.edge_weights:
             targets = self.data_df[self.label].to_numpy() 
             if self.edge_weights =='discrete':
-                targets = np.where(targets > 5, 1, np.where(targets < -5, -1, 0))
+                targets = np.where(targets > 5, 1, 0)
         else: 
             targets = None
     

@@ -149,7 +149,7 @@ class RelationalGraphConv(MessagePassingBase):
         node_in, node_out, relation = graph.edge_list.t()
         node_out = node_out * self.num_relation + relation
         degree_out = scatter_add(graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation)
-        edge_weight = graph.edge_weight / degree_out[node_out]
+        edge_weight = graph.edge_weight / (10e-10+degree_out[node_out])
         adjacency = utils.sparse_coo_tensor(torch.stack([node_in, node_out]), edge_weight,
                                             (graph.num_node, graph.num_node * graph.num_relation))
         update = torch.sparse.mm(adjacency.t(), input)
@@ -219,7 +219,7 @@ class GraphConv(MessagePassingBase):
         node_in, node_out, relation = graph.edge_list.t()
         node_out = node_out * self.num_relation + relation
         degree_out = scatter_add(graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation)
-        edge_weight = graph.edge_weight / degree_out[node_out]
+        edge_weight = graph.edge_weight / (10e-10+degree_out[node_out])
         adjacency = utils.sparse_coo_tensor(torch.stack([node_in, node_out]), edge_weight,
                                             (graph.num_node, graph.num_node * graph.num_relation))
         transform_input = self.transform_input(input)
