@@ -5,4 +5,3 @@ checkpoint_callback:
   filename: '{epoch:02d}-{val_auroc:.4f}'
   save_top_k: 1
   monitor: 'val_auroc'
-  hello: 'world'
