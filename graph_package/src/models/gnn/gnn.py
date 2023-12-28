@@ -127,7 +127,7 @@ class GNN(nn.Module, core.Configurable):
         return node_feature
 
     def forward(self, inputs) -> torch.FloatTensor:
-        """Run a forward pass of the R-GCN model.
+        """Run a forward pass of the GNN model.
 
         :returns: A vector of predicted synergy scores
         """
