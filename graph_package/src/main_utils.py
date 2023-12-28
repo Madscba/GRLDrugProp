@@ -105,6 +105,7 @@ def init_model(
         model = model_dict[model.lower()](**config.model)
     pl_module = BasePL(
         model,
+        lr=config.lr,
         task=config.task,
         logger_enabled=logger_enabled,
         target=config.dataset.target,
