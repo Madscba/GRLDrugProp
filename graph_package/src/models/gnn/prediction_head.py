@@ -27,16 +27,16 @@ class MLP(nn.Module):
         else:
             global_mlp_input_dim = 2 * dim + 64
 
-        # self.global_mlp = nn.Sequential(
-        #     nn.Linear(global_mlp_input_dim, 256),
-        #     nn.ReLU(),
-        #     nn.Linear(256, 128),
-        #     nn.ReLU(),
-        #     nn.Linear(128, 64),
-        #     nn.ReLU(),
-        #     nn.Linear(64, 1),
-        # )
-        self.global_mlp = nn.Linear(global_mlp_input_dim, 1)
+        self.global_mlp = nn.Sequential(
+            nn.Linear(global_mlp_input_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        )
+
 
 
     def _load_ccle(self):
@@ -155,7 +155,7 @@ class DistMult(nn.Module):
         drug_1_ids: torch.Tensor,
         drug_2_ids: torch.Tensor,
     ) -> torch.FloatTensor:
-        score = self.score_triplet(context_ids, d1_embd, d2_embd)
+        score = self.score_triplet(d1_embd, d2_embd, context_ids)
         return score
 
     def predict(self, data):

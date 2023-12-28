@@ -27,7 +27,7 @@ class KnowledgeGraphDataset(Dataset):
     def __init__(
         self, 
         name: str="oneil_almanac",
-        discrete_edge_weights: bool = False,
+        edge_weights: bool = None,
         target: str = "zip_mean", 
         task: str = "reg", 
         use_node_features: bool = False,
@@ -55,7 +55,7 @@ class KnowledgeGraphDataset(Dataset):
         - use_edge_features (bool, optional): Whether to use edge features and load them into the KG.
         """
         self.target = target
-        self.discrete_edge_weights = discrete_edge_weights
+        self.edge_weights = edge_weights
         self.task = task
         self.dataset_path = dataset_dict[name.lower()]
         self.use_node_features = use_node_features
@@ -92,9 +92,14 @@ class KnowledgeGraphDataset(Dataset):
         triplets = self.data_df.loc[
             :, ["drug_1_id", "drug_2_id", "context_id"]
         ].to_numpy()
-        targets = self.data_df[self.label].to_numpy() 
-        if self.discrete_edge_weights:
-            targets = np.where(targets > 5, 1, np.where(targets < -5, -1, 0))
+        
+        if self.edge_weights:
+            targets = self.data_df[self.label].to_numpy() 
+            if self.edge_weights =='discrete':
+                targets = np.where(targets > 5, 1, np.where(targets < -5, -1, 0))
+        else: 
+            targets = None
+    
         node_features = self._get_node_features() if self.use_node_features else None
         edge_features = self._get_edge_features() if self.use_edge_features else None
         num_relations = len(set(self.data_df["context"]))
@@ -124,7 +129,14 @@ class KnowledgeGraphDataset(Dataset):
         if self.modalities == 'None':
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
-                
+
+        
+        elif self.modalities == 'onehot':
+            for i, drug in enumerate(drug_features.index):
+                 one_hot = np.zeros(len(drug_features))
+                 one_hot[i] = 1 
+                 node_feature_dict[drug] = list(one_hot)
+
         # Load PCA nearest neighbor features
         else: 
             pca_feature_path = Directories.DATA_PATH / "features" / "node_features" / "oneil_almanac_drug_features.json"

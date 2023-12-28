@@ -112,7 +112,7 @@ class RelationalGraphConv(MessagePassingBase):
         activation (str or function, optional): activation function
     """
     eps = 1e-10
-
+    
     def __init__(self, input_dim, output_dim, num_relation, batch_norm=False):
         super(RelationalGraphConv, self).__init__()
         self.input_dim = input_dim
