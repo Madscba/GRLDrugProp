@@ -27,16 +27,16 @@ class MLP(nn.Module):
         else:
             global_mlp_input_dim = 2 * dim + 64
 
-        # self.global_mlp = nn.Sequential(
-        #     nn.Linear(global_mlp_input_dim, 256),
-        #     nn.ReLU(),
-        #     nn.Linear(256, 128),
-        #     nn.ReLU(),
-        #     nn.Linear(128, 64),
-        #     nn.ReLU(),
-        #     nn.Linear(64, 1),
-        # )
-        self.global_mlp = nn.Linear(global_mlp_input_dim, 1)
+        self.global_mlp = nn.Sequential(
+            nn.Linear(global_mlp_input_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        )
+
 
 
     def _load_ccle(self):
