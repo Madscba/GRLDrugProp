@@ -109,6 +109,7 @@ def init_model(
         task=config.task,
         logger_enabled=logger_enabled,
         target=config.dataset.target,
+        l2_reg=config.l2_reg,
         model_config=config.model,
     )
     return pl_module

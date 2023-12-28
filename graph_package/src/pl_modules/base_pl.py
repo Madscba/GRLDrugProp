@@ -17,6 +17,7 @@ class BasePL(LightningModule):
         task: str = "clf",
         logger_enabled: bool = True,
         target: str = "zip_mean",
+        l2_reg: bool = False,
         model_config: dict = {},
     ):
         super().__init__()
@@ -28,6 +29,7 @@ class BasePL(LightningModule):
         self.test_metrics = metric("test", target)
         self.model = model
         self.logger_enabled = logger_enabled
+        self.l2_reg = l2_reg
         self.model_config = model_config
 
     def forward(self, inputs):
@@ -68,6 +70,14 @@ class BasePL(LightningModule):
                 prog_bar=True,
                 logger=self.logger_enabled,
             )
+
+        if self.l2_reg:
+            self.weight_decay = 1e-5
+            l2_regularization = 0.0
+            for param in self.parameters():
+                l2_regularization += torch.norm(param, p=2)
+            loss += 0.5 * self.weight_decay * l2_regularization
+
         return loss
 
     def validation_step(self, batch, batch_idx):
