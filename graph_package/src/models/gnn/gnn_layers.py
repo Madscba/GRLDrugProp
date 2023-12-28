@@ -275,4 +275,6 @@ class GraphConv(MessagePassingBase):
         if self.batch_norm:
             output = self.batch_norm(output)
         output = self.activation(output)
+        if self.feature_dropout:
+            output = self.feature_dropout(output)
         return output

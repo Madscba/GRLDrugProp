@@ -22,14 +22,17 @@ class MLP(nn.Module):
         self.use_mono_response = use_mono_response
         self.dataset = dataset
         self.ccle = self._load_ccle()
+        self.feature_dropout = nn.Dropout(feature_dropout)
         cell_line_input_dim = self.ccle.shape[1]
         cell_layers = [
             nn.Linear(cell_line_input_dim, 128),
             nn.BatchNorm1d(128) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
             nn.Linear(128, 64),
             nn.BatchNorm1d(64) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
         ]
         self.cell_line_mlp = nn.Sequential(*cell_layers)
 
@@ -43,12 +46,15 @@ class MLP(nn.Module):
             nn.Linear(global_mlp_input_dim, 256),
             nn.BatchNorm1d(256) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
             nn.Linear(256, 128),
             nn.BatchNorm1d(128) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
             nn.Linear(128, 64),
             nn.BatchNorm1d(64) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
             nn.Linear(64, 1),
         ]
 
