@@ -2,6 +2,7 @@ import json
 import torch
 import pandas as pd
 from graph_package.configs.directories import Directories
+from graph_package.configs.definitions import dataset_dict
 from graph_package.src.etl.medallion.gold import (
     create_drug_id_vocabs, 
     create_cell_line_id_vocabs
@@ -9,6 +10,7 @@ from graph_package.src.etl.medallion.gold import (
 from torch.utils.data import Dataset
 from torchdrug.data import Graph
 import numpy as np
+
 
 target_dict = {
     "reg": {
@@ -24,7 +26,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class KnowledgeGraphDataset(Dataset):
     def __init__(
         self, 
-        dataset_path, 
+        name: str="oneil_almanac",
+        edge_weights: bool = None,
         target: str = "zip_mean", 
         task: str = "reg", 
         use_node_features: bool = False,
@@ -35,6 +38,8 @@ class KnowledgeGraphDataset(Dataset):
         Initialize the Knowledge Graph.
 
         Parameters:
+        - name (str): The name of the dataset.
+        - edge_weights (bool): Whether to discretize the edge weights to -1, 0 and 1.
         - dataset_path (str): The path to the dataset.
         - target (str, optional): The target variable for the task.
         - task (str, optional): The type of task ("reg" for regression, "clf" for classification).
@@ -50,9 +55,9 @@ class KnowledgeGraphDataset(Dataset):
         - use_edge_features (bool, optional): Whether to use edge features and load them into the KG.
         """
         self.target = target
+        self.edge_weights = edge_weights
         self.task = task
-        self.dataset_path = dataset_path
-        self.device = device
+        self.dataset_path = dataset_dict[name.lower()]
         self.use_node_features = use_node_features
         self.modalities = modalities
         self.use_edge_features = use_edge_features
@@ -69,10 +74,9 @@ class KnowledgeGraphDataset(Dataset):
                 self.label: float,
             },
         )
-        triplets = self.data_df.loc[
-            :, ["drug_1_id", "drug_2_id", "context_id"]
-        ].to_numpy()
-        self.graph = self._init_graph(triplets)
+        
+        self.graph = self._init_graph(self.data_df)
+            
         self.indices = list(range(len(self.data_df)))
 
     def get_labels(self, indices=None):
@@ -84,29 +88,34 @@ class KnowledgeGraphDataset(Dataset):
             labels = self.data_df.iloc[indices][target_dict['clf'][self.target]]
         return labels
     
-    def _init_graph(self, triplets):
+    def _init_graph(self, data_df: pd.DataFrame):
+        triplets = self.data_df.loc[
+            :, ["drug_1_id", "drug_2_id", "context_id"]
+        ].to_numpy()
+        
+        if self.edge_weights:
+            targets = self.data_df[self.label].to_numpy() 
+            if self.edge_weights =='discrete':
+                targets = np.where(targets > 5, 1, 0)
+        else: 
+            targets = None
+    
         node_features = self._get_node_features() if self.use_node_features else None
         edge_features = self._get_edge_features() if self.use_edge_features else None
         num_relations = len(set(self.data_df["context"]))
         num_nodes = len(
             set(self.data_df["drug_1_id"]).union(set(self.data_df["drug_2_id"]))
         )
-        triplets = torch.as_tensor(triplets, dtype=torch.long, device=self.device)
+        triplets = torch.as_tensor(triplets, dtype=torch.long, device=device)
         graph = Graph(
             triplets, 
             num_node=num_nodes, 
             num_relation=num_relations, 
             node_feature=node_features,
-            edge_feature=edge_features
+            edge_feature=edge_features, 
+            edge_weight=targets,
         )
         return graph
-
-    def _update_dataset(self, df: pd.DataFrame):
-        self.data_df = pd.concat([self.data_df, df], ignore_index=True)
-        triplets = self.data_df.loc[
-            :, ["drug_1_id", "drug_2_id", "context_id"]
-        ].to_numpy()
-        self.graph = self._init_graph(triplets)
     
     def _get_node_features(self):
         # Load drug features and vocab with graph node IDs
@@ -115,10 +124,18 @@ class KnowledgeGraphDataset(Dataset):
         with open(self.dataset_path.parent / "entity_vocab.json") as f:
             drug_vocab = json.load(f)
         node_feature_dict = {}
+        
         # In case only drug features are used
         if self.modalities == 'None':
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
+
+        
+        elif self.modalities == 'onehot':
+            for i, drug in enumerate(drug_features.index):
+                 one_hot = np.zeros(len(drug_features))
+                 one_hot[i] = 1 
+                 node_feature_dict[drug] = list(one_hot)
 
         # Load PCA nearest neighbor features
         else: 
@@ -150,10 +167,12 @@ class KnowledgeGraphDataset(Dataset):
             node_feature_dict[name] for name in drug_vocab.keys() 
             if name in node_feature_dict.keys()
         ]
+        # Convert to float arraylike 
+        node_features = np.array(node_features).astype(np.float32)
         return node_features
 
     def _get_edge_features(self):
-        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express.json"
+        feature_path = Directories.DATA_PATH / "features" / "cell_line_features" / "CCLE_954_gene_express_pca.json"
         with open(feature_path) as f:
             all_edge_features = json.load(f)
         edge_df = self.data_df['context'].map(all_edge_features)
@@ -167,7 +186,8 @@ class KnowledgeGraphDataset(Dataset):
         df_inv["drug_1_name"], df_inv["drug_2_name"] = df_subset["drug_2_name"], df_subset["drug_1_name"]
         df_inv["drug_1_id"], df_inv["drug_2_id"] = df_subset["drug_2_id"], df_subset["drug_1_id"]
         inv_idx_start = len(self.data_df)
-        self._update_dataset(df_inv)
+        self.data_df = pd.concat([self.data_df, df_inv], ignore_index=True)
+        self.graph = self._init_graph(self.data_df)
         sub_set_indices = list(range(inv_idx_start, len(self.data_df)))  
         return sub_set_indices 
     

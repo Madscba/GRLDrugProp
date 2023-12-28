@@ -6,6 +6,6 @@ from graph_package.src.models.transe import TransE
 from graph_package.src.models.distmult import DistMult
 from graph_package.src.models.complex import ComplEx
 from graph_package.src.models.rotate import RotatE
-from graph_package.src.models.rgcn import RGCN
+from graph_package.src.models.gnn.gnn import GNN
 
-__all__ = ["RESCAL", "DeepDDS", "HybridModel", "RGCN", "TransE", "DistMult", "ComplEx", "RotatE"]
+__all__ = ["RESCAL", "DeepDDS", "HybridModel", "TransE", "DistMult", "ComplEx", "RotatE","GNN"]

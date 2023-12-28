@@ -18,7 +18,6 @@ from sklearn.metrics import (
 )
 import seaborn as sns
 from datetime import date
-from graph_package.src.main_utils import load_data
 import numpy as np
 import torch
 from pathlib import Path
