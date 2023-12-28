@@ -181,21 +181,26 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
         df_mono.to_csv(data_path / m_file_name, index=True)
 
 
+
 def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
+
     """
     Make ONEIL and ONEIL-ALMANAC datasets
     """
+
     for study in studies:
         logger.info(f"Making {study} dataset.")
         save_path = Directories.DATA_PATH / "gold" / study
         save_path.mkdir(parents=True, exist_ok=True)
         df = load_oneil() if study == "oneil" else load_oneil_almanac()
+        
         rename_dict = {
             "block_id": "block_id",
             "drug_row": "drug_1_name",
             "drug_col": "drug_2_name",
             "cell_line_name": "context",
         }
+
         df.rename(columns=rename_dict, inplace=True)
         columns_to_keep = list(rename_dict.values()) + ["css_col", "css_row"]
         df = df[columns_to_keep]
