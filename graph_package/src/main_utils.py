@@ -5,6 +5,7 @@ from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from graph_package.configs.directories import Directories
 from graph_package.src.pl_modules import BasePL
+from graph_package.src.pl_modules.gaecds_pl import GAECDS_PL
 from torch.utils.data import random_split, Subset
 from torchdrug.data import DataLoader
 import os
@@ -89,7 +90,6 @@ def reset_wandb_env():
             del os.environ[k]
 
 
-
 def init_model(
     model: str = "deepdds",
     config: dict = None,
@@ -99,10 +99,25 @@ def init_model(
     """Load model from registry"""
 
     if model == "gnn":
-        model = model_dict[model.lower()](graph=graph,dataset=config.dataset.name,**config.model)
+        model = model_dict[model.lower()](
+            graph=graph, dataset=config.dataset.name, **config.model
+        )
     else:
         model = model_dict[model.lower()](**config.model)
-    pl_module = BasePL(model, task=config.task, logger_enabled=logger_enabled, target=config.dataset.target)
+    if model == "gaecds":
+        pl_module = GAECDS_PL(
+            model,
+            task=config.task,
+            logger_enabled=logger_enabled,
+            target=config.dataset.target,
+        )
+    else:
+        pl_module = BasePL(
+            model,
+            task=config.task,
+            logger_enabled=logger_enabled,
+            target=config.dataset.target,
+        )
     return pl_module
 
 
@@ -121,11 +136,14 @@ def update_shallow_embedding_args(dataset):
     }
     return update_dict
 
+
 def update_deepdds_args(config):
     return {"dataset_path": dataset_dict[config.dataset.name]}
 
+
 def update_rgcn_args(config):
     return {"dataset_path": dataset_dict[config.dataset.name]}
+
 
 def update_model_kwargs(config: dict, model_name: str, dataset):
     if model_name.startswith("deepdds"):
@@ -133,9 +151,9 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
         config.model.rescal.update(update_shallow_embedding_args(dataset))
-    elif model_name =="gnn":
+    elif model_name == "gnn":
         pass
-        #config.model.update(update_rgcn_args(config))
+        # config.model.update(update_rgcn_args(config))
     else:
         config.model.update(update_shallow_embedding_args(dataset))
 

@@ -2,34 +2,31 @@ from pytorch_lightning import LightningModule
 from graph_package.src.pl_modules.metrics import RegMetrics, ClfMetrics
 from torchmetrics import MeanSquaredError
 from torch.optim import Adam
-from torch.nn import ModuleDict, BCEWithLogitsLoss, BCELoss, MSELoss
+from torch.nn import ModuleDict, BCEWithLogitsLoss, MSELoss
 from torchmetrics import AUROC
-from torchmetrics.classification import (
-    Accuracy,
-    AveragePrecision,
-    CalibrationError,
-    ConfusionMatrix,
-    F1Score,
-)
 import torch
 
-loss_func_dict = {
-    "clf": {"gae": BCEWithLogitsLoss(), "cnn": BCELoss},
-    "reg": {"gae": BCEWithLogitsLoss(), "cnn": MSELoss()},
-}
+loss_func_dict = {"clf": BCEWithLogitsLoss(), "reg": MSELoss()}
 
 
-class GAECDSPL(LightningModule):
-    def __init__(self, model, lr: float = 0.001, task: str = "clf"):
+class GAECDS_PL(LightningModule):
+    def __init__(
+        self,
+        model,
+        lr: float = 0.001,
+        task: str = "clf",
+        logger_enabled: bool = True,
+        target: str = "zip_mean",
+    ):
         super().__init__()
         self.lr = lr
         self.task = task
         self.loss_func = loss_func_dict[task]
         metric = ClfMetrics if task == "clf" else RegMetrics
-        self.val_metrics = metric("val")
-        self.test_metrics = metric("test")
+        self.val_metrics = metric("val", target)
+        self.test_metrics = metric("test", target)
         self.model = model
-        self.logger_enabled = True if self.logger is not None else False
+        self.logger_enabled = logger_enabled
 
     def forward(self, inputs):
         return self.model(inputs)
@@ -43,11 +40,6 @@ class GAECDSPL(LightningModule):
         return loss, target, preds
 
     def training_step(self, batch, batch_idx):
-        if self.current_epoch % 200 == 0:
-            # update GAE
-            # fetch full adj matrix, and node features
-            # calculate x_matrix
-            pass
         loss, target, preds = self._step(batch)
         self.log(
             "train_loss",
@@ -74,6 +66,11 @@ class GAECDSPL(LightningModule):
                 prog_bar=True,
                 logger=self.logger_enabled,
             )
+        if (
+            str(self.model) == "gaecds"
+            and self.trainer.current_epoch % (self.trainer.max_epochs // 5) == 0
+        ):
+            self.model.train_gnn()
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -123,4 +120,9 @@ class GAECDSPL(LightningModule):
         return
 
     def configure_optimizers(self):
-        return Adam(self.model.parameters(), lr=self.lr)
+        return torch.optim.Adam(
+            [
+                {"params": self.model.cnn.parameters(), "lr": 0.00001},
+                {"params": self.model.mlp_cell.parameters(), "lr": 0.01},
+            ]
+        )

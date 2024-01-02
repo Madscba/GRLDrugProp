@@ -66,6 +66,11 @@ class BasePL(LightningModule):
                 prog_bar=True,
                 logger=self.logger_enabled,
             )
+        if (
+            str(self.model) == "gaecds"
+            and self.trainer.current_epoch % (self.trainer.max_epochs // 5) == 0
+        ):
+            self.model.train_gnn()
         return loss
 
     def validation_step(self, batch, batch_idx):
