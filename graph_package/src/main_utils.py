@@ -18,8 +18,8 @@ from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 def get_drug_split(dataset, config, n_drugs_per_fold=3):
     splits = []
     df = dataset.data_df
-    for i in range(0, dataset.num_nodes, n_drugs_per_fold):
-        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.num_nodes)))
+    for i in range(0, dataset.graph.num_node, n_drugs_per_fold):
+        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.graph.num_node)))
         drug_1_idx = df[df["drug_1_id"].isin(drug_ids)].index
         drug_2_idx = df[df["drug_2_id"].isin(drug_ids)].index
         test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
@@ -89,32 +89,20 @@ def reset_wandb_env():
             del os.environ[k]
 
 
-def load_data(dataset_config: dict, task="reg"):
-    """Fetch formatted data depending on modelling task"""
-    dataset_path = dataset_dict[dataset_config.name.lower()]
-    data_loader = KnowledgeGraphDataset(
-        dataset_path, task=task, target=dataset_config.target,
-        use_node_features=dataset_config.use_node_features,
-        neighbors=dataset_config.neighbors,
-        use_edge_features=dataset_config.use_edge_features
-    )
-    return data_loader
-
 
 def init_model(
     model: str = "deepdds",
-    task: str = "clf",
-    target: str = "zip_mean",
-    model_kwargs: dict = {},
+    config: dict = None,
     graph: Optional[KnowledgeGraphDataset] = None,
     logger_enabled: bool = True,
 ):
     """Load model from registry"""
-    if model == "rgcn":
-        model = model_dict[model.lower()](graph,**model_kwargs)
+
+    if model == "gnn":
+        model = model_dict[model.lower()](graph=graph,dataset=config.dataset.name,**config.model)
     else:
-        model = model_dict[model.lower()](**model_kwargs)
-    pl_module = BasePL(model, task=task, logger_enabled=logger_enabled, target=target)
+        model = model_dict[model.lower()](**config.model)
+    pl_module = BasePL(model, task=config.task, logger_enabled=logger_enabled, target=config.dataset.target)
     return pl_module
 
 
@@ -145,7 +133,7 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
         config.model.rescal.update(update_shallow_embedding_args(dataset))
-    elif model_name =="rgcn":
+    elif model_name =="gnn":
         pass
         #config.model.update(update_rgcn_args(config))
     else:

@@ -1,0 +1,6 @@
+# @package _global_
+model:
+  prediction_head: mlp
+  ph_kwargs: 
+      dataset: ''
+      use_mono_response: False

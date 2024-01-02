@@ -21,7 +21,7 @@ docker-pycreds==0.4.0
 exceptiongroup==1.2.0
 executing==2.0.1
 fair-esm==2.0.0
-filelock==3.12.4
+filelock==3.12.4$
 fonttools==4.43.1
 frozenlist==1.4.0
 fsspec==2023.10.0
@@ -117,5 +117,7 @@ wcwidth==0.2.12
 yarl==1.9.2
 zipp==3.17.0
 gget==0.28.2
+openbabel==3.1.0
+
 # local package
 -e .
