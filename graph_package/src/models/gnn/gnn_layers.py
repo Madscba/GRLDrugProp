@@ -118,7 +118,14 @@ class RelationalGraphConv(MessagePassingBase):
 
     eps = 1e-10
 
-    def __init__(self, input_dim, output_dim, num_relation, batch_norm=False):
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        num_relation,
+        batch_norm=False,
+        feature_dropout: float = 0.0,
+    ):
         super(RelationalGraphConv, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -132,6 +139,7 @@ class RelationalGraphConv(MessagePassingBase):
         self.activation = F.relu
         self.self_loop = nn.Linear(input_dim, output_dim)
         self.linear = nn.Linear(num_relation * input_dim, output_dim)
+        self.feature_dropout = nn.Dropout(feature_dropout)
 
     def message(self, graph, input):
         node_in = graph.edge_list[:, 0]
@@ -164,10 +172,11 @@ class RelationalGraphConv(MessagePassingBase):
         assert graph.num_relation == self.num_relation
         node_in, node_out, relation = graph.edge_list.t()
         node_out = node_out * self.num_relation + relation
-        degree_out = scatter_add(
-            graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
-        )
-        edge_weight = graph.edge_weight / degree_out[node_out]
+        # degree_out = scatter_add(
+        #     graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
+        # )
+        # edge_weight = graph.edge_weight / degree_out[node_out]
+        edge_weight = graph.edge_weight
         adjacency = utils.sparse_coo_tensor(
             torch.stack([node_in, node_out]),
             edge_weight,
@@ -181,6 +190,8 @@ class RelationalGraphConv(MessagePassingBase):
         if self.batch_norm:
             output = self.batch_norm(output)
         output = self.activation(output)
+        if self.feature_dropout:
+            output = self.feature_dropout(output)
         return output
 
 
@@ -257,10 +268,11 @@ class GraphConv(MessagePassingBase):
         assert graph.num_relation == self.num_relation
         node_in, node_out, relation = graph.edge_list.t()
         node_out = node_out * self.num_relation + relation
-        degree_out = scatter_add(
-            graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
-        )
-        edge_weight = graph.edge_weight / degree_out[node_out]
+        # degree_out = scatter_add(
+        #     graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
+        # )
+        # edge_weight = graph.edge_weight / degree_out[node_out]
+        edge_weight = graph.edge_weight
         adjacency = utils.sparse_coo_tensor(
             torch.stack([node_in, node_out]),
             edge_weight,
