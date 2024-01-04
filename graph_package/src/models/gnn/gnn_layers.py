@@ -307,7 +307,7 @@ class RelationalGraphAttentionConv(MessagePassingBase):
 
     eps = 1e-10
 
-    def __init__(self, input_dim, output_dim, num_relations, w_per_relation=False, edge_input_dim=None, num_head=2, negative_slope=0.2, concat=True,
+    def __init__(self, input_dim, output_dim, num_relations, w_per_relation=False, edge_input_dim=None, num_head=1, negative_slope=0.2, concat=True,
                  batch_norm=False):
         super(RelationalGraphAttentionConv, self).__init__()
         self.input_dim = input_dim

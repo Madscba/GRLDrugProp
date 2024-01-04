@@ -4,3 +4,4 @@ model:
   layer: 'rgac'
   enc_kwargs: 
     w_per_relation: True
+    num_head: 1
