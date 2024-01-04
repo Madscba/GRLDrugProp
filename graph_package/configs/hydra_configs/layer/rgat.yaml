@@ -4,5 +4,5 @@ model:
   layer: 'rgat'
   enc_kwargs: 
     dataset: ''
-    num_head: 1
+    n_heads: 1
     dropout: 0.6

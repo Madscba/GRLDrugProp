@@ -688,14 +688,11 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
             self.n_hidden = output_dim
 
         self.output_dim = output_dim
-        self.W = nn.Linear(self.input_dim,  self.n_hidden * n_heads)
-
-        # Define parameters for each relation type and each head
-        self.attentions = nn.ModuleList()
-        for _ in range(num_relation):
-            head_attentions = nn.ModuleList([nn.Linear(2 * self.n_hidden, 1) for _ in range(n_heads)])
-            self.attentions.append(head_attentions)
-
+        # Weight matrix for linear transformation
+        self.W = nn.Linear(self.input_dim,  self.n_hidden * n_heads * (self.num_relation+1))
+        # Attention mechanism
+        self.attention = nn.Parameter(torch.empty(size=((self.num_relation+1), n_heads , output_dim * 2 // n_heads)))
+        nn.init.xavier_uniform_(self.attention.data)
         self.activation = nn.ELU() if self.concat_hidden else None
 
     def _add_relation_specific_self_loops(self, n_nodes, device):
@@ -728,7 +725,7 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
         Wh_concat = torch.cat([Wh_i, Wh_j], dim=2) # Concatenate source and target features
 
         # Calculate attention coefficients e_ij for each node pair following eq. 3 [Velickovic] with leaky rely
-        e = torch.einsum("nhd, nhd -> nh", self.attn[relation], Wh_concat)
+        e = torch.einsum("nhd, nhd -> nh", self.attention[relation], Wh_concat)
         e = F.leaky_relu(e, negative_slope=self.negative_slope)
 
         # Multiply synergy scores to the attention coefficients including self-loop
