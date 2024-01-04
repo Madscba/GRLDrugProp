@@ -1,6 +1,12 @@
 # @package _global_
 model:
   prediction_head: mlp
-  ph_kwargs: 
+  ph_kwargs:
       dataset: ''
       use_mono_response: False
+      custom_lr_setup:
+        value: False
+        lr_ph_cell_mlp: 0.01
+        lr_ph_global_mlp: 0.0002
+      batch_norm: False #this value overwrites enc_kwargs.batch_norm in gnn.yaml
+      feature_dropout: 0.0 #this value overwrites enc_kwargs.feature_dropout in gnn.yaml

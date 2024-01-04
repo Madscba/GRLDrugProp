@@ -7,18 +7,32 @@ from torchdrug.data import Graph
 import torch
 from torch import nn
 from torchdrug import core
-from graph_package.src.models.gnn.gnn_layers import RelationalGraphConv, GraphConv, DummyLayer, GraphAttentionConv, RelationalGraphAttentionConv
+from graph_package.src.models.gnn.gnn_layers import (
+    RelationalGraphConv,
+    GraphConv,
+    DummyLayer,
+    GraphAttentionLayer,
+    RelationalGraphAttentionLayer,
+    RelationalGraphAttentionConv
+)
+
 from torchdrug.core import Registry as R
 from graph_package.src.models.gnn.prediction_head import MLP, DistMult
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-layer_dict = {"rgc": RelationalGraphConv,
-              "gc": GraphConv,
-              "dummy": DummyLayer,
-              "gat": GraphAttentionConv,
-              "rgac": RelationalGraphAttentionConv}
+
+layer_dict = {
+    "rgc": RelationalGraphConv, 
+    "gc": GraphConv, 
+    "dummy": DummyLayer,
+    "gat": GraphAttentionLayer,
+    "rgat": RelationalGraphAttentionLayer,
+    "rgac": RelationalGraphAttentionConv
+}
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 prediction_head_dict = {"mlp": MLP, "distmult": DistMult}
 
@@ -40,7 +54,7 @@ class GNN(nn.Module, core.Configurable):
         - short_cut (bool, optional): use short cut or not
         - enc_kwargs (dict, optional): additional arguments for layer class
         - ph_kwargs (dict, optional): additional arguments for prediction head class
-        
+
     """
 
     def __init__(
