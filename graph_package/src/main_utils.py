@@ -98,13 +98,13 @@ def init_model(
 ):
     """Load model from registry"""
 
-    if model == "gnn":
+    if model == "gnn" or model == "gaecds":
         model = model_dict[model.lower()](
             graph=graph, dataset=config.dataset.name, **config.model
         )
     else:
         model = model_dict[model.lower()](**config.model)
-    if model == "gaecds":
+    if model.__class__.__name__.lower() == "gaecds":
         pl_module = GAECDS_PL(
             model,
             task=config.task,
@@ -151,7 +151,7 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
         config.model.rescal.update(update_shallow_embedding_args(dataset))
-    elif model_name == "gnn":
+    elif model_name == "gnn" or model_name == "gaecds":
         pass
         # config.model.update(update_rgcn_args(config))
     else:

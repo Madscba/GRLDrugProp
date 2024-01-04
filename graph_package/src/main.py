@@ -43,7 +43,7 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    if model_name == "gnn":
+    if model_name == "gnn" or model_name == "gaecds":
         config.dataset.update({"use_node_features": True})
 
     dataset = KnowledgeGraphDataset(**config.dataset)
@@ -103,7 +103,7 @@ def main(config):
         model = init_model(
             model=model_name,
             config=config,
-            graph=train_set.dataset.graph.edge_mask(train_set.indices)
+            graph=train_set.dataset.graph.edge_mask(train_set.indices),
         )
 
         trainer = Trainer(

@@ -15,22 +15,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class GCN(nn.Module):
     def __init__(self, in_feats, hid_feats, out_feats):
         super(GCN, self).__init__()
-        self.conv1 = GraphConvolutionalNetwork(
-            in_channels=in_feats, out_channels=hid_feats
+        self.drug_conv = GraphConvolutionalNetwork(
+            input_dim=in_feats, hidden_dims=[hid_feats, out_feats], activation="relu"
         )
-        self.conv2 = GraphConvolutionalNetwork(
-            in_channels=hid_feats, out_channels=out_feats
-        )
-        self.sigmoid = nn.Sigmoid()
-        self.tanh = nn.Tanh()
-        self.relu = nn.ReLU()
+        self.drug_conv.to(device)
 
     def forward(self, g_adj, feature):
-        h = self.conv1(g_adj, feature)
-        h = self.relu(h)
-        h = self.conv2(g_adj, h)
-        h = self.relu(h)
-
+        h = self.drug_conv(g_adj, feature)
+        h = h["node_feature"]
         return h
 
 
@@ -121,8 +113,6 @@ class GAECDS(nn.Module):
         self,
         graph: Graph,
         hidden_dims: list,
-        layer: str,
-        prediction_head: str,
         dataset: str,
         concat_hidden: bool = False,
         short_cut: bool = False,
@@ -134,10 +124,15 @@ class GAECDS(nn.Module):
 
         self.gae = GAE(300, 256, 128)
         self.cnn = CNN(128, 64, 32, 1)
-        self.mlp_cell = MLP(in_feats=954, out_feats=128)
+        self.mlp_cell = MLP(in_feats=128, out_feats=128)
+        self.dataset = dataset
+        self.ccle = self._load_ccle()
+
+        _, gcn_feature = self.gae(self.graph, self.graph.node_feature)
+        self.gcn_feature = gcn_feature
 
         self.optim_gae = torch.optim.Adam(
-            {"params": self.model.GAE.parameters(), "lr": 0.00001}
+            [{"params": self.gae.parameters(), "lr": 0.00001}]
         )
 
     def forward(self, inputs):
@@ -148,9 +143,11 @@ class GAECDS(nn.Module):
         # c = self.cell_line_mlp(self.ccle[context_ids])
         cell_feature = self.ccle
         cell_out = self.mlp_cell(cell_feature, "sigmoid")
-        cell_out = cell_out.detach().numpy()
+        cell_out = cell_out.cpu().detach().numpy()
         x_matrix = self.gcn_feature
-        x_matrix = x_matrix.detach().numpy()
+        x_matrix = x_matrix.cpu().detach().numpy()
+        # todo debug code below and extract relevant node_drugs
+        # todo setup function new_matrix_cell from gaecds model
         drug1 = np.array(node_drug["g_id1"])
         drug2 = np.array(node_drug["g_id2"])
         x_new_matrix = new_matrix_with_cell(drug1, drug2, cell_out, x_matrix)
@@ -199,23 +196,23 @@ class GAECDS(nn.Module):
         self.optim_gae.step()
         print("loss:", loss_model.item())
 
-        def _load_ccle(self):
-            feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "cell_line_features"
-                / "CCLE_954_gene_express_pca.json"
-            )
-            with open(feature_path) as f:
-                all_edge_features = json.load(f)
-            vocab_path = (
-                Directories.DATA_PATH / "gold" / self.dataset / "relation_vocab.json"
-            )
-            with open(vocab_path) as f:
-                entity_vocab = json.load(f)
-            vocab_reverse = {v: k for k, v in entity_vocab.items()}
-            ids = sorted(list(vocab_reverse.keys()))
-            ccle = torch.tensor(
-                [all_edge_features[vocab_reverse[id]] for id in ids], device=device
-            )
-            return ccle
+    def _load_ccle(self):
+        feature_path = (
+            Directories.DATA_PATH
+            / "features"
+            / "cell_line_features"
+            / "CCLE_954_gene_express_pca.json"
+        )
+        with open(feature_path) as f:
+            all_edge_features = json.load(f)
+        vocab_path = (
+            Directories.DATA_PATH / "gold" / self.dataset / "relation_vocab.json"
+        )
+        with open(vocab_path) as f:
+            relation_vocab = json.load(f)
+        vocab_reverse = {v: k for k, v in relation_vocab.items()}
+        ids = sorted(list(vocab_reverse.keys()))
+        ccle = torch.tensor(
+            [all_edge_features[vocab_reverse[id]] for id in ids], device=device
+        )
+        return ccle
