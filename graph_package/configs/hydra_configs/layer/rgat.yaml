@@ -1,0 +1,5 @@
+# @package _global_
+model:
+  layer: 'rgat'
+  enc_kwargs: 
+    dataset: ''
