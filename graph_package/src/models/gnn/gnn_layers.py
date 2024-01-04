@@ -407,8 +407,6 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         return output
 
 
-
-
 class GraphAttentionConv(MessagePassingBase):
     """
     ORIGINAL TORCHDRUG IMPLEMENTATION WITH COMMENTS. THIS IS JUST FOR REFERENCE.
