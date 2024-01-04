@@ -346,8 +346,8 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         input_per_relation = input.expand(self.num_relations+1,*input.shape)
         # tedious way to make [1,1,1 for num_cell_lines,...num_nodes,num_nodes,num_nodes for num_cell_lines]
         weight_index = torch.arange(0,self.num_relations+1).expand(graph.num_node,self.num_relations+1).T.reshape(-1)
-        # maybe we would want to do this for only existising (drug,cell-lines)-pair
-        hidden=torch.bmm(self.W_tau[weight_index],input_per_relation.reshape(-1,input.shape[-1],1))
+
+        hidden = torch.bmm(self.W_tau[weight_index],input_per_relation.reshape(-1,input.shape[-1],1))
         hidden = hidden.reshape(self.num_relations+1,graph.num_node,-1)
 
         key = torch.stack([hidden[relation,node_in], hidden[relation,node_out]], dim=-1)
