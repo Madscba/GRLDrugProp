@@ -138,7 +138,7 @@ class KnowledgeGraphDataset(Dataset):
                  node_feature_dict[drug] = list(one_hot)
 
     
-        # Load PCA nearest neighbor features
+        # Load PCA nearest neighbor featuresLu
         if not self.modalities == 'None':
             pca_feature_path = Directories.DATA_PATH / "features" / "node_features" / "oneil_almanac_drug_features.json"
             with open(pca_feature_path) as f:
