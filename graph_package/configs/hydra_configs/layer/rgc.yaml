@@ -1,4 +1,6 @@
 # @package _global_
 model:
   layer: 'rgc'
-  enc_kwargs: {}
+  enc_kwargs:
+    batch_norm: False
+    feature_dropout: 0.0

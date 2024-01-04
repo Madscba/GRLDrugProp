@@ -4,22 +4,37 @@ import json
 from graph_package.configs.directories import Directories
 import pandas as pd
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MLP(nn.Module):
-    def __init__(self, dim: int, dataset: str, use_mono_response: bool = False):
+    def __init__(
+        self,
+        dim: int,
+        dataset: str,
+        use_mono_response: bool = False,
+        custom_lr_setup: bool = False,
+        batch_norm: bool = False,
+        feature_dropout: float = 0.0,
+    ):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.dataset = dataset
         self.ccle = self._load_ccle()
+        self.feature_dropout = nn.Dropout(feature_dropout)
         cell_line_input_dim = self.ccle.shape[1]
-        self.cell_line_mlp = nn.Sequential(
+        cell_layers = [
             nn.Linear(cell_line_input_dim, 128),
+            nn.BatchNorm1d(128) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
             nn.Linear(128, 64),
+            nn.BatchNorm1d(64) if batch_norm else nn.Identity(),
             nn.ReLU(),
-        )
+            self.feature_dropout,
+        ]
+        self.cell_line_mlp = nn.Sequential(*cell_layers)
 
         if self.use_mono_response:
             self.mono_r_index, self.mono_r = self._load_mono_response(self.dataset)
@@ -27,17 +42,24 @@ class MLP(nn.Module):
         else:
             global_mlp_input_dim = 2 * dim + 64
 
-        self.global_mlp = nn.Sequential(
+        global_layers = [
             nn.Linear(global_mlp_input_dim, 256),
+            nn.BatchNorm1d(256) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
             nn.Linear(256, 128),
+            nn.BatchNorm1d(128) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
             nn.Linear(128, 64),
+            nn.BatchNorm1d(64) if batch_norm else nn.Identity(),
             nn.ReLU(),
+            self.feature_dropout,
             nn.Linear(64, 1),
-        )
+        ]
 
-
+        self.global_mlp = nn.Sequential(*global_layers)
+        # self.global_mlp = nn.Linear(global_mlp_input_dim, 1)
 
     def _load_ccle(self):
         feature_path = (
@@ -84,9 +106,10 @@ class MLP(nn.Module):
 
     def _get_mono_response(self, drug_ids, context_ids):
         sample_ids = list(zip(drug_ids.cpu().numpy(), context_ids.cpu().numpy()))
-        batch_mono_val = [
-            self.mono_r[self.mono_r_index.get_loc(ids)] for ids in sample_ids
-        ]
+        batch_mono_val = torch.vstack(
+            [self.mono_r[self.mono_r_index.get_loc(ids)] for ids in sample_ids]
+        )
+        batch_mono_val = batch_mono_val.to(torch.float32)
         return batch_mono_val
 
     def forward(
