@@ -45,7 +45,7 @@ def main(config):
     model_name = get_model_name(config, sys_args=sys.argv)
     if model_name == "gnn":
         config.dataset.update({"use_node_features": True})
-
+    
     dataset = KnowledgeGraphDataset(**config.dataset)
     update_model_kwargs(config, model_name, dataset)
 
@@ -97,7 +97,7 @@ def main(config):
         call_backs.append(checkpoint_callback)
 
         if (model_name == "hybridmodel") and config.model.pretrain_model:
-            check_point = pretrain_single_model(config, data_loaders, k)
+            check_point = pretrain_single_model(model_name, config, data_loaders, k)
             config.model.update({"ckpt_path": check_point})
 
         model = init_model(

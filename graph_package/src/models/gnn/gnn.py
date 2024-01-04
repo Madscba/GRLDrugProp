@@ -12,20 +12,24 @@ from graph_package.src.models.gnn.gnn_layers import (
     GraphConv,
     DummyLayer,
     GraphAttentionLayer,
-    RelationalGraphAttentionLayer
+    RelationalGraphAttentionLayer,
+    RelationalGraphAttentionConv
 )
+
 from torchdrug.core import Registry as R
 from graph_package.src.models.gnn.prediction_head import MLP, DistMult
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 layer_dict = {
     "rgc": RelationalGraphConv, 
     "gc": GraphConv, 
     "dummy": DummyLayer,
     "gat": GraphAttentionLayer,
-    "rgat": RelationalGraphAttentionLayer
+    "rgat": RelationalGraphAttentionLayer,
+    "rgac": RelationalGraphAttentionConv
 }
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -67,26 +71,20 @@ class GNN(nn.Module, core.Configurable):
     ):
         super(GNN, self).__init__()
         self.graph = graph
-        input_dim_gnn = [graph.node_feature.shape[1]]
         self.enc_kwargs = enc_kwargs
-        self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
+        self.ph_kwargs = ph_kwargs
+        self.update_kwargs(layer,prediction_head, dataset)
 
-        if layer == "gc":
-            self.enc_kwargs.update({"dataset": dataset})
-
-        if prediction_head == "distmult":
-            ph_kwargs.update({"rel_tot": graph.num_relation.item()})
-
-        elif prediction_head == "mlp":
-            ph_kwargs.update({"dataset": dataset})
-
+        input_dim_gnn = [graph.node_feature.shape[1]]
+    
         self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
         self.gnn_layers = self._init_gnn_layers(
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
 
+        dim = self.output_dim if not layer=='dummy' else graph.num_node
         self.prediction_head = prediction_head_dict[prediction_head](
-            dim=self.output_dim, **ph_kwargs
+            dim=dim, **ph_kwargs
         )
         self.short_cut = short_cut
         self.concat_hidden = concat_hidden
@@ -96,7 +94,6 @@ class GNN(nn.Module, core.Configurable):
     ):
         layers = nn.ModuleList()
         dims = input_dim + hidden_dims
-
         for i in range(len(dims) - 1):
             layers.append(
                 layer_dict[layer](
@@ -151,3 +148,14 @@ class GNN(nn.Module, core.Configurable):
         d2 = drug_embeddings[drug_2_ids]
         out = self.prediction_head(d1, d2, context_ids, drug_1_ids, drug_2_ids)
         return out
+
+    def update_kwargs(self, layer,prediction_head,dataset):
+        if layer == "gc":
+            self.enc_kwargs.update({"dataset": dataset})
+
+        if prediction_head == "distmult":
+            self.ph_kwargs.update({"rel_tot": self.graph.num_relation.item()})
+
+        elif prediction_head == "mlp":
+            self.ph_kwargs.update({"dataset": dataset})
+        

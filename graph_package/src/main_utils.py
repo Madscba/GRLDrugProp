@@ -45,22 +45,19 @@ def get_cv_splits(dataset, config):
         return kfold.split(dataset, dataset.get_labels(dataset.indices), group)
 
 
-def pretrain_single_model(config, data_loaders, k):
-    model_name = config.model.pretrain_model
+def pretrain_single_model(model_name, config, data_loaders, k):
     check_point_path = Directories.CHECKPOINT_PATH / model_name
     if os.path.isdir(check_point_path):
         shutil.rmtree(check_point_path)
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
+        dirpath=get_checkpoint_path(config.model.pretrain_model, k), **config.checkpoint_callback
     )
 
     model = init_model(
         model=model_name,
-        task=config.task,
-        model_kwargs=config.model[model_name],
-        logger_enabled=False,
-        target=config.dataset.target,
+        config=config,
+        pretrain=True,
     )
 
     trainer = Trainer(
@@ -94,6 +91,7 @@ def init_model(
     config: dict = None,
     graph: Optional[KnowledgeGraphDataset] = None,
     logger_enabled: bool = True,
+    pretrain: bool = False,
 ):
     """Load model from registry"""
 
@@ -101,8 +99,12 @@ def init_model(
         model = model_dict[model.lower()](
             graph=graph, dataset=config.dataset.name, **config.model
         )
+    elif pretrain:
+         pretrain_model = config.model.pretrain_model
+         model = model_dict[pretrain_model](**config.model[pretrain_model])
     else:
         model = model_dict[model.lower()](**config.model)
+    
     pl_module = BasePL(
         model,
         lr=config.lr,
