@@ -488,8 +488,53 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
         self_loop_edge_list = torch.cat([self_loop_edges, relation_indices], dim=1)
         return self_loop_edge_list
 
-
     def message_and_aggregate(self, graph, input):
+        # Extract triplets from the graph and create self-loop edges
+        n_nodes = input.shape[0]
+        self_loop_edges = torch.stack([torch.arange(n_nodes, device=graph.device)], dim=1).view(-1, 1).repeat(1, 2)
+        self_loop_edge_list = torch.cat([self_loop_edges, torch.ones(n_nodes,1,dtype=torch.int,device=graph.device)*self.num_relation], dim=1)
+        edge_list = torch.cat([graph.edge_list, self_loop_edge_list], dim=0)
+        
+        node_in, node_out, relation = edge_list.t()
+
+        # Handling edge weights, assigning small positive weights to self-edges
+        self_loop_weights = torch.ones(n_nodes, device=graph.device)
+        edge_weight = torch.cat([graph.edge_weight, self_loop_weights])
+
+        # Linear transformation with reshaping for relations
+        Wh = self.W(input).view(-1, self.n_heads, self.n_hidden, self.num_relation+1)
+
+        # Calculate attention coefficients for all attention heads and relations
+        Wh_i = Wh[node_in, :, :, relation]  # Source node features
+        Wh_j = Wh[node_out, :, :, relation]  # Target node features
+
+        Wh_concat = torch.cat([Wh_i, Wh_j], dim=2) # Concatenate source and target features
+
+        # Calculate attention coefficients e_ij for each node pair following eq. 3 [Velickovic] with leaky rely
+        e = torch.einsum("nhd, nhd -> nh", self.attn[relation], Wh_concat)
+        e = F.leaky_relu(e, negative_slope=self.negative_slope)
+
+        # Multiply synergy scores to the attention coefficients including self-loop
+        e *= edge_weight.unsqueeze(1)
+
+        # Normalize attention coefficients and apply dropout
+        a = scatter_softmax(e, node_out, dim=0)
+        a = F.dropout(a, p=self.dropout, training=self.training)
+
+        # Expand 'a' to have the same number of dimensions as 'Wh_j'
+        a = a.unsqueeze(-1).expand_as(Wh_j)
+
+        # Aggregate the attention-weighted node features for each source node and compute final output features
+        # following eq. 4 [Velickovic]
+        h_prime = scatter_add(a * Wh_j, node_in, dim=0, dim_size=input.size(0))
+
+        if self.concat_hidden:
+            # eq. 5 [Velickovic]
+            return h_prime.view(input.shape[0], self.n_heads * self.n_hidden)
+        else:
+            return h_prime.mean(dim=1)
+
+    def message_and_aggregate_old(self, graph, input):
         # Extract triplets from the graph and create self-loop edges
         n_nodes = input.shape[0]
         self_loop_edge_list = self._add_relation_specific_self_loops(n_nodes, graph.device)
