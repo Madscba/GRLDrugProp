@@ -171,21 +171,27 @@ class RelationalGraphConv(MessagePassingBase):
     def message_and_aggregate(self, graph, input):
         assert graph.num_relation == self.num_relation
         node_in, node_out, relation = graph.edge_list.t()
+        # make an index of size num_edges*num_relations
         node_out = node_out * self.num_relation + relation
-        # degree_out = scatter_add(
-        #     graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
-        # )
-        # edge_weight = graph.edge_weight / degree_out[node_out]
-        edge_weight = graph.edge_weight
+        # sum the edge weights for each node_out
+        degree_out = scatter_add(
+            graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
+        )
+        # normalize weights for each node_out by dividing by the sum of the weights
+        edge_weight = graph.edge_weight / (10e-10 + degree_out[node_out])
+
+        # make sparse adjacency matrix of size (graph.num_node, graph.num_node * graph.num_relation)
         adjacency = utils.sparse_coo_tensor(
             torch.stack([node_in, node_out]),
             edge_weight,
             (graph.num_node, graph.num_node * graph.num_relation),
         )
+        # multiply the adjacency matrix with the input tensor, corresponds to the aggregation step
         update = torch.sparse.mm(adjacency.t(), input)
         return update.view(graph.num_node, self.num_relation * self.input_dim)
 
     def combine(self, input, update):
+        # combine the input tensor with the update tensor, corresponds to the update step
         output = self.linear(update) + self.self_loop(input)
         if self.batch_norm:
             output = self.batch_norm(output)
@@ -197,6 +203,7 @@ class RelationalGraphConv(MessagePassingBase):
 
 class DummyLayer(MessagePassingBase):
     def __init__(self, input_dim, output_dim, num_relation, dataset, batch_norm=False):
+        "For testing MLP predictionhead without any GNN aggregation"
         super(DummyLayer, self).__init__()
 
     def message_and_aggregate(self, graph, input):
@@ -255,6 +262,10 @@ class GraphConv(MessagePassingBase):
         return ccle
 
     def transform_input(self, input: torch.Tensor):
+        """
+        Combine the input tensor with the CCLE tensor,
+        by making a tensor of shape (num_relations*num_nodes, input_dim + ccle_dim)
+        """
         ccle = self.ccle
         input_reshaped = input.unsqueeze(1).expand(-1, self.ccle.shape[0], -1)
         ccle_reshaped = ccle.unsqueeze(0).expand(input.shape[0], -1, -1)
@@ -268,11 +279,12 @@ class GraphConv(MessagePassingBase):
         assert graph.num_relation == self.num_relation
         node_in, node_out, relation = graph.edge_list.t()
         node_out = node_out * self.num_relation + relation
-        # degree_out = scatter_add(
-        #     graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
-        # )
-        # edge_weight = graph.edge_weight / degree_out[node_out]
-        edge_weight = graph.edge_weight
+        degree_out = scatter_add(
+            graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
+        )
+        # add small value to demoninator to avoid division by zero when using discrete edge weights
+        edge_weight = graph.edge_weight / (10e-10 + degree_out[node_out])
+
         adjacency = utils.sparse_coo_tensor(
             torch.stack([node_in, node_out]),
             edge_weight,
@@ -289,4 +301,5 @@ class GraphConv(MessagePassingBase):
         output = self.activation(output)
         if self.feature_dropout:
             output = self.feature_dropout(output)
+
         return output

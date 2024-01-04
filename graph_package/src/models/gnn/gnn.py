@@ -33,15 +33,16 @@ class GNN(nn.Module, core.Configurable):
         https://arxiv.org/pdf/1703.06103.pdf
 
     Parameters:
-        input_dim (int): input dimension
-        hidden_dims (list of int): hidden dimensions
-        num_relation (int): number of relations
-        edge_input_dim (int, optional): dimension of edge features
-        short_cut (bool, optional): use short cut or not
-        batch_norm (bool, optional): apply batch normalization or not
-        activation (str or function, optional): activation function
-        concat_hidden (bool, optional): concat hidden representations from all layers as output
-        readout (str, optional): readout function. Available functions are ``sum`` and ``mean``.
+        - graph (torchdrug.Graph): use for messsage passing
+        - hidden_dims (list of int): hidden dimensions
+        - layer (str): key in layer_dict for fetching layer class
+        - prediction_head (str): key in prediction_head_dict for fetching prediction head class
+        - dataset (str): name of dataset
+        - concat_hidden (bool, optional): concat hidden representations from all layers as output
+        - short_cut (bool, optional): use short cut or not
+        - enc_kwargs (dict, optional): additional arguments for layer class
+        - ph_kwargs (dict, optional): additional arguments for prediction head class
+
     """
 
     def __init__(
@@ -130,7 +131,7 @@ class GNN(nn.Module, core.Configurable):
         return node_feature
 
     def forward(self, inputs) -> torch.FloatTensor:
-        """Run a forward pass of the R-GCN model.
+        """Run a forward pass of the GNN model.
 
         :returns: A vector of predicted synergy scores
         """

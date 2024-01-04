@@ -178,7 +178,7 @@ class DistMult(nn.Module):
         drug_1_ids: torch.Tensor,
         drug_2_ids: torch.Tensor,
     ) -> torch.FloatTensor:
-        score = self.score_triplet(context_ids, d1_embd, d2_embd)
+        score = self.score_triplet(d1_embd, d2_embd, context_ids)
         return score
 
     def predict(self, data):
