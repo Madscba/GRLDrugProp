@@ -1,4 +1,6 @@
 # @package _global_
+hidden_dims: [64]
 model:
   layer: 'rgac'
-  enc_kwargs: {}
+  enc_kwargs: 
+    w_per_relation: True

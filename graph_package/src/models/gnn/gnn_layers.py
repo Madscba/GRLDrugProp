@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.utils import checkpoint
-from torch_scatter import scatter_add, scatter_mean, scatter_max
+from torch_scatter import scatter_add, scatter_mean, scatter_max, scatter_softmax
 
 from torchdrug import data, layers, utils
 from graph_package.configs.directories import Directories
@@ -307,7 +307,7 @@ class RelationalGraphAttentionConv(MessagePassingBase):
 
     eps = 1e-10
 
-    def __init__(self, input_dim, output_dim, num_relations, edge_input_dim=None, num_head=1, negative_slope=0.2, concat=True,
+    def __init__(self, input_dim, output_dim, num_relations, w_per_relation=False, edge_input_dim=None, num_head=2, negative_slope=0.2, concat=True,
                  batch_norm=False):
         super(RelationalGraphAttentionConv, self).__init__()
         self.input_dim = input_dim
@@ -315,6 +315,7 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         self.num_head = num_head
         self.concat = concat
         self.num_relations = num_relations
+        self.w_per_relation = w_per_relation
         # call relu bu with a slightly negative slop for negative values
         self.leaky_relu = functools.partial(F.leaky_relu, negative_slope=negative_slope)
 
@@ -328,8 +329,10 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         if output_dim % num_head != 0:
             raise ValueError("Expect output_dim to be a multiplier of num_head, but found `%d` and `%d`"
                              % (output_dim, num_head))
-
-        self.W_tau = nn.Parameter(torch.zeros(self.num_relations+1, output_dim,input_dim))
+        if w_per_relation:
+            self.W_tau = nn.Parameter(torch.zeros(self.num_relations+1, output_dim,input_dim))
+        else:
+            self.W_tau = nn.Parameter(torch.zeros(1, output_dim,input_dim))
         # what they do in torch-geometric 
         nn.init.xavier_uniform(self.W_tau)
         # the idea is that different heads are each allocated to a slice of the hidden vector 
@@ -344,10 +347,17 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         edge_weight = torch.cat([graph.edge_weight, torch.ones(graph.num_node, device=graph.device)])
         edge_weight = edge_weight.unsqueeze(-1)
         input_per_relation = input.expand(self.num_relations+1,*input.shape)
-        # tedious way to make [1,1,1 for num_cell_lines,...num_nodes,num_nodes,num_nodes for num_cell_lines]
-        weight_index = torch.arange(0,self.num_relations+1).expand(graph.num_node,self.num_relations+1).T.reshape(-1)
+        # tedious way to make [0,0,+ for num_cell_lines,...num_nodes,num_nodes,num_nodes for num_cell_lines]
+        
+        if self.w_per_relation:
+            weight_index = torch.arange(0,self.num_relations+1).expand(graph.num_node,self.num_relations+1).T.reshape(-1)
+        else:
+            weight_index = torch.zeros(graph.num_node*(self.num_relations+1),dtype=torch.int32)
+
+        input_per_relation.reshape(-1,input.shape[-1],1)
 
         hidden = torch.bmm(self.W_tau[weight_index],input_per_relation.reshape(-1,input.shape[-1],1))
+
         hidden = hidden.reshape(self.num_relations+1,graph.num_node,-1)
 
         key = torch.stack([hidden[relation,node_in], hidden[relation,node_out]], dim=-1)
@@ -358,9 +368,10 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         # Calculate the dot product between the self.query tensor and the key tensor
         # using Einstein summation notation. The resulting tensor represents the
         # similarity between the query and key vectors for each sample and head.
+        # numerator of 5.20 
         weight = torch.einsum("nhd, nhd -> nh", self.query[relation], key)
         weight = self.leaky_relu(weight)
-
+        
         # the maximum attention for each node, denominator in [Hamilton] eq 5.20, but uses max instead of sum 
         # used to force the largest value to be 1 after taking exp
         max_attention_per_node=scatter_max(weight, node_out, dim=0, dim_size=graph.num_node)[0][node_out]
@@ -394,6 +405,7 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         if self.activation:
             output = self.activation(output)
         return output
+
 
 
 
