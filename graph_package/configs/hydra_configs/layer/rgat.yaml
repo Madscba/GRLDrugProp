@@ -1,5 +1,8 @@
 # @package _global_
+hidden_dims: [64]
 model:
   layer: 'rgat'
   enc_kwargs: 
     dataset: ''
+    num_head: 1
+    dropout: 0.6
