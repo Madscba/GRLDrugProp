@@ -11,6 +11,8 @@ from graph_package.src.models.gnn.gnn_layers import (
     RelationalGraphConv,
     GraphConv,
     DummyLayer,
+    GraphAttentionLayer,
+    RelationalGraphAttentionLayer
 )
 from torchdrug.core import Registry as R
 from graph_package.src.models.gnn.prediction_head import MLP, DistMult
@@ -18,7 +20,13 @@ from graph_package.src.models.gnn.prediction_head import MLP, DistMult
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-layer_dict = {"rgc": RelationalGraphConv, "gc": GraphConv, "dummy": DummyLayer}
+layer_dict = {
+    "rgc": RelationalGraphConv, 
+    "gc": GraphConv, 
+    "dummy": DummyLayer,
+    "gat": GraphAttentionLayer,
+    "rgat": RelationalGraphAttentionLayer
+}
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
