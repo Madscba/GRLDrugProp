@@ -7,16 +7,18 @@ from torchdrug.data import Graph
 import torch
 from torch import nn
 from torchdrug import core
-from graph_package.src.models.gnn.gnn_layers import RelationalGraphConv, GraphConv, DummyLayer
+from graph_package.src.models.gnn.gnn_layers import (
+    RelationalGraphConv,
+    GraphConv,
+    DummyLayer,
+)
 from torchdrug.core import Registry as R
 from graph_package.src.models.gnn.prediction_head import MLP, DistMult
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-layer_dict = {"rgc": RelationalGraphConv,
-              "gc": GraphConv,
-              "dummy": DummyLayer}
+layer_dict = {"rgc": RelationalGraphConv, "gc": GraphConv, "dummy": DummyLayer}
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -40,7 +42,7 @@ class GNN(nn.Module, core.Configurable):
         - short_cut (bool, optional): use short cut or not
         - enc_kwargs (dict, optional): additional arguments for layer class
         - ph_kwargs (dict, optional): additional arguments for prediction head class
-        
+
     """
 
     def __init__(
@@ -60,6 +62,7 @@ class GNN(nn.Module, core.Configurable):
         input_dim_gnn = [graph.node_feature.shape[1]]
         self.enc_kwargs = enc_kwargs
         self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
+
         if layer == "gc":
             self.enc_kwargs.update({"dataset": dataset})
 

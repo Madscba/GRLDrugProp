@@ -118,7 +118,14 @@ class RelationalGraphConv(MessagePassingBase):
 
     eps = 1e-10
 
-    def __init__(self, input_dim, output_dim, num_relation, batch_norm=False):
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        num_relation,
+        batch_norm=False,
+        feature_dropout: float = 0.0,
+    ):
         super(RelationalGraphConv, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -132,6 +139,7 @@ class RelationalGraphConv(MessagePassingBase):
         self.activation = F.relu
         self.self_loop = nn.Linear(input_dim, output_dim)
         self.linear = nn.Linear(num_relation * input_dim, output_dim)
+        self.feature_dropout = nn.Dropout(feature_dropout)
 
     def message(self, graph, input):
         node_in = graph.edge_list[:, 0]
@@ -165,14 +173,13 @@ class RelationalGraphConv(MessagePassingBase):
         node_in, node_out, relation = graph.edge_list.t()
         # make an index of size num_edges*num_relations
         node_out = node_out * self.num_relation + relation
-        
-        # sum the edge weights for each node_out 
+        # sum the edge weights for each node_out
         degree_out = scatter_add(
             graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
         )
         # normalize weights for each node_out by dividing by the sum of the weights
         edge_weight = graph.edge_weight / (10e-10 + degree_out[node_out])
-        
+
         # make sparse adjacency matrix of size (graph.num_node, graph.num_node * graph.num_relation)
         adjacency = utils.sparse_coo_tensor(
             torch.stack([node_in, node_out]),
@@ -189,6 +196,8 @@ class RelationalGraphConv(MessagePassingBase):
         if self.batch_norm:
             output = self.batch_norm(output)
         output = self.activation(output)
+        if self.feature_dropout:
+            output = self.feature_dropout(output)
         return output
 
 
@@ -205,7 +214,15 @@ class DummyLayer(MessagePassingBase):
 
 
 class GraphConv(MessagePassingBase):
-    def __init__(self, input_dim, output_dim, num_relation, dataset, batch_norm=False):
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        num_relation,
+        dataset,
+        batch_norm=False,
+        feature_dropout=0.0,
+    ):
         super(GraphConv, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -221,6 +238,7 @@ class GraphConv(MessagePassingBase):
         self.activation = F.relu
         self.self_loop = nn.Linear(input_dim, output_dim)
         self.linear = nn.Linear(input_dim + cell_feature_size, output_dim)
+        self.feature_dropout = nn.Dropout(feature_dropout)
 
     def _load_ccle(self):
         feature_path = (
@@ -245,10 +263,9 @@ class GraphConv(MessagePassingBase):
 
     def transform_input(self, input: torch.Tensor):
         """
-        Combine the input tensor with the CCLE tensor, 
+        Combine the input tensor with the CCLE tensor,
         by making a tensor of shape (num_relations*num_nodes, input_dim + ccle_dim)
         """
-
         ccle = self.ccle
         input_reshaped = input.unsqueeze(1).expand(-1, self.ccle.shape[0], -1)
         ccle_reshaped = ccle.unsqueeze(0).expand(input.shape[0], -1, -1)
@@ -267,6 +284,7 @@ class GraphConv(MessagePassingBase):
         )
         # add small value to demoninator to avoid division by zero when using discrete edge weights
         edge_weight = graph.edge_weight / (10e-10 + degree_out[node_out])
+
         adjacency = utils.sparse_coo_tensor(
             torch.stack([node_in, node_out]),
             edge_weight,
@@ -281,4 +299,7 @@ class GraphConv(MessagePassingBase):
         if self.batch_norm:
             output = self.batch_norm(output)
         output = self.activation(output)
+        if self.feature_dropout:
+            output = self.feature_dropout(output)
+
         return output
