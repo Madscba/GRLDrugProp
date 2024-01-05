@@ -11,6 +11,7 @@ from graph_package.src.main_utils import (
     update_model_kwargs,
     pretrain_single_model,
     get_cv_splits,
+    generate_drug_embeddings_deepdds,
 )
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
@@ -105,13 +106,12 @@ def main(config):
             config=config,
             graph=train_set.dataset.graph.edge_mask(train_set.indices)
         )
-
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-
+        
         trainer.validate(model, dataloaders=data_loaders["val"])
 
         trainer.fit(
@@ -128,7 +128,13 @@ def main(config):
         if config.wandb:
             wandb.config.checkpoint_path = checkpoint_callback.best_model_path
             wandb.finish()
-
+        if model_name=="deepdds":
+            generate_drug_embeddings_deepdds(
+                model=model,
+                graph=train_set.dataset.graph.edge_mask(train_set.indices),
+                dataset_str=config.dataset.name,
+                fold=k
+            )
         dataset.del_inv_triplets()
         os.remove(checkpoint_callback.best_model_path)
         wandb.finish()

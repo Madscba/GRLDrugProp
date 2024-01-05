@@ -1,5 +1,6 @@
 from graph_package.configs.directories import Directories
 import torch
+import json
 from typing import List, Tuple, Dict, Optional
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
@@ -184,3 +185,21 @@ def split_dataset(
         val_set = Subset(dataset, split_idx[1])
 
     return train_set, val_set
+
+def generate_drug_embeddings_deepdds(model, graph, dataset_str, fold):
+    drug_ids = torch.arange(graph.num_node, device=graph.device)
+    molecules = model.model._get_drug_molecules(drug_ids)
+    features = model.model.drug_conv(
+            molecules, molecules.data_dict["atom_feature"].float()
+        )["node_feature"]
+    features = model.model.drug_readout(molecules, features)
+    dataset_path = dataset_dict[dataset_str.lower()]
+    with open(dataset_path.parents / "entity_vocab.json") as f:
+        drug_vocab = json.load(f)
+    reverse_vocab = {i: drug for drug, i in drug_vocab.items()}
+    drug_feature_dict = {reverse_vocab[i]: features[i] for i in drug_ids}
+    file_name = f"drug_molecule_deepdds_f{fold}.json"
+    save_path = Directories.DATA_PATH / "features" / "deepdds_features" / file_name
+    with open(save_path / file_name, "w") as json_file:
+        json.dump(drug_feature_dict, json_file)
+    return features
