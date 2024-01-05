@@ -5,7 +5,7 @@ data/gold
 data/hetionet
 data/features/node_features
 data/features/cell_line_features/raw/
-
+data/features/drug_features/
 .idea/
 .vscode/
 poetry.lock 
