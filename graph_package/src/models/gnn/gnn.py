@@ -7,14 +7,18 @@ from torchdrug.data import Graph
 import torch
 from torch import nn
 from torchdrug import core
-from graph_package.src.models.gnn.gnn_layers import (
-    RelationalGraphConv,
-    GraphConv,
-    DummyLayer,
+from graph_package.src.models.gnn.att_layers import (
     GraphAttentionLayer,
+    GraphAttentionConv,
     RelationalGraphAttentionLayer,
     RelationalGraphAttentionConv,
     GraphAttentionLayerPerCellLine,
+)
+
+from graph_package.src.models.gnn.conv_layers import (
+    GraphConv,
+    RelationalGraphConv,
+    DummyLayer,
 )
 
 from torchdrug.core import Registry as R
@@ -29,6 +33,7 @@ layer_dict = {
     "gc": GraphConv,
     "dummy": DummyLayer,
     "gat": GraphAttentionLayer,
+    "gac": GraphAttentionConv,
     "rgat": RelationalGraphAttentionLayer,
     "rgac": RelationalGraphAttentionConv,
     "gat_pr_rel": GraphAttentionLayerPerCellLine,
@@ -169,7 +174,7 @@ class GNN(nn.Module, core.Configurable):
         return drug_1_ids, drug_2_ids
 
     def update_kwargs(self, layer, prediction_head, dataset):
-        if layer == "gc":
+        if layer in ["gc", "gac"]:
             self.enc_kwargs.update({"dataset": dataset})
 
         if prediction_head == "distmult":
