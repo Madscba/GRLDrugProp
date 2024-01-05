@@ -7,13 +7,16 @@ from torchdrug.data import Graph
 import torch
 from torch import nn
 from torchdrug import core
-from graph_package.src.models.gnn.gnn_layers import (
-    RelationalGraphConv,
-    GraphConv,
-    DummyLayer,
+from graph_package.src.models.gnn.att_layers import (
     GraphAttentionLayer,
     RelationalGraphAttentionLayer,
-    RelationalGraphAttentionConv
+    RelationalGraphAttentionConv,
+)
+
+from graph_package.src.models.gnn.conv_layers import (
+    GraphConv,
+    RelationalGraphConv,
+    DummyLayer,
 )
 
 from torchdrug.core import Registry as R
@@ -24,12 +27,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 layer_dict = {
-    "rgc": RelationalGraphConv, 
-    "gc": GraphConv, 
+    "rgc": RelationalGraphConv,
+    "gc": GraphConv,
     "dummy": DummyLayer,
     "gat": GraphAttentionLayer,
     "rgat": RelationalGraphAttentionLayer,
-    "rgac": RelationalGraphAttentionConv
+    "rgac": RelationalGraphAttentionConv,
 }
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -73,16 +76,16 @@ class GNN(nn.Module, core.Configurable):
         self.graph = graph
         self.enc_kwargs = enc_kwargs
         self.ph_kwargs = ph_kwargs
-        self.update_kwargs(layer,prediction_head, dataset)
+        self.update_kwargs(layer, prediction_head, dataset)
 
         input_dim_gnn = [graph.node_feature.shape[1]]
-    
+
         self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
         self.gnn_layers = self._init_gnn_layers(
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
 
-        dim = self.output_dim if not layer=='dummy' else graph.num_node
+        dim = self.output_dim if not layer == "dummy" else graph.num_node
         self.prediction_head = prediction_head_dict[prediction_head](
             dim=dim, **ph_kwargs
         )
@@ -149,8 +152,8 @@ class GNN(nn.Module, core.Configurable):
         out = self.prediction_head(d1, d2, context_ids, drug_1_ids, drug_2_ids)
         return out
 
-    def update_kwargs(self, layer,prediction_head,dataset):
-        if layer == "gc":
+    def update_kwargs(self, layer, prediction_head, dataset):
+        if layer in ["gc", "gat"]:
             self.enc_kwargs.update({"dataset": dataset})
 
         if prediction_head == "distmult":
@@ -158,4 +161,3 @@ class GNN(nn.Module, core.Configurable):
 
         elif prediction_head == "mlp":
             self.ph_kwargs.update({"dataset": dataset})
-        
