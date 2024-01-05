@@ -76,7 +76,7 @@ class GNN(nn.Module, core.Configurable):
         input_dim_gnn = [graph.node_feature.shape[1]]
         self.enc_kwargs = enc_kwargs
         self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
-
+        self.layer_name = layer
         if layer == "gc":
             self.enc_kwargs.update({"dataset": dataset})
 
@@ -133,10 +133,7 @@ class GNN(nn.Module, core.Configurable):
         for layer in self.gnn_layers:
             hidden = layer(graph, layer_input)
             if self.short_cut and hidden.shape == layer_input.shape:
-                if (
-                    self.gnn_layers[0].__class__.__name__
-                    == "GraphAttentionLayerPerCellLine"
-                ):
+                if self.layer_name == "gat_pr_rel":
                     layer_input = layer_input.expand(
                         self.gnn_layers[0].num_relations + 1,
                         layer_input.shape[0],
@@ -171,7 +168,7 @@ class GNN(nn.Module, core.Configurable):
         return out
 
     def get_drug_ids(self, drug_1_ids, drug_2_ids, context_ids):
-        if self.gnn_layers[0].__class__.__name__ == "GraphAttentionLayerPerCellLine":
+        if self.layer_name == "gat_pr_rel":
             # If we are using drug embeddings per cell line, we need to fetch the correct embeddings using the context ids
             drug_1_ids = [context_ids, drug_1_ids]
             drug_2_ids = [context_ids, drug_2_ids]
