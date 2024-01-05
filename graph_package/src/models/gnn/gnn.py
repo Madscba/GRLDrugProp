@@ -11,7 +11,8 @@ from graph_package.src.models.gnn.att_layers import (
     GraphAttentionLayer,
     GraphAttentionConv,
     RelationalGraphAttentionLayer,
-    RelationalGraphAttentionConv
+    RelationalGraphAttentionConv,
+    GraphAttentionLayerPerCellLine,
 )
 
 from graph_package.src.models.gnn.conv_layers import (
@@ -35,6 +36,7 @@ layer_dict = {
     "gac": GraphAttentionConv,
     "rgat": RelationalGraphAttentionLayer,
     "rgac": RelationalGraphAttentionConv,
+    "gat_pr_rel": GraphAttentionLayerPerCellLine,
 }
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -77,6 +79,7 @@ class GNN(nn.Module, core.Configurable):
         super(GNN, self).__init__()
         self.graph = graph
         self.enc_kwargs = enc_kwargs
+        self.layer_name = layer
         self.ph_kwargs = ph_kwargs
         self.update_kwargs(layer, prediction_head, dataset)
 
@@ -129,6 +132,12 @@ class GNN(nn.Module, core.Configurable):
         for layer in self.gnn_layers:
             hidden = layer(graph, layer_input)
             if self.short_cut and hidden.shape == layer_input.shape:
+                if self.layer_name == "gat_pr_rel":
+                    layer_input = layer_input.expand(
+                        self.gnn_layers[0].num_relations + 1,
+                        layer_input.shape[0],
+                        layer_input.shape[1],
+                    )
                 hidden = hidden + layer_input
             hiddens.append(hidden)
             layer_input = hidden
@@ -149,10 +158,20 @@ class GNN(nn.Module, core.Configurable):
             lambda x: x.squeeze(), inputs.split(1, dim=1)
         )
         drug_embeddings = self.encode(self.graph, self.graph.node_feature)
-        d1 = drug_embeddings[drug_1_ids]
-        d2 = drug_embeddings[drug_2_ids]
+        drug_1_emb_ids, drug_2_emb_ids = self.get_drug_ids(
+            drug_1_ids, drug_2_ids, context_ids
+        )
+        d1 = drug_embeddings[drug_1_emb_ids]
+        d2 = drug_embeddings[drug_2_emb_ids]
         out = self.prediction_head(d1, d2, context_ids, drug_1_ids, drug_2_ids)
         return out
+
+    def get_drug_ids(self, drug_1_ids, drug_2_ids, context_ids):
+        if self.layer_name == "gat_pr_rel":
+            # If we are using drug embeddings per cell line, we need to fetch the correct embeddings using the context ids
+            drug_1_ids = [context_ids, drug_1_ids]
+            drug_2_ids = [context_ids, drug_2_ids]
+        return drug_1_ids, drug_2_ids
 
     def update_kwargs(self, layer, prediction_head, dataset):
         if layer in ["gc", "gac"]:

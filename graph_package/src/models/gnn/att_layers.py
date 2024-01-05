@@ -363,18 +363,19 @@ class GraphAttentionLayer(MessagePassingBase):
         batch_norm (bool, optional): apply batch normalization on nodes or not
         activation (str or function, optional): activation function
     """
+
     def __init__(
-            self, 
-            input_dim, 
-            output_dim, 
-            num_relation, 
-            dataset, 
-            n_heads: int = 4,
-            negative_slope: int = 0.2,
-            dropout: int = 0.6,
-            concat_hidden=True, 
-            batch_norm=False
-        ):
+        self,
+        input_dim,
+        output_dim,
+        num_relation,
+        dataset,
+        n_heads: int = 4,
+        negative_slope: int = 0.2,
+        dropout: int = 0.6,
+        concat_hidden=True,
+        batch_norm=False,
+    ):
         super(GraphAttentionLayer, self).__init__()
         self.input_dim = input_dim
         self.num_relation = num_relation
@@ -391,14 +392,16 @@ class GraphAttentionLayer(MessagePassingBase):
 
         if self.concat_hidden:
             assert output_dim % n_heads == 0
-            self.n_hidden = output_dim // n_heads 
+            self.n_hidden = output_dim // n_heads
         else:
             self.n_hidden = output_dim
 
         self.output_dim = self.n_hidden * n_heads
-        self.W = nn.Parameter(torch.empty(size=(self.input_dim,  self.n_hidden * n_heads)))
+        self.W = nn.Parameter(
+            torch.empty(size=(self.input_dim, self.n_hidden * n_heads))
+        )
         nn.init.xavier_uniform_(self.W.data)
-        self.attention = nn.Parameter(torch.empty(size=(2*self.n_hidden, 1)))
+        self.attention = nn.Parameter(torch.empty(size=(2 * self.n_hidden, 1)))
         nn.init.xavier_uniform_(self.attention.data)
         self.activation = nn.ELU()
 
@@ -408,7 +411,7 @@ class GraphAttentionLayer(MessagePassingBase):
         """
         n_nodes = Wh.shape[0]
         # Duplicate the transformed input to allow for pairwise interactions
-        Wh_repeat = Wh.repeat(n_nodes, 1, 1) 
+        Wh_repeat = Wh.repeat(n_nodes, 1, 1)
         # Repeat and interleave the transformed input for pairwise interactions
         Wh_repeat_interleave = Wh.repeat_interleave(n_nodes, dim=0)
         # Concatenate the repeated and interleaved inputs along the last dimension
@@ -418,16 +421,22 @@ class GraphAttentionLayer(MessagePassingBase):
         return Wh_concat
 
     def message_and_aggregate(self, graph, input):
-         # Extract duplets from the graph
+        # Extract duplets from the graph
         node_in, node_out, _ = graph.edge_list.t()
         n_nodes = input.shape[0]
 
         # Create an uni-relational adjacency matrix
-        adjacency = torch.zeros((graph.num_node, graph.num_node, 1), dtype=torch.float32, device=graph.device)
+        adjacency = torch.zeros(
+            (graph.num_node, graph.num_node, 1),
+            dtype=torch.float32,
+            device=graph.device,
+        )
         adjacency[node_in, node_out] = 1
 
         # Add self-loops
-        adjacency += torch.eye(graph.num_node, graph.num_node, device=graph.device).unsqueeze(-1)
+        adjacency += torch.eye(
+            graph.num_node, graph.num_node, device=graph.device
+        ).unsqueeze(-1)
 
         # Initial linear transformation to obtain Wh [n_nodes, n_heads, n_hidden]
         Wh = torch.mm(input, self.W).view(n_nodes, self.n_heads, self.n_hidden)
@@ -436,17 +445,19 @@ class GraphAttentionLayer(MessagePassingBase):
         Wh_concat = self._prepare_attentional_mechanism_input(Wh)
 
         # Calculate the attention score e_ij with shape [n_nodes, n_nodes, n_heads]
-        e = F.leaky_relu(torch.matmul(Wh_concat,self.attention),negative_slope=self.negative_slope).squeeze(-1)
+        e = F.leaky_relu(
+            torch.matmul(Wh_concat, self.attention), negative_slope=self.negative_slope
+        ).squeeze(-1)
 
         # Mask based on adjacency matrix
-        e = e.masked_fill(adjacency == 0, float('-inf'))
+        e = e.masked_fill(adjacency == 0, float("-inf"))
 
         # Normalizer following eq. 3 [Velickovic]
         a = F.softmax(e, dim=1)
         a = F.dropout(a, self.dropout, training=self.training)
 
         # Calculate output for each attention head following eq. 4 [Velickovic] (without non-linearity)
-        h_prime = torch.einsum('ijh,jhf->ihf', a, Wh)
+        h_prime = torch.einsum("ijh,jhf->ihf", a, Wh)
 
         # Whether to mean across the multiple attention heads or not
         if self.concat_hidden:
@@ -605,6 +616,112 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
             return h_prime.reshape(input.shape[0], self.n_heads * self.n_hidden)
         else:
             return h_prime.mean(dim=1)
+
+    def combine(self, input, update):
+        output = update
+        if self.batch_norm:
+            output = self.batch_norm(output)
+        if self.activation:
+            output = self.activation(output)
+        return output
+
+class GraphAttentionLayerPerCellLine(RelationalGraphAttentionConv):
+    def __init__(self, *args, **kwargs):
+        super(GraphAttentionLayerPerCellLine, self).__init__(*args, **kwargs)
+
+    def message(self, graph, input: torch.Tensor):
+        # torch.arange(graph.num_node, device=graph.device) is added to make self-loop
+        node_in = torch.cat(
+            [graph.edge_list[:, 0], torch.arange(graph.num_node, device=graph.device)]
+        ).to(torch.int64)
+        node_out = torch.cat(
+            [graph.edge_list[:, 1], torch.arange(graph.num_node, device=graph.device)]
+        ).to(torch.int64)
+        relation = torch.cat(
+            [
+                graph.edge_list[:, 2],
+                (self.num_relations) * torch.ones(graph.num_node, device=graph.device),
+            ]
+        ).to(torch.int64)
+        edge_weight = torch.cat(
+            [graph.edge_weight, torch.ones(graph.num_node, device=graph.device)]
+        )
+        edge_weight = edge_weight.unsqueeze(-1)
+        input_per_relation = input.expand(self.num_relations + 1, *input.shape)
+        # tedious way to make [0,0,+ for num_cell_lines,...num_nodes,num_nodes,num_nodes for num_cell_lines]
+
+        weight_index = torch.zeros(
+            graph.num_node * (self.num_relations + 1), dtype=torch.int64
+        )
+        input_per_relation.reshape(-1, input.shape[-1], 1)
+
+        hidden = torch.bmm(
+            self.W_tau[weight_index], input_per_relation.reshape(-1, input.shape[-1], 1)
+        )
+
+        hidden = hidden.reshape(self.num_relations + 1, graph.num_node, -1)
+
+        key = torch.stack(
+            [hidden[relation, node_in], hidden[relation, node_out]], dim=-1
+        )
+
+        # shape is (n_triplets+n_nodes, num_heads, output_dim * 2 // num_head)
+        key = key.view(key.shape[0], self.num_head, -1)
+
+        # Calculate the dot product between the self.query tensor and the key tensor
+        # using Einstein summation notation. The resulting tensor represents the
+        # similarity between the query and key vectors for each sample and head.
+        # numerator of 5.20
+        weight = torch.einsum("nhd, nhd -> nh", self.query[relation], key)
+        weight = self.leaky_relu(weight)
+
+        # the maximum attention for each node, denominator in [Hamilton] eq 5.20, but uses max instead of sum
+        # used to force the largest value to be 1 after taking exp
+        node_out_rel = node_out * self.num_relations + relation
+        n_rel_nodes = graph.num_node * (self.num_relations + 1)
+        # now find the max attention for each node_out_rel using the node_out_rel as index and expand the max attention for each relation
+        max_attention_per_node = scatter_max(
+            weight, node_out_rel, dim=0, dim_size=n_rel_nodes
+        )[0][node_out_rel]
+
+        # see [Hamilton] eq 5.20
+        attention = (weight - max_attention_per_node).exp()
+        attention = attention * edge_weight
+        # Comment from source: why mean? because with mean we have normalized message scale across different node degrees
+
+        normalizer = scatter_mean(attention, node_out_rel, dim=0, dim_size=n_rel_nodes)[
+            node_out_rel
+        ]
+
+        attention = attention / (normalizer + self.eps)
+        # see eq. 5.19 [Hamilton], this is 'h'
+
+        value = hidden[relation, node_in].view(
+            -1, self.num_head, self.query.shape[-1] // 2
+        )
+        # Copies a_{v,u} for each dimension of output
+        attention = attention.unsqueeze(-1).expand_as(value)
+        message = (attention * value).flatten(1)
+        return message
+
+    def aggregate(self, graph, message):
+        # add self loop
+        node_out = torch.cat(
+            [graph.edge_list[:, 1], torch.arange(graph.num_node, device=graph.device)]
+        )
+        relation = torch.cat(
+            [
+                graph.edge_list[:, 2],
+                (self.num_relations) * torch.ones(graph.num_node, device=graph.device),
+            ]
+        ).to(torch.int64)
+        node_out_rel = node_out * self.num_relations + relation
+        n_rel_nodes = graph.num_node * (self.num_relations + 1)
+        # create an update for each cell line specific drug embedding ((num_relations+1), num_nodes),1)
+        update = scatter_mean(
+            message, node_out_rel, dim=0, dim_size=n_rel_nodes
+        ).reshape((self.num_relations + 1), graph.num_node, -1)
+        return update
 
     def combine(self, input, update):
         output = update
