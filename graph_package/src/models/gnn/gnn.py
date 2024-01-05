@@ -133,6 +133,15 @@ class GNN(nn.Module, core.Configurable):
         for layer in self.gnn_layers:
             hidden = layer(graph, layer_input)
             if self.short_cut and hidden.shape == layer_input.shape:
+                if (
+                    self.gnn_layers[0].__class__.__name__
+                    == "GraphAttentionLayerPerCellLine"
+                ):
+                    layer_input = layer_input.expand(
+                        self.gnn_layers[0].num_relations + 1,
+                        layer_input.shape[0],
+                        layer_input.shape[1],
+                    )
                 hidden = hidden + layer_input
             hiddens.append(hidden)
             layer_input = hidden
@@ -153,7 +162,17 @@ class GNN(nn.Module, core.Configurable):
             lambda x: x.squeeze(), inputs.split(1, dim=1)
         )
         drug_embeddings = self.encode(self.graph, self.graph.node_feature)
-        d1 = drug_embeddings[drug_1_ids]
-        d2 = drug_embeddings[drug_2_ids]
+        drug_1_emb_ids, drug_2_emb_ids = self.get_drug_ids(
+            drug_1_ids, drug_2_ids, context_ids
+        )
+        d1 = drug_embeddings[drug_1_emb_ids]
+        d2 = drug_embeddings[drug_2_emb_ids]
         out = self.prediction_head(d1, d2, context_ids, drug_1_ids, drug_2_ids)
         return out
+
+    def get_drug_ids(self, drug_1_ids, drug_2_ids, context_ids):
+        if self.gnn_layers[0].__class__.__name__ == "GraphAttentionLayerPerCellLine":
+            # If we are using drug embeddings per cell line, we need to fetch the correct embeddings using the context ids
+            drug_1_ids = [context_ids, drug_1_ids]
+            drug_2_ids = [context_ids, drug_2_ids]
+        return drug_1_ids, drug_2_ids

@@ -385,16 +385,16 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         # torch.arange(graph.num_node, device=graph.device) is added to make self-loop
         node_in = torch.cat(
             [graph.edge_list[:, 0], torch.arange(graph.num_node, device=graph.device)]
-        )
+        ).to(dtype=torch.int64)
         node_out = torch.cat(
             [graph.edge_list[:, 1], torch.arange(graph.num_node, device=graph.device)]
-        )
+        ).to(dtype=torch.int64)
         relation = torch.cat(
             [
                 graph.edge_list[:, 2],
                 (self.num_relations) * torch.ones(graph.num_node, device=graph.device),
             ]
-        ).to(torch.int32)
+        ).to(torch.int64)
         edge_weight = torch.cat(
             [graph.edge_weight, torch.ones(graph.num_node, device=graph.device)]
         )
@@ -885,16 +885,16 @@ class GraphAttentionLayerPerCellLine(RelationalGraphAttentionConv):
         # torch.arange(graph.num_node, device=graph.device) is added to make self-loop
         node_in = torch.cat(
             [graph.edge_list[:, 0], torch.arange(graph.num_node, device=graph.device)]
-        )
+        ).to(torch.int64)
         node_out = torch.cat(
             [graph.edge_list[:, 1], torch.arange(graph.num_node, device=graph.device)]
-        )
+        ).to(torch.int64)
         relation = torch.cat(
             [
                 graph.edge_list[:, 2],
                 (self.num_relations) * torch.ones(graph.num_node, device=graph.device),
             ]
-        ).to(torch.int32)
+        ).to(torch.int64)
         edge_weight = torch.cat(
             [graph.edge_weight, torch.ones(graph.num_node, device=graph.device)]
         )
@@ -902,10 +902,8 @@ class GraphAttentionLayerPerCellLine(RelationalGraphAttentionConv):
         input_per_relation = input.expand(self.num_relations + 1, *input.shape)
         # tedious way to make [0,0,+ for num_cell_lines,...num_nodes,num_nodes,num_nodes for num_cell_lines]
 
-        weight_index = (
-            torch.arange(0, self.num_relations + 1)
-            .expand(graph.num_node, self.num_relations + 1)
-            .T.reshape(-1)
+        weight_index = torch.zeros(
+            graph.num_node * (self.num_relations + 1), dtype=torch.int64
         )
         input_per_relation.reshape(-1, input.shape[-1], 1)
 
@@ -931,17 +929,20 @@ class GraphAttentionLayerPerCellLine(RelationalGraphAttentionConv):
 
         # the maximum attention for each node, denominator in [Hamilton] eq 5.20, but uses max instead of sum
         # used to force the largest value to be 1 after taking exp
+        node_out_rel = node_out * self.num_relations + relation
+        n_rel_nodes = graph.num_node * (self.num_relations + 1)
+        # now find the max attention for each node_out_rel using the node_out_rel as index and expand the max attention for each relation
         max_attention_per_node = scatter_max(
-            weight, node_out, dim=0, dim_size=graph.num_node
-        )[0][node_out]
+            weight, node_out_rel, dim=0, dim_size=n_rel_nodes
+        )[0][node_out_rel]
 
         # see [Hamilton] eq 5.20
         attention = (weight - max_attention_per_node).exp()
         attention = attention * edge_weight
         # Comment from source: why mean? because with mean we have normalized message scale across different node degrees
 
-        normalizer = scatter_mean(attention, node_out, dim=0, dim_size=graph.num_node)[
-            node_out
+        normalizer = scatter_mean(attention, node_out_rel, dim=0, dim_size=n_rel_nodes)[
+            node_out_rel
         ]
 
         attention = attention / (normalizer + self.eps)
@@ -960,7 +961,18 @@ class GraphAttentionLayerPerCellLine(RelationalGraphAttentionConv):
         node_out = torch.cat(
             [graph.edge_list[:, 1], torch.arange(graph.num_node, device=graph.device)]
         )
-        update = scatter_mean(message, node_out, dim=0, dim_size=graph.num_node)
+        relation = torch.cat(
+            [
+                graph.edge_list[:, 2],
+                (self.num_relations) * torch.ones(graph.num_node, device=graph.device),
+            ]
+        ).to(torch.int64)
+        node_out_rel = node_out * self.num_relations + relation
+        n_rel_nodes = graph.num_node * (self.num_relations + 1)
+        # create an update for each cell line specific drug embedding ((num_relations+1), num_nodes),1)
+        update = scatter_mean(
+            message, node_out_rel, dim=0, dim_size=n_rel_nodes
+        ).reshape((self.num_relations + 1), graph.num_node, -1)
         return update
 
     def combine(self, input, update):
