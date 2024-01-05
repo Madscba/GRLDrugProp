@@ -25,7 +25,6 @@ class DeepDDS(nn.Module):
     def __init__(
         self,
         dataset_path,
-        context_channels: int = 288,  # cx only have 288 instead 954 as in paper, might have to use other implementation
         context_hidden_dims: List[int] = (2048, 512),  # same as paper
         drug_channels: int = TORCHDRUG_NODE_FEATURES,  # don't know about paper
         drug_gcn_hidden_dims: List[int] = [1024, 512, 156],  # same as paper
@@ -40,6 +39,7 @@ class DeepDDS(nn.Module):
         self.context_vocab = json.load(open(dataset_path.parent / "relation_vocab.json","r"))
         self.drug_features = self.load_drug_features()
         self.context_features = self.load_context_features()
+        context_channels = list(self.context_features.values())[0].shape[1]
         # Check default parameters:
         # Defaults are different from the original implementation.
         if context_hidden_dims is None:
@@ -90,25 +90,33 @@ class DeepDDS(nn.Module):
     def load_drug_features(self):
         path = Directories.DATA_PATH / "bronze" / "drugcomb" / "drug_dict.json"
         drug_dict = json.load(path.open())
+        
         drug_features = {
             id: {
-                "molecule": Molecule.from_smiles(drug_dict[drug]["smiles"]).to(device),
+                "molecule": Molecule.from_smiles(drug_dict[drug]["smiles"].split(';')[0]).to(device),
             }
             for drug, id in self.entity_vocab.items()
         }
+
         return drug_features
 
     def load_context_features(self) -> dict:
         """Get the context feature set."""
-        path = "https://raw.githubusercontent.com/AstraZeneca/chemicalx/main/dataset/drugcomb/context_set.json"
-        with urllib.request.urlopen(path) as url:
-            raw_data = json.loads(url.read().decode())
-        raw_data = {v: torch.FloatTensor(np.array(raw_data[k]).reshape(1, -1)).to(device) for k, v in self.context_vocab.items()}
-        
+        feature_path = (
+            Directories.DATA_PATH
+            / "features"
+            / "cell_line_features"
+            / "CCLE_954_gene_express_pca.json"
+        )
+        with open(feature_path) as f:
+            all_edge_features = json.load(f)
+
+        raw_data = {v: torch.FloatTensor(np.array(all_edge_features[k]).reshape(1, -1)).to(device) for k, v in self.context_vocab.items()}
         return raw_data
 
     def _get_drug_molecules(self, drug_identifiers: Iterable[int]) -> Optional[PackedGraph]:
         return Graph.pack([self.drug_features[drug.item()]["molecule"] for drug in drug_identifiers])
+
     
     def _get_context_features(self, context_identifiers: Iterable[int]) -> Optional[torch.FloatTensor]:
         return torch.cat([self.context_features[context.item()] for context in context_identifiers])
