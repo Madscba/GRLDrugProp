@@ -9,8 +9,9 @@ from torch import nn
 from torchdrug import core
 from graph_package.src.models.gnn.att_layers import (
     GraphAttentionLayer,
+    GraphAttentionConv,
     RelationalGraphAttentionLayer,
-    RelationalGraphAttentionConv,
+    RelationalGraphAttentionConv
 )
 
 from graph_package.src.models.gnn.conv_layers import (
@@ -31,6 +32,7 @@ layer_dict = {
     "gc": GraphConv,
     "dummy": DummyLayer,
     "gat": GraphAttentionLayer,
+    "gac": GraphAttentionConv,
     "rgat": RelationalGraphAttentionLayer,
     "rgac": RelationalGraphAttentionConv,
 }
@@ -153,7 +155,7 @@ class GNN(nn.Module, core.Configurable):
         return out
 
     def update_kwargs(self, layer, prediction_head, dataset):
-        if layer in ["gc", "gat"]:
+        if layer in ["gc", "gac"]:
             self.enc_kwargs.update({"dataset": dataset})
 
         if prediction_head == "distmult":
