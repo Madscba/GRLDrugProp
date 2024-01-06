@@ -187,3 +187,26 @@ class DistMult(nn.Module):
 
     def __name__(self) -> str:
         return "DistMult"
+
+
+class DotProduct(nn.Module):
+    """
+    DotProduct prediction head
+    """
+
+    def __init__(self, dim, dataset: str = ""):
+        super(DotProduct, self).__init__()
+
+    def forward(
+        self,
+        d1_embd: torch.Tensor,
+        d2_embd: torch.Tensor,
+        context_ids: torch.Tensor,
+        drug_1_ids: torch.Tensor,
+        drug_2_ids: torch.Tensor,
+    ) -> torch.FloatTensor:
+        score = (d1_embd * d2_embd).sum(-1)
+        return score
+
+    def __name__(self) -> str:
+        return "DotProduct"

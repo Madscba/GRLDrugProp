@@ -1,0 +1,5 @@
+# @package _global_
+model:
+  prediction_head: 'dotproduct'
+  ph_kwargs:
+    dataset: ""
