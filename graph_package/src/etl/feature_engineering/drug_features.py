@@ -52,9 +52,15 @@ def generate_and_save_rdkit_descriptor(drug_names, mols, save_path):
     drug_2d_rdkit_descriptor = []
     for mol in mols:
         drug_2d_rdkit_descriptor.append(calculate_molecular_descriptors(mol))
-    pd.DataFrame(drug_2d_rdkit_descriptor, index=drug_names).to_csv(
-        save_path / "drug_rdkit_descriptor_2D.csv"
-    )
+    from sklearn.preprocessing import MinMaxScaler
+
+    scaler = MinMaxScaler()
+    drug_features_scaled = scaler.fit_transform(drug_2d_rdkit_descriptor)
+    df = pd.DataFrame(drug_features_scaled, index=drug_names).dropna(axis=1, how="all")
+    column_sums = df.sum(axis=0)
+    zero_sum_columns = column_sums[column_sums == 0].index
+    df = df.drop(columns=zero_sum_columns)
+    df.to_csv(save_path / "drug_rdkit_descriptor_2D.csv")
 
 
 def generate_and_save_maccs_fp(drug_names, mols, save_path):
