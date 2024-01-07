@@ -12,6 +12,7 @@ from graph_package.src.models.gnn.gnn_layers import (
     GraphConv,
     DummyLayer,
     GraphAttentionLayer,
+    GraphAttentionConv,
     RelationalGraphAttentionLayer,
     RelationalGraphAttentionConv
 )
@@ -27,6 +28,7 @@ layer_dict = {
     "rgc": RelationalGraphConv, 
     "gc": GraphConv, 
     "dummy": DummyLayer,
+    "gac": GraphAttentionConv,
     "gat": GraphAttentionLayer,
     "rgat": RelationalGraphAttentionLayer,
     "rgac": RelationalGraphAttentionConv

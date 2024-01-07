@@ -11,7 +11,6 @@ from graph_package.src.main_utils import (
     update_model_kwargs,
     pretrain_single_model,
     get_cv_splits,
-    generate_drug_embeddings_deepdds,
 )
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
@@ -44,7 +43,7 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    if model_name == "gnn":
+    if (model_name == "gnn") & (config.dataset.drug_representation not in ["distmult", "deepdds"]):
         config.dataset.update({"use_node_features": True})
     
     dataset = KnowledgeGraphDataset(**config.dataset)
@@ -67,7 +66,7 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config)]
+        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config, fold=k)]
 
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
@@ -103,6 +102,7 @@ def main(config):
 
         model = init_model(
             model=model_name,
+            fold=k,
             config=config,
             graph=train_set.dataset.graph.edge_mask(train_set.indices)
         )
@@ -128,13 +128,6 @@ def main(config):
         if config.wandb:
             wandb.config.checkpoint_path = checkpoint_callback.best_model_path
             wandb.finish()
-        if model_name=="deepdds":
-            generate_drug_embeddings_deepdds(
-                model=model,
-                graph=train_set.dataset.graph.edge_mask(train_set.indices),
-                dataset_str=config.dataset.name,
-                fold=k
-            )
         dataset.del_inv_triplets()
         os.remove(checkpoint_callback.best_model_path)
         wandb.finish()

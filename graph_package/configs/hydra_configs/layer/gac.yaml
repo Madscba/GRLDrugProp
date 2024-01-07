@@ -1,0 +1,6 @@
+# @package _global_
+hidden_dims: [64]
+model:
+  layer: 'gac'
+  enc_kwargs: 
+    num_head: 1
