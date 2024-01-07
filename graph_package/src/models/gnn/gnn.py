@@ -23,7 +23,7 @@ from graph_package.src.models.gnn.conv_layers import (
 )
 
 from torchdrug.core import Registry as R
-from graph_package.src.models.gnn.prediction_head import MLP, DistMult
+from graph_package.src.models.gnn.prediction_head import MLP, DistMult, DotProduct
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -39,7 +39,10 @@ layer_dict = {
     "gat_pr_rel": GraphAttentionLayerPerCellLine,
 }
 
-prediction_head_dict = {"mlp": MLP, "distmult": DistMult}
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+prediction_head_dict = {"mlp": MLP, "distmult": DistMult, "dotproduct": DotProduct}
 
 
 class GNN(nn.Module, core.Configurable):

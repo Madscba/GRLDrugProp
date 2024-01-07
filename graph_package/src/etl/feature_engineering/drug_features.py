@@ -5,8 +5,7 @@ from graph_package.src.error_analysis.utils import get_drug_info as get_drug_inf
 
 from rdkit import Chem
 from chemopy import Fingerprint
-import time as t
-from tqdm import tqdm
+from rdkit.Chem import Descriptors
 from pathlib import Path
 
 
@@ -16,7 +15,7 @@ def get_feature_path() -> Path:
     return path_to_drug_feature_folder
 
 
-def make_drug_fingerprint_features(get_extended_repr: bool = False):
+def make_drug_fingerprint_features(get_extended_repr: bool = False, dim=None):
     """Function takes drugs from oneil_almanack
 
     We could consider a more advanced fingerprint method:
@@ -30,33 +29,97 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False):
     save_path = get_feature_path()
 
     # morgan_fingerprint:
-    drug_2d_morgan_fingerprint = []
-    for mol in mols:
-        drug_2d_morgan_fingerprint.append(
-            Fingerprint.calculate_morgan_fp(mol, radius=6, nbits=300)
-        )  # Settings from SOTA paper we are implementing
-    pd.DataFrame(drug_2d_morgan_fingerprint, index=drug_names).to_csv(
-        save_path / "drug_ECFP_fp_2D.csv"
-    )
+    generate_and_save_morgan_fp(dim, drug_names, mols, save_path)
 
     # calculate_minhash_atompair_fp
-    drug_2d_minhash_fingerprint = []
+    generate_and_save_minhash_fp(dim, drug_names, mols, save_path)
+
+    generate_and_save_maccs_fp(drug_names, mols, save_path)
+
+    generate_and_save_rdkit_descriptor(drug_names, mols, save_path)
+    #
+    # if get_extended_repr:
+    #     # To obtain 11 2D molecular fingerprints with default folding size, one can use the following:
+    #     drug_2d_fingerprint = []
+    #     for mol in mols:
+    #         drug_2d_fingerprint.append(Fingerprint.get_all_fps(mol))
+    #     pd.DataFrame(drug_2d_fingerprint, index=drug_names).to_csv(
+    #         save_path / "drug_all_fp_2D.csv"
+    #     )
+
+
+def generate_and_save_rdkit_descriptor(drug_names, mols, save_path):
+    drug_2d_rdkit_descriptor = []
     for mol in mols:
-        drug_2d_minhash_fingerprint.append(
-            Fingerprint.calculate_minhash_atompair_fp(mol)
-        )  # Settings from SOTA paper we are implementing
-    pd.DataFrame(drug_2d_minhash_fingerprint, index=drug_names).to_csv(
-        save_path / "drug_MINHASH_fp_2D.csv"
+        drug_2d_rdkit_descriptor.append(calculate_molecular_descriptors(mol))
+    pd.DataFrame(drug_2d_rdkit_descriptor, index=drug_names).to_csv(
+        save_path / "drug_rdkit_descriptor_2D.csv"
     )
 
-    if get_extended_repr:
-        # To obtain 11 2D molecular fingerprints with default folding size, one can use the following:
-        drug_2d_fingerprint = []
-        for mol in mols:
-            drug_2d_fingerprint.append(Fingerprint.get_all_fps(mol))
-        pd.DataFrame(drug_2d_fingerprint, index=drug_names).to_csv(
-            save_path / "drug_all_fp_2D.csv"
-        )
+
+def generate_and_save_maccs_fp(drug_names, mols, save_path):
+    drug_2d_maccs_fingerprint = []
+    for mol in mols:
+        drug_2d_maccs_fingerprint.append(Fingerprint.calculate_maccs_fp(mol))
+    pd.DataFrame(drug_2d_maccs_fingerprint, index=drug_names).to_csv(
+        save_path / "drug_MACCS_fp_2D_.csv"
+    )
+
+
+def generate_and_save_minhash_fp(dim, drug_names, mols, save_path):
+    drug_2d_minhash_fingerprint = []
+    if dim is None:
+        minhash_dim = 2048
+        minhash_fname = "drug_MINHASH_fp_2D.csv"
+    else:
+        minhash_dim = dim
+        minhash_fname = f"drug_MINHASH_fp_2D_{minhash_dim}.csv"
+    for mol in mols:
+        drug_2d_minhash_fingerprint.append(
+            Fingerprint.calculate_minhash_atompair_fp(mol, radius=6, nbits=minhash_dim)
+        )  # Settings from SOTA paper we are implementing
+    pd.DataFrame(drug_2d_minhash_fingerprint, index=drug_names).to_csv(
+        save_path / minhash_fname
+    )
+
+
+def generate_and_save_morgan_fp(dim, drug_names, mols, save_path):
+    drug_2d_morgan_fingerprint = []
+    if dim is None:
+        morgan_dim = 300
+        morgan_fpath = "drug_ECFP_fp_2D.csv"
+    else:
+        morgan_dim = dim
+        morgan_fpath = f"drug_ECFP_fp_2D_{morgan_dim}.csv"
+    for mol in mols:
+        drug_2d_morgan_fingerprint.append(
+            Fingerprint.calculate_morgan_fp(mol, radius=6, nbits=morgan_dim)
+        )  # Settings from SOTA paper we are implementing
+    pd.DataFrame(drug_2d_morgan_fingerprint, index=drug_names).to_csv(
+        save_path / morgan_fpath
+    )
+
+
+def calculate_molecular_descriptors(mol, print_descriptors=False):
+    """
+    get mol descriptors for a molecule (rdkit-type)
+
+    Args:
+    - mol (RDKit Mol): RDKit molecule object.
+
+    Returns:
+    - concatenated_descriptor (list): List of calculated molecular descriptors.
+    """
+
+    mol_descriptors = Descriptors.CalcMolDescriptors(mol)
+    concatenated_descriptor = list(mol_descriptors.values())
+    # fill nan values with 0
+    concatenated_descriptor = [0 if x is None else x for x in concatenated_descriptor]
+
+    if print_descriptors:
+        print(mol_descriptors.keys())
+
+    return concatenated_descriptor
 
 
 def get_drug_SMILES_repr():
@@ -91,4 +154,4 @@ def get_molecules_from_SMILES(drug_SMILES):
 
 
 if __name__ == "__main__":
-    make_drug_fingerprint_features()
+    make_drug_fingerprint_features(dim=83)
