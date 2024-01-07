@@ -7,36 +7,42 @@ from torchdrug.data import Graph
 import torch
 from torch import nn
 from torchdrug import core
-from graph_package.src.models.gnn.gnn_layers import (
-    RelationalGraphConv,
-    GraphConv,
-    DummyLayer,
+from graph_package.src.models.gnn.att_layers import (
     GraphAttentionLayer,
     GraphAttentionConv,
     RelationalGraphAttentionLayer,
-    RelationalGraphAttentionConv
+    RelationalGraphAttentionConv,
+    GraphAttentionLayerPerCellLine,
+)
+
+from graph_package.src.models.gnn.conv_layers import (
+    GraphConv,
+    RelationalGraphConv,
+    DummyLayer,
 )
 
 from torchdrug.core import Registry as R
-from graph_package.src.models.gnn.prediction_head import MLP, DistMult
+from graph_package.src.models.gnn.prediction_head import MLP, DistMult, DotProduct
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 layer_dict = {
-    "rgc": RelationalGraphConv, 
-    "gc": GraphConv, 
+    "rgc": RelationalGraphConv,
+    "gc": GraphConv,
     "dummy": DummyLayer,
     "gac": GraphAttentionConv,
     "gat": GraphAttentionLayer,
+    "gac": GraphAttentionConv,
     "rgat": RelationalGraphAttentionLayer,
-    "rgac": RelationalGraphAttentionConv
+    "rgac": RelationalGraphAttentionConv,
+    "gat_pr_rel": GraphAttentionLayerPerCellLine,
 }
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-prediction_head_dict = {"mlp": MLP, "distmult": DistMult}
+prediction_head_dict = {"mlp": MLP, "distmult": DistMult, "dotproduct": DotProduct}
 
 
 class GNN(nn.Module, core.Configurable):
@@ -74,17 +80,18 @@ class GNN(nn.Module, core.Configurable):
         super(GNN, self).__init__()
         self.graph = graph
         self.enc_kwargs = enc_kwargs
+        self.layer_name = layer
         self.ph_kwargs = ph_kwargs
-        self.update_kwargs(layer,prediction_head, dataset)
+        self.update_kwargs(layer, prediction_head, dataset)
 
         input_dim_gnn = [graph.node_feature.shape[1]]
-    
+
         self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
         self.gnn_layers = self._init_gnn_layers(
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
 
-        dim = self.output_dim if not layer=='dummy' else graph.num_node
+        dim = self.output_dim if not layer == "dummy" else graph.num_node
         self.prediction_head = prediction_head_dict[prediction_head](
             dim=dim, **ph_kwargs
         )
@@ -126,6 +133,12 @@ class GNN(nn.Module, core.Configurable):
         for layer in self.gnn_layers:
             hidden = layer(graph, layer_input)
             if self.short_cut and hidden.shape == layer_input.shape:
+                if self.layer_name == "gat_pr_rel":
+                    layer_input = layer_input.expand(
+                        self.gnn_layers[0].num_relations + 1,
+                        layer_input.shape[0],
+                        layer_input.shape[1],
+                    )
                 hidden = hidden + layer_input
             hiddens.append(hidden)
             layer_input = hidden
@@ -146,13 +159,23 @@ class GNN(nn.Module, core.Configurable):
             lambda x: x.squeeze(), inputs.split(1, dim=1)
         )
         drug_embeddings = self.encode(self.graph, self.graph.node_feature)
-        d1 = drug_embeddings[drug_1_ids]
-        d2 = drug_embeddings[drug_2_ids]
+        drug_1_emb_ids, drug_2_emb_ids = self.get_drug_ids(
+            drug_1_ids, drug_2_ids, context_ids
+        )
+        d1 = drug_embeddings[drug_1_emb_ids]
+        d2 = drug_embeddings[drug_2_emb_ids]
         out = self.prediction_head(d1, d2, context_ids, drug_1_ids, drug_2_ids)
         return out
 
-    def update_kwargs(self, layer,prediction_head,dataset):
-        if layer == "gc":
+    def get_drug_ids(self, drug_1_ids, drug_2_ids, context_ids):
+        if self.layer_name == "gat_pr_rel":
+            # If we are using drug embeddings per cell line, we need to fetch the correct embeddings using the context ids
+            drug_1_ids = [context_ids, drug_1_ids]
+            drug_2_ids = [context_ids, drug_2_ids]
+        return drug_1_ids, drug_2_ids
+
+    def update_kwargs(self, layer, prediction_head, dataset):
+        if layer in ["gc", "gac"]:
             self.enc_kwargs.update({"dataset": dataset})
 
         if prediction_head == "distmult":
@@ -160,4 +183,3 @@ class GNN(nn.Module, core.Configurable):
 
         elif prediction_head == "mlp":
             self.ph_kwargs.update({"dataset": dataset})
-        
