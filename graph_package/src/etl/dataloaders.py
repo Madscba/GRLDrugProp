@@ -161,7 +161,7 @@ class KnowledgeGraphDataset(Dataset):
                 Directories.DATA_PATH
                 / "features"
                 / "drug_features"
-                / "drug_MACCS_fp.csv"
+                / "drug_MACCS_fp_2D_.csv"
             )
             drug_features = pd.read_csv(drug_feature_path, index_col=0)
             for drug in drug_features.index:
@@ -171,7 +171,7 @@ class KnowledgeGraphDataset(Dataset):
                 Directories.DATA_PATH
                 / "features"
                 / "drug_features"
-                / "drug_MINHASH_fp.csv"
+                / "drug_MINHASH_fp_2D.csv"
             )
             drug_features = pd.read_csv(drug_feature_path, index_col=0)
             for drug in drug_features.index:
@@ -181,7 +181,7 @@ class KnowledgeGraphDataset(Dataset):
                 Directories.DATA_PATH
                 / "features"
                 / "drug_features"
-                / "drug_MINHASH_fp_83.csv"
+                / "drug_MINHASH_fp_2D_83.csv"
             )
             drug_features = pd.read_csv(drug_feature_path, index_col=0)
             for drug in drug_features.index:
@@ -191,7 +191,7 @@ class KnowledgeGraphDataset(Dataset):
                 Directories.DATA_PATH
                 / "features"
                 / "drug_features"
-                / "drug_MINHASH_fp_83_rad3.csv"
+                / "drug_MINHASH_fp_2D_83_rad3.csv"
             )
             drug_features = pd.read_csv(drug_feature_path, index_col=0)
             for drug in drug_features.index:
@@ -201,7 +201,7 @@ class KnowledgeGraphDataset(Dataset):
                 Directories.DATA_PATH
                 / "features"
                 / "drug_features"
-                / "drug_rdkit_descriptors.csv"
+                / "drug_rdkit_descriptor_2D.csv"
             )
             drug_features = pd.read_csv(drug_feature_path, index_col=0)
             for drug in drug_features.index:
