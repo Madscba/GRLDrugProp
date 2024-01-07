@@ -19,7 +19,7 @@ dataset:
   name: 'oneil' # deepdds_original, oneil_legacy, oneil_almanac
   target: 'zip_mean' # zip_max, css, loewe (legacy)
   use_node_features: False
-  use_edge_features: False
+  use_edge_features: False  
   drug_representation: morgan # morgan, onehot
   modalities: 'None' # All, Gene, Side Effect, Disease, Pharmacologic Class
   edge_weights: False # continous, discrete, False
