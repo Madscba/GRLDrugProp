@@ -189,7 +189,6 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         return output
 
 
-
 class GraphAttentionConv(MessagePassingBase):
     """
     This is a PyTorch implementation of the GAT operator from the paper 'Graph Attention Networks?'_.
@@ -215,6 +214,7 @@ class GraphAttentionConv(MessagePassingBase):
         output_dim,
         num_relation,
         dataset,
+        cell_line_features="ccle",
         n_heads: int = 1,
         negative_slope: int = 0.2,
         feature_dropout: int = 0.0,
@@ -229,7 +229,11 @@ class GraphAttentionConv(MessagePassingBase):
         self.concat_hidden = concat_hidden
         self.negative_slope = negative_slope
         self.n_heads = n_heads
-        self.ccle = self._load_ccle()
+        self.encoding = (
+            self._load_ccle()
+            if cell_line_features == "ccle"
+            else self.load_cell_line_onehot()
+        )
         if batch_norm:
             self.batch_norm = nn.BatchNorm1d(output_dim)
         else:
@@ -237,7 +241,7 @@ class GraphAttentionConv(MessagePassingBase):
 
         self.n_hidden = output_dim
 
-        dim = self.input_dim + self.ccle.shape[1]
+        dim = self.input_dim + self.encoding.shape[1]
 
         self.output_dim = self.n_hidden
         self.W = nn.Parameter(torch.empty(size=(output_dim, dim)))
@@ -268,18 +272,28 @@ class GraphAttentionConv(MessagePassingBase):
         )
         return ccle
 
+    def load_cell_line_onehot(self):
+        # Define the path to the cell line features file
+        vocab_path = (
+            Directories.DATA_PATH / "gold" / self.dataset / "relation_vocab.json"
+        )
+        with open(vocab_path) as f:
+            entity_vocab = json.load(f)
+
+        return torch.eye(len(entity_vocab), device=device)
+
     def transform_input(self, input: torch.Tensor):
         """
         Combine the input tensor with the CCLE tensor,
         by making a tensor of shape (num_relations, num_nodes, input_dim + ccle_dim)
         """
-        ccle = self.ccle
-        input_reshaped = input.unsqueeze(1).expand(-1, ccle.shape[0], -1)
-        ccle_reshaped = ccle.unsqueeze(0).expand(input.shape[0], -1, -1)
-        combined = torch.cat((input_reshaped, ccle_reshaped), dim=2)
+        encoding = self.encoding
+        input_reshaped = input.unsqueeze(1).expand(-1, encoding.shape[0], -1)
+        encoding_reshaped = encoding.unsqueeze(0).expand(input.shape[0], -1, -1)
+        combined = torch.cat((input_reshaped, encoding_reshaped), dim=2)
         # Reshape the combined tensor to the desired shape
         combined = combined.reshape(
-            ccle.shape[0], input.shape[0], input.shape[1] + ccle.shape[1]
+            encoding.shape[0], input.shape[0], input.shape[1] + encoding.shape[1]
         )
         return combined
 
@@ -344,6 +358,7 @@ class GraphAttentionConv(MessagePassingBase):
             output = self.batch_norm(output)
         output = self.activation(output)
         return output
+
 
 class GraphAttentionLayer(MessagePassingBase):
     """
@@ -624,6 +639,7 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
         if self.activation:
             output = self.activation(output)
         return output
+
 
 class GraphAttentionLayerPerCellLine(RelationalGraphAttentionConv):
     def __init__(self, *args, **kwargs):
