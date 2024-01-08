@@ -1,6 +1,5 @@
 from pytorch_lightning import LightningModule
 from graph_package.src.pl_modules.metrics import RegMetrics, ClfMetrics
-from graph_package.src.pl_modules.explainer import Explainer
 from typing import List, Tuple, Dict, Optional, Union
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from torchmetrics import MeanSquaredError
@@ -32,6 +31,7 @@ class BasePL(LightningModule):
         self.val_metrics = metric("val", target)
         self.test_metrics = metric("test", target)
         self.model = model
+        self.graph = graph
         self.logger_enabled = logger_enabled
         self.l2_reg = l2_reg
         self.model_config = model_config

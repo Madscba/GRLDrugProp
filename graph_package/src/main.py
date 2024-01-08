@@ -71,8 +71,6 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config)]
-
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
         )
@@ -96,6 +94,12 @@ def main(config):
             [train_set, val_set, test_set], batch_sizes=config.batch_sizes
         )
 
+        call_backs = [TestDiagnosticCallback(
+            model_name=model_name, 
+            config=config,
+            graph=train_set.dataset.graph.edge_mask(train_set.indices))
+        ]
+
         checkpoint_callback = ModelCheckpoint(
             dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
         )
@@ -116,29 +120,34 @@ def main(config):
             callbacks=call_backs,
             **config.trainer,
         )
-
-        #trainer.validate(model, dataloaders=data_loaders["val"])
-        hetero_data = transform_hetero_data(train_set.dataset.graph)
-        data_loaders["train"].dataset.dataset.graph = hetero_data
-        trainer.fit(
-            model,
-            train_dataloaders=data_loaders["train"],
-            val_dataloaders=data_loaders["val"],
-        )
-        #input = (hetero_data.x_dict)
-        #ig = IntegratedGradients(model)
-        #attributions, delta = ig.attribute(input, baseline, target=0, return_convergence_delta=True)
-        #print('IG Attributions:', attributions)
-        #print('Convergence Delta:', delta)
-        explain = True
-        if explain:
-            model.eval()
-            explainer = init_explainer(
-                model=model,
-                explainer_algorithm='IG'
+        if False:
+            #trainer.validate(model, dataloaders=data_loaders["val"])
+            hetero_data = transform_hetero_data(train_set.dataset.graph)
+            data_loaders["train"].dataset.dataset.graph = hetero_data
+            trainer.fit(
+                model,
+                train_dataloaders=data_loaders["train"],
+                val_dataloaders=data_loaders["val"],
             )
-            explaination = get_explaination(explainer, data_loaders["train"].dataset.dataset.graph)
-
+            #input = (hetero_data.x_dict)
+            #ig = IntegratedGradients(model)
+            #attributions, delta = ig.attribute(input, baseline, target=0, return_convergence_delta=True)
+            #print('IG Attributions:', attributions)
+            #print('Convergence Delta:', delta)
+            explain = True
+            if explain:
+                model.eval()
+                explainer = init_explainer(
+                    model=model,
+                    explainer_algorithm='IG'
+                )
+                explaination = get_explaination(explainer, data_loaders["train"].dataset.dataset.graph)
+        else:
+            trainer.fit(
+                model,
+                train_dataloaders=data_loaders["train"],
+                val_dataloaders=data_loaders["val"],
+            )
         trainer.test(
             model,
             dataloaders=data_loaders["test"],
@@ -149,7 +158,7 @@ def main(config):
             wandb.finish()
 
         dataset.del_inv_triplets()
-        os.remove(checkpoint_callback.best_model_path)
+        #os.remove(checkpoint_callback.best_model_path)
         wandb.finish()
 
 
