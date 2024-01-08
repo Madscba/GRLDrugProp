@@ -91,7 +91,7 @@ class GNN(nn.Module, core.Configurable):
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
 
-        dim = self.output_dim if not layer == "dummy" else graph.num_node
+        dim = self.output_dim if not layer == "dummy" else input_dim_gnn[0]
         self.prediction_head = prediction_head_dict[prediction_head](
             dim=dim, **ph_kwargs
         )

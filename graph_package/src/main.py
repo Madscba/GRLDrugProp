@@ -130,7 +130,8 @@ def main(config):
             wandb.finish()
 
         dataset.del_inv_triplets()
-        os.remove(checkpoint_callback.best_model_path)
+        if config.remove_old_checkpoints:
+            os.remove(checkpoint_callback.best_model_path)
         wandb.finish()
 
 
