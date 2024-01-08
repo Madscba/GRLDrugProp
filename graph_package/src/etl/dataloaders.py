@@ -207,14 +207,14 @@ class KnowledgeGraphDataset(Dataset):
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
 
-        else:
+        elif self.drug_representation == "onehot":
             for i, (drug, drug_id) in enumerate(drug_vocab.items()):
                 one_hot = np.zeros(len(drug_vocab))
                 one_hot[i] = 1
                 node_feature_dict[drug] = list(one_hot)
 
-        # Load PCA nearest neighbor featuresLu
-        if not self.modalities == "None":
+        # Load PCA nearest neighbor features
+        else:
             pca_feature_path = (
                 Directories.DATA_PATH
                 / "features"
@@ -229,7 +229,7 @@ class KnowledgeGraphDataset(Dataset):
                 "Disease": ["treats"],
                 "Pharmacologic Class": ["includes"],
             }
-            if self.modalities[0] == "All":
+            if self.modalities == "All":
                 self.modalities = [
                     "Gene",
                     "Side Effect",
@@ -248,7 +248,7 @@ class KnowledgeGraphDataset(Dataset):
                 for relation, value in feature.items():
                     if relation in relations_to_include:
                         concatenated_pca_features.extend(value)
-                node_feature_dict[node].extend(concatenated_pca_features)
+                node_feature_dict[node] = concatenated_pca_features
 
         # Convert to a list in correct order determined by graph node ID
         node_features = [

@@ -20,7 +20,7 @@ dataset:
   target: 'zip_mean' # zip_max, css, loewe (legacy)
   use_node_features: False
   use_edge_features: False
-  drug_representation: morgan # morgan, onehot
+  drug_representation: morgan # morgan, onehot, het
   modalities: 'None' # All, Gene, Side Effect, Disease, Pharmacologic Class
   edge_weights: False # continous, discrete, False
 
