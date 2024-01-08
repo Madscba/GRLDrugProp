@@ -3,6 +3,7 @@ import torch
 import json
 from graph_package.configs.directories import Directories
 import pandas as pd
+from typing import List
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -14,6 +15,8 @@ class MLP(nn.Module):
         dim: int,
         dataset: str,
         use_mono_response: bool = False,
+        cell_line_features: str = "ccle",
+        hidden_dims: List[int] = [256, 128, 64],
         custom_lr_setup: bool = False,
         batch_norm: bool = False,
         feature_dropout: float = 0.0,
@@ -21,9 +24,10 @@ class MLP(nn.Module):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.dataset = dataset
-        self.ccle = self._load_ccle()
+        self.encoding = self._load_ccle() if cell_line_features=="ccle" else self.load_cell_line_onehot()
         self.feature_dropout = nn.Dropout(feature_dropout)
-        cell_line_input_dim = self.ccle.shape[1]
+        cell_line_input_dim = self.encoding.shape[1]
+        
         cell_layers = [
             nn.Linear(cell_line_input_dim, 128),
             nn.BatchNorm1d(128) if batch_norm else nn.Identity(),
@@ -42,24 +46,8 @@ class MLP(nn.Module):
         else:
             global_mlp_input_dim = 2 * dim + 64
 
-        global_layers = [
-            nn.Linear(global_mlp_input_dim, 256),
-            nn.BatchNorm1d(256) if batch_norm else nn.Identity(),
-            nn.ReLU(),
-            self.feature_dropout,
-            nn.Linear(256, 128),
-            nn.BatchNorm1d(128) if batch_norm else nn.Identity(),
-            nn.ReLU(),
-            self.feature_dropout,
-            nn.Linear(128, 64),
-            nn.BatchNorm1d(64) if batch_norm else nn.Identity(),
-            nn.ReLU(),
-            self.feature_dropout,
-            nn.Linear(64, 1),
-        ]
+        self.global_mlp = self.create_global_mlp(global_mlp_input_dim, hidden_dims, batch_norm, feature_dropout)
 
-        self.global_mlp = nn.Sequential(*global_layers)
-        # self.global_mlp = nn.Linear(global_mlp_input_dim, 1)
 
     def _load_ccle(self):
         feature_path = (
@@ -81,6 +69,17 @@ class MLP(nn.Module):
             [all_edge_features[vocab_reverse[id]] for id in ids], device=device
         )
         return ccle
+    
+    
+    def load_cell_line_onehot(self):
+        # Define the path to the cell line features file
+        vocab_path = (
+            Directories.DATA_PATH / "gold" / self.dataset / "relation_vocab.json"
+        )
+        with open(vocab_path) as f:
+            entity_vocab = json.load(f)
+
+        return torch.eye(len(entity_vocab), device=device)
 
     def _load_mono_response(self, study_name):
         d_path = Directories.DATA_PATH / "gold" / study_name
@@ -111,6 +110,33 @@ class MLP(nn.Module):
         )
         batch_mono_val = batch_mono_val.to(torch.float32)
         return batch_mono_val
+    
+    def create_global_mlp(self, global_mlp_input_dim, hidden_dims, batch_norm=True, feature_dropout=None):
+        layers = []
+        input_dim = global_mlp_input_dim
+        
+        # Iterate over the hidden dimensions and create linear layers
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(input_dim, hidden_dim))
+            
+            if batch_norm:
+                layers.append(nn.BatchNorm1d(hidden_dim))
+            else:
+                layers.append(nn.Identity())
+            
+            layers.append(nn.ReLU())
+            
+            if feature_dropout is not None:
+                layers.append(nn.Dropout(feature_dropout))
+            
+            input_dim = hidden_dim
+        
+        # Add the final linear layer
+        layers.append(nn.Linear(input_dim, 1))
+        
+        global_mlp = nn.Sequential(*layers)
+    
+        return global_mlp
 
     def forward(
         self,
@@ -120,7 +146,7 @@ class MLP(nn.Module):
         drug_1_ids: torch.Tensor,
         drug_2_ids: torch.Tensor,
     ) -> torch.FloatTensor:
-        c = self.cell_line_mlp(self.ccle[context_ids])
+        c = self.cell_line_mlp(self.encoding[context_ids])
         if self.use_mono_response:
             d1_mono = self._get_mono_response(drug_1_ids, context_ids)
             d2_mono = self._get_mono_response(drug_2_ids, context_ids)
