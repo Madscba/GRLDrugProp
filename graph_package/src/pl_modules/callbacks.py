@@ -85,8 +85,5 @@ class TestDiagnosticCallback(Callback):
             ].values[0]
             top_triplets_with_scores.append((triplet, synergy_score))
 
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-
 
         return
