@@ -2,8 +2,10 @@
 model:
   prediction_head: mlp
   ph_kwargs:
+      hidden_dims: [256, 128, 64]
       dataset: ''
       use_mono_response: False
+      cell_line_features: ccle
       custom_lr_setup:
         value: False
         lr_ph_cell_mlp: 0.01
