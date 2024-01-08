@@ -48,7 +48,7 @@ class BasePL(LightningModule):
             else:
                 context_ids = explainer_edge_ids['edge_label_index']
             inputs = torch.stack([drug_1_ids, drug_2_ids, context_ids], dim=1)
-        return self.model(inputs, node_features)
+        return self.model(inputs)
 
     def _step(self, batch):
         inputs = batch[0]

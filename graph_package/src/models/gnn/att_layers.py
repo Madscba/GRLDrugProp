@@ -531,8 +531,28 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
         self.attention = nn.Parameter(torch.empty(size=((self.num_relation+1), n_heads , output_dim * 2 // n_heads)))
         nn.init.xavier_uniform_(self.attention.data)
         self.activation = nn.ELU() if self.concat_hidden else None
+    
+    def forward(self, graph, input, return_att=False):
+        """
+        Perform message passing over the graph(s).
 
-    def message_and_aggregate(self, graph, input):
+        Parameters:
+            graph (Graph): graph(s)
+            input (Tensor): node representations of shape :math:`(|V|, ...)`
+        """
+        if self.gradient_checkpoint:
+            update = checkpoint.checkpoint(
+                self._message_and_aggregate, *graph.to_tensors(), input
+            )
+        else:
+            if return_att:
+                update, attention = self.message_and_aggregate(graph, input, return_att=return_att)
+            else:
+                update = self.message_and_aggregate(graph, input)
+        output = self.combine(input, update)
+        return output if not return_att else (output, attention)
+
+    def message_and_aggregate(self, graph, input, return_att=False):
         # Extract triplets from the graph and create self-loop edges
         n_nodes = input.shape[0]
         self_loop_edges = torch.stack([torch.arange(n_nodes, device=graph.device)], dim=1).view(-1, 1).repeat(1, 2)
@@ -562,21 +582,22 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
         e *= edge_weight.unsqueeze(1)
 
         # Normalize attention coefficients and apply dropout
-        a = scatter_softmax(e, node_out, dim=0)
-        a = F.dropout(a, p=self.dropout, training=self.training)
+        attention = scatter_softmax(e, node_out, dim=0)
+        attention = F.dropout(attention, p=self.dropout, training=self.training)
 
-        # Expand 'a' to have the same number of dimensions as 'Wh_j'
-        a = a.unsqueeze(-1).expand_as(Wh_i)
+        # Expand 'attention' to have the same number of dimensions as 'Wh_j'
+        a_ij = attention.unsqueeze(-1).expand_as(Wh_j)
 
         # Aggregate the attention-weighted node features for each source node and compute final output features
         # following eq. 4 [Velickovic]
-        h_prime = scatter_add(a * Wh_i, node_in, dim=0, dim_size=input.size(0))
+        h_prime = scatter_add(a_ij * Wh_j, node_in, dim=0, dim_size=input.size(0))
 
         if self.concat_hidden:
             # eq. 5 [Velickovic]
-            return h_prime.view(input.shape[0], self.n_heads * self.n_hidden)
+            update = h_prime.view(input.shape[0], self.n_heads * self.n_hidden)
         else:
-            return h_prime.mean(dim=1)
+            update = h_prime.mean(dim=1)
+        return (update, attention) if return_att else update 
 
     def combine(self, input, update):
         output = update

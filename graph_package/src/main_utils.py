@@ -119,6 +119,7 @@ def init_model(
     
     pl_module = BasePL(
         model,
+        graph=graph,
         lr=config.lr,
         task=config.task,
         logger_enabled=logger_enabled,

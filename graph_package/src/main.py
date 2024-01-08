@@ -71,8 +71,6 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config, fold=k)]
-
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
         )
@@ -99,7 +97,12 @@ def main(config):
         call_backs = [TestDiagnosticCallback(
             model_name=model_name, 
             config=config,
-            graph=train_set.dataset.graph.edge_mask(train_set.indices))
+            graph=train_set.dataset.graph.edge_mask(train_set.indices),
+            fold=k,
+            triplets=dataset.data_df.loc[
+                    :, ["drug_1_id", "drug_2_id", "context_id", "synergy_zip_mean"]
+                ]
+            )
         ]
 
         checkpoint_callback = ModelCheckpoint(
