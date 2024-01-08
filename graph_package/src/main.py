@@ -48,7 +48,7 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    if model_name == "gnn":
+    if (model_name == "gnn") & (config.dataset.drug_representation not in ["distmult", "deepdds"]):
         config.dataset.update({"use_node_features": True})
     
     dataset = KnowledgeGraphDataset(**config.dataset)
@@ -70,6 +70,8 @@ def main(config):
                 config=dict(config),
             )
             loggers.append(WandbLogger())
+
+        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config, fold=k)]
 
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
@@ -111,43 +113,24 @@ def main(config):
 
         model = init_model(
             model=model_name,
+            fold=k,
             config=config,
             graph=train_set.dataset.graph.edge_mask(train_set.indices)
         )
-        
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-        if False:
-            #trainer.validate(model, dataloaders=data_loaders["val"])
-            hetero_data = transform_hetero_data(train_set.dataset.graph)
-            data_loaders["train"].dataset.dataset.graph = hetero_data
-            trainer.fit(
-                model,
-                train_dataloaders=data_loaders["train"],
-                val_dataloaders=data_loaders["val"],
-            )
-            #input = (hetero_data.x_dict)
-            #ig = IntegratedGradients(model)
-            #attributions, delta = ig.attribute(input, baseline, target=0, return_convergence_delta=True)
-            #print('IG Attributions:', attributions)
-            #print('Convergence Delta:', delta)
-            explain = True
-            if explain:
-                model.eval()
-                explainer = init_explainer(
-                    model=model,
-                    explainer_algorithm='IG'
-                )
-                explaination = get_explaination(explainer, data_loaders["train"].dataset.dataset.graph)
-        else:
-            trainer.fit(
-                model,
-                train_dataloaders=data_loaders["train"],
-                val_dataloaders=data_loaders["val"],
-            )
+        
+        trainer.validate(model, dataloaders=data_loaders["val"])
+
+        trainer.fit(
+            model,
+            train_dataloaders=data_loaders["train"],
+            val_dataloaders=data_loaders["val"],
+        )
+
         trainer.test(
             model,
             dataloaders=data_loaders["test"],
@@ -156,7 +139,6 @@ def main(config):
         if config.wandb:
             wandb.config.checkpoint_path = checkpoint_callback.best_model_path
             wandb.finish()
-
         dataset.del_inv_triplets()
         if config.remove_old_checkpoints:
             os.remove(checkpoint_callback.best_model_path)

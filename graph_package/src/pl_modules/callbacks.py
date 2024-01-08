@@ -3,7 +3,8 @@ from graph_package.src.error_analysis.utils import (
     save_model_pred,
 )
 from graph_package.src.main_utils import (
-    init_model
+    init_model,
+    save_pretrained_drug_embeddings
 )
 from graph_package.src.models.hybridmodel import remove_prefix_from_keys
 from pytorch_lightning.callbacks import Callback
@@ -13,11 +14,11 @@ from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 import torch
 
 class TestDiagnosticCallback(Callback):
-    def __init__(self, model_name, config: DictConfig, graph: KnowledgeGraphDataset) -> None:
+    def __init__(self, model_name, config: DictConfig, graph: KnowledgeGraphDataset, fold: int) -> None:
         self.model_name = model_name
         self.config = config
         self.graph = graph
-        super().__init__()
+        self.fold = fold
 
     def on_test_end(self, trainer, pl_module):
         # save and perform err_diag
@@ -47,6 +48,9 @@ class TestDiagnosticCallback(Callback):
                 torch.load(trainer.checkpoint_callback.best_model_path)["state_dict"], "model."
             )
             model.load_state_dict(state_dict)
+        # save pretrained drug embeddings
+        if self.model_name in ["deepdds", "distmult"]:
+            save_pretrained_drug_embeddings(model=pl_module,fold=self.fold)
         pl_module.test_step_outputs.clear()
 
     def _explain_attention(self,batch,model):
