@@ -32,7 +32,6 @@ layer_dict = {
     "rgc": RelationalGraphConv,
     "gc": GraphConv,
     "dummy": DummyLayer,
-    "gac": GraphAttentionConv,
     "gat": GraphAttentionLayer,
     "gac": GraphAttentionConv,
     "rgat": RelationalGraphAttentionLayer,
