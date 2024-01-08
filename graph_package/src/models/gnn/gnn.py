@@ -6,6 +6,7 @@ from torch.nn.functional import normalize
 from torchdrug.data import Graph
 import torch
 from torch import nn
+import numpy as np
 from torchdrug import core
 from graph_package.src.models.gnn.att_layers import (
     GraphAttentionLayer,
@@ -27,7 +28,6 @@ from graph_package.src.models.gnn.prediction_head import MLP, DistMult, DotProdu
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 layer_dict = {
     "rgc": RelationalGraphConv,
     "gc": GraphConv,
@@ -38,6 +38,7 @@ layer_dict = {
     "rgac": RelationalGraphAttentionConv,
     "gat_pr_rel": GraphAttentionLayerPerCellLine,
 }
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -85,12 +86,12 @@ class GNN(nn.Module, core.Configurable):
 
         input_dim_gnn = [graph.node_feature.shape[1]]
 
-        self.output_dim = hidden_dims[-1] * (len(hidden_dims) if concat_hidden else 1)
+        self.output_dim = hidden_dims[-1] if not concat_hidden else np.sum(hidden_dims)
         self.gnn_layers = self._init_gnn_layers(
             layer, input_dim_gnn, hidden_dims, enc_kwargs
         )
 
-        dim = self.output_dim if not layer == "dummy" else graph.num_node
+        dim = self.output_dim if not layer == "dummy" else input_dim_gnn[0]
         self.prediction_head = prediction_head_dict[prediction_head](
             dim=dim, **ph_kwargs
         )

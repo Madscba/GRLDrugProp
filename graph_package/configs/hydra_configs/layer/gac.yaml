@@ -3,5 +3,5 @@ model:
   layer: 'gac'
   enc_kwargs: 
     dataset: ''
-    dropout: 0.0
+    feature_dropout: 0.0
     n_heads: 1

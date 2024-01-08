@@ -1,4 +1,5 @@
 
 hidden_dims: [256]
+concat_hidden: False
 enc_kwargs:
 ph_kwargs:
