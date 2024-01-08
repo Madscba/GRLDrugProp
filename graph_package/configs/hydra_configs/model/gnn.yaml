@@ -1,0 +1,4 @@
+
+hidden_dims: [256]
+enc_kwargs:
+ph_kwargs:

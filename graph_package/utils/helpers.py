@@ -29,16 +29,8 @@ def remove_prefix_from_keys(d, prefix):
 
 def init_logger():
     # Create a logger object
-    log_path = Directories.MODULE_PATH / "logs"
-    log_path.mkdir(exist_ok=True)
-    log_file = log_path / "log.txt"
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-
     # Create a file handler
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(logging.DEBUG)
-
     # Create a stream handler with colored output
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setLevel(logging.DEBUG)
@@ -54,11 +46,9 @@ def init_logger():
             },
         )
     )
-
     # Add the handlers to the logger
-    logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
-
+    logger.propagate = False
     return logger
 
 logger = init_logger()

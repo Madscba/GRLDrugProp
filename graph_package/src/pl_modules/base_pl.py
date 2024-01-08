@@ -20,7 +20,9 @@ class BasePL(LightningModule):
         lr: float = 0.001,
         task: str = "clf",
         logger_enabled: bool = True,
-        target: str = "zip_mean"
+        target: str = "zip_mean",
+        l2_reg: bool = False,
+        model_config: dict = {},
     ):
         super().__init__()
         self.lr = lr
@@ -31,7 +33,8 @@ class BasePL(LightningModule):
         self.test_metrics = metric("test", target)
         self.model = model
         self.logger_enabled = logger_enabled
-        self.graph = graph
+        self.l2_reg = l2_reg
+        self.model_config = model_config
 
     def forward(self, inputs, *explainer_node_ids, **explainer_edge_ids):
         node_features = self.graph.node_feature
@@ -82,6 +85,14 @@ class BasePL(LightningModule):
                 prog_bar=True,
                 logger=self.logger_enabled,
             )
+
+        if self.l2_reg:
+            self.weight_decay = 1e-5
+            l2_regularization = 0.0
+            for param in self.parameters():
+                l2_regularization += torch.norm(param, p=2)
+            loss += 0.5 * self.weight_decay * l2_regularization
+
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -131,4 +142,29 @@ class BasePL(LightningModule):
         return
 
     def configure_optimizers(self):
-        return Adam(self.model.parameters(), lr=self.lr)
+        if "ph_kwargs" in self.model_config:
+            if self.model.prediction_head.__class__.__name__ == "MLP":
+                pk_kwargs = self.model_config.ph_kwargs
+                self.custom_lr_setup = pk_kwargs.custom_lr_setup.value
+                if self.custom_lr_setup:
+                    lr_setup = pk_kwargs.custom_lr_setup
+                    return Adam(
+                        [
+                            {
+                                "params": self.model.gnn_layers.parameters(),
+                                "lr": self.lr,
+                            },
+                            {
+                                "params": self.model.prediction_head.cell_line_mlp.parameters(),
+                                "lr": lr_setup.lr_ph_cell_mlp,
+                            },
+                            {
+                                "params": self.model.prediction_head.global_mlp.parameters(),
+                                "lr": lr_setup.lr_ph_global_mlp,
+                            },
+                        ]
+                    )
+            return Adam(self.model.parameters(), lr=self.lr)
+
+        else:
+            return Adam(self.model.parameters(), lr=self.lr)

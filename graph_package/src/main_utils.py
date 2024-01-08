@@ -21,8 +21,8 @@ from torch_geometric.data import HeteroData
 def get_drug_split(dataset, config, n_drugs_per_fold=3):
     splits = []
     df = dataset.data_df
-    for i in range(0, dataset.num_nodes, n_drugs_per_fold):
-        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.num_nodes)))
+    for i in range(0, dataset.graph.num_node, n_drugs_per_fold):
+        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.graph.num_node)))
         drug_1_idx = df[df["drug_1_id"].isin(drug_ids)].index
         drug_2_idx = df[df["drug_2_id"].isin(drug_ids)].index
         test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
@@ -48,22 +48,19 @@ def get_cv_splits(dataset, config):
         return kfold.split(dataset, dataset.get_labels(dataset.indices), group)
 
 
-def pretrain_single_model(config, data_loaders, k):
-    model_name = config.model.pretrain_model
+def pretrain_single_model(model_name, config, data_loaders, k):
     check_point_path = Directories.CHECKPOINT_PATH / model_name
     if os.path.isdir(check_point_path):
         shutil.rmtree(check_point_path)
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
+        dirpath=get_checkpoint_path(config.model.pretrain_model, k), **config.checkpoint_callback
     )
 
     model = init_model(
         model=model_name,
-        task=config.task,
-        model_kwargs=config.model[model_name],
-        logger_enabled=False,
-        target=config.dataset.target,
+        config=config,
+        pretrain=True,
     )
 
     trainer = Trainer(
@@ -92,32 +89,34 @@ def reset_wandb_env():
             del os.environ[k]
 
 
-def load_data(dataset_config: dict, task="reg"):
-    """Fetch formatted data depending on modelling task"""
-    dataset_path = dataset_dict[dataset_config.name.lower()]
-    data_loader = KnowledgeGraphDataset(
-        dataset_path, task=task, target=dataset_config.target,
-        use_node_features=dataset_config.use_node_features,
-        modalities=dataset_config.modalities,
-        use_edge_features=dataset_config.use_edge_features
-    )
-    return data_loader
-
-
 def init_model(
     model: str = "deepdds",
-    task: str = "clf",
-    target: str = "zip_mean",
-    model_kwargs: dict = {},
+    config: dict = None,
     graph: Optional[KnowledgeGraphDataset] = None,
     logger_enabled: bool = True,
+    pretrain: bool = False,
 ):
     """Load model from registry"""
-    if model == "rgcn":
-        model = model_dict[model.lower()](graph,**model_kwargs)
+
+    if model == "gnn":
+        model = model_dict[model.lower()](
+            graph=graph, dataset=config.dataset.name, **config.model
+        )
+    elif pretrain:
+         pretrain_model = config.model.pretrain_model
+         model = model_dict[pretrain_model](**config.model[pretrain_model])
     else:
-        model = model_dict[model.lower()](**model_kwargs)
-    pl_module = BasePL(model, task=task, logger_enabled=logger_enabled, target=target, graph=graph)
+        model = model_dict[model.lower()](**config.model)
+    
+    pl_module = BasePL(
+        model,
+        lr=config.lr,
+        task=config.task,
+        logger_enabled=logger_enabled,
+        target=config.dataset.target,
+        l2_reg=config.l2_reg,
+        model_config=config.model,
+    )
     return pl_module
 
 def transform_hetero_data(graph: KnowledgeGraphDataset):
@@ -206,11 +205,14 @@ def update_shallow_embedding_args(dataset):
     }
     return update_dict
 
+
 def update_deepdds_args(config):
     return {"dataset_path": dataset_dict[config.dataset.name]}
 
+
 def update_rgcn_args(config):
     return {"dataset_path": dataset_dict[config.dataset.name]}
+
 
 def update_model_kwargs(config: dict, model_name: str, dataset):
     if model_name.startswith("deepdds"):
@@ -218,9 +220,9 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
         config.model.rescal.update(update_shallow_embedding_args(dataset))
-    elif model_name =="rgcn":
+    elif model_name == "gnn":
         pass
-        #config.model.update(update_rgcn_args(config))
+        # config.model.update(update_rgcn_args(config))
     else:
         config.model.update(update_shallow_embedding_args(dataset))
 

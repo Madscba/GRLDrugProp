@@ -1,10 +1,10 @@
 deepdds:
   dataset_path: ''
 rescal: 
-  dim: 100
+  dim: 256 
   ent_tot: ''
   rel_tot: ''
 
 ckpt_path: ''
-pretrain_model: "rescal"
+pretrain_model: "deepdds"
 comb_weight_req_grad: True 

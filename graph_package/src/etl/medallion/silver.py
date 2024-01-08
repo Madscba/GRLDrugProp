@@ -6,11 +6,8 @@ import json
 import os
 import requests
 import bz2
-from graph_package.src.etl.medallion.bronze import (
-    download_response_info_drugcomb,
-    load_block_ids,
-)
-
+from graph_package.src.etl.medallion.bronze import download_response_info_drugcomb
+from graph_package.src.etl.medallion.load import load_block_ids
 
 def load_drugcomb():
     data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
@@ -167,8 +164,7 @@ def generate_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
         df_study_cleaned = df_study.dropna(
             subset=["drug_row", "drug_col", "synergy_zip"]
         )
-        if study == "oneil_almanac":
-            df_study_cleaned = filter_from_hetionet(df_study_cleaned)
+        df_study_cleaned = filter_from_hetionet(df_study_cleaned)
         unique_block_ids = df_study_cleaned["block_id"].unique().tolist()
         download_response_info(unique_block_ids, study, overwrite=False)
         df_study_cleaned = df_study_cleaned.loc[
@@ -205,4 +201,4 @@ def download_response_info(list_entities, study_names="oneil", overwrite=False):
 
 
 if __name__ == "__main__":
-    generate_oneil_almanac_dataset(studies=["oneil_almanac"])
+    generate_oneil_almanac_dataset(studies=["oneil_almanac","oneil"])

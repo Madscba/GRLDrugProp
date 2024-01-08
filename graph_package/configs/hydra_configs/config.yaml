@@ -6,6 +6,7 @@ defaults:
 run_name: 'NO_NAME'
 wandb: False
 lr: 0.001
+l2_reg: False
 batch_sizes: {"train": 128,"val": 1000, "test": 10000}
 group_val: False
 
@@ -18,13 +19,15 @@ dataset:
   name: 'oneil' # deepdds_original, oneil_legacy, oneil_almanac
   target: 'zip_mean' # zip_max, css, loewe (legacy)
   use_node_features: False
-  modalities: 'None' # All, Gene, Side Effect, Disease, Pharmacologic Class
   use_edge_features: False
+  drug_representation: morgan # morgan, onehot
+  modalities: 'None' # All, Gene, Side Effect, Disease, Pharmacologic Class
+  edge_weights: False # continous, discrete, False
 
 checkpoint_callback:
-  mode: 'max'
-  filename: '{epoch:02d}-{val_auroc:.4f}'
-  monitor: 'val_auroc'
+  mode: 'min'
+  filename: '{epoch:02d}-{val_mse:.4f}'
+  monitor: 'val_mse'
   save_top_k: 1
 
 trainer:  
