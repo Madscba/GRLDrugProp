@@ -15,6 +15,43 @@ import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 
 
+def get_drug_few_shot_split(dataset, config, n_drugs_per_fold=3, max_train_triplets=10):
+    """Split into 5 folds"""
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    degrees = (
+        (dataset.graph.data.degree_in + dataset.graph.data.degree_out).cpu().numpy()
+    )
+    plt.hist(degrees)
+    df_degrees = pd.DataFrame(degrees)
+    plt.title(
+        f"quartiles: {df_degrees.quantile([0.25, 0.5, 0.75])}. median: {df_degrees.median()}"
+    )
+    plt.show()
+    plt.savefig("degree_dist_histogram.png")
+
+    splits = []
+    df = dataset.data_df
+    for i in range(0, dataset.graph.num_node, n_drugs_per_fold):
+        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.graph.num_node)))
+        # put x triplets from test drugs in train
+        test_idx = []
+        for drug_id in drug_ids:
+            drug_1_idx = df[df["drug_1_id"] == drug_id].index
+            drug_2_idx = df[df["drug_2_id"] == drug_id].index
+            drug_test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
+            n_triplets_to_include_in_train = min(len(drug_test_idx), max_train_triplets)
+            # take n_triplets_to_include_in_train and put in test, use remainder for test
+            test_idx = test_idx + drug_test_idx[n_triplets_to_include_in_train:]
+
+        test_idx = set(test_idx)
+        train_idx = list(set(dataset.data_df.index).difference(test_idx))
+        splits.append((train_idx, test_idx))
+
+    return splits
+
+
 def get_drug_split(dataset, config, n_drugs_per_fold=3):
     splits = []
     df = dataset.data_df
@@ -31,6 +68,9 @@ def get_drug_split(dataset, config, n_drugs_per_fold=3):
 def get_cv_splits(dataset, config):
     if config.group_val == "drug":
         splits = get_drug_split(dataset, config)
+        return splits
+    elif config.group_val == "drug_few_shot":
+        splits = get_drug_few_shot_split(dataset, config)
         return splits
     else:
         if config.group_val == "drug_combination":
@@ -51,7 +91,8 @@ def pretrain_single_model(model_name, config, data_loaders, k):
         shutil.rmtree(check_point_path)
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=get_checkpoint_path(config.model.pretrain_model, k), **config.checkpoint_callback
+        dirpath=get_checkpoint_path(config.model.pretrain_model, k),
+        **config.checkpoint_callback,
     )
 
     model = init_model(
@@ -100,11 +141,11 @@ def init_model(
             graph=graph, dataset=config.dataset.name, **config.model
         )
     elif pretrain:
-         pretrain_model = config.model.pretrain_model
-         model = model_dict[pretrain_model](**config.model[pretrain_model])
+        pretrain_model = config.model.pretrain_model
+        model = model_dict[pretrain_model](**config.model[pretrain_model])
     else:
         model = model_dict[model.lower()](**config.model)
-    
+
     pl_module = BasePL(
         model,
         lr=config.lr,
