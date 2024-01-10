@@ -14,14 +14,41 @@ from sklearn.model_selection import StratifiedGroupKFold
 import numpy as np
 import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+import matplotlib.pyplot as plt
+import pandas as pd
 
 random.seed(4)  # set seed for reproducibility of shuffle get_drug_few_shot_split
 
 
+def generate_histogram_of_node_degrees(dataset, dataset_name):
+    """For group_val = drug_few_shot, generate histogram of node degrees to properly design limited connectivity exp."""
+    degrees = (
+        (dataset.graph.data.degree_in + dataset.graph.data.degree_out).cpu().numpy()
+    )
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, gridspec_kw={"height_ratios": [3, 1]}, figsize=(8, 6)
+    )
+    ax1.hist(degrees, bins=40, color="skyblue", edgecolor="black")
+    ax1.set_title("Degree Distribution Histogram")
+    ax1.set_xlabel("Degrees")
+    ax1.set_ylabel("Frequency")
+    ax1.grid(axis="y", linestyle="--", alpha=0.7)
+    df_degrees = pd.DataFrame(degrees)
+    ax2.boxplot(degrees, vert=False)
+    ax2.set_title("Summary Statistics of Degrees")
+    ax2.set_xlabel("Degrees")
+    ax2.grid(axis="x", linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    output_path = Directories.OUTPUT_PATH
+    plt.savefig(output_path / f"degree_dist_histogram_{dataset_name}.png")
+    plt.show()
+
+
 def get_drug_few_shot_split(
-    dataset, config, n_drugs_per_fold=8, print_split_stats=False
+    dataset, config, n_drugs_per_fold=8, print_split_stats=True
 ):
     """Split into 5 folds"""
+    generate_histogram_of_node_degrees(dataset, dataset_name=config.dataset.name)
     all_drugs_ids = list(range(0, dataset.graph.num_node))
     random.shuffle(all_drugs_ids)
     splits = []
