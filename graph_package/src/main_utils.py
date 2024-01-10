@@ -8,47 +8,50 @@ from graph_package.src.pl_modules import BasePL
 from torch.utils.data import random_split, Subset
 from torchdrug.data import DataLoader
 import os
+import random
 from pytorch_lightning import Trainer
 from sklearn.model_selection import StratifiedGroupKFold
 import numpy as np
 import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 
+random.seed(4)  # set seed for reproducibility of shuffle get_drug_few_shot_split
 
-def get_drug_few_shot_split(dataset, config, n_drugs_per_fold=3, max_train_triplets=10):
+
+def get_drug_few_shot_split(
+    dataset, config, n_drugs_per_fold=8, print_split_stats=False
+):
     """Split into 5 folds"""
-    import matplotlib.pyplot as plt
-    import pandas as pd
-
-    degrees = (
-        (dataset.graph.data.degree_in + dataset.graph.data.degree_out).cpu().numpy()
-    )
-    plt.hist(degrees)
-    df_degrees = pd.DataFrame(degrees)
-    plt.title(
-        f"quartiles: {df_degrees.quantile([0.25, 0.5, 0.75])}. median: {df_degrees.median()}"
-    )
-    plt.show()
-    plt.savefig("degree_dist_histogram.png")
-
+    all_drugs_ids = list(range(0, dataset.graph.num_node))
+    random.shuffle(all_drugs_ids)
     splits = []
     df = dataset.data_df
     for i in range(0, dataset.graph.num_node, n_drugs_per_fold):
-        drug_ids = list(range(i, min(i + n_drugs_per_fold, dataset.graph.num_node)))
+        drug_ids = all_drugs_ids[
+            i : min(i + n_drugs_per_fold, dataset.graph.num_node.cpu().numpy())
+        ]
         # put x triplets from test drugs in train
         test_idx = []
         for drug_id in drug_ids:
             drug_1_idx = df[df["drug_1_id"] == drug_id].index
             drug_2_idx = df[df["drug_2_id"] == drug_id].index
             drug_test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
-            n_triplets_to_include_in_train = min(len(drug_test_idx), max_train_triplets)
+            random.shuffle(drug_test_idx)
+            n_triplets_to_include_in_train = min(
+                len(drug_test_idx), config.max_train_triplets
+            )
             # take n_triplets_to_include_in_train and put in test, use remainder for test
             test_idx = test_idx + drug_test_idx[n_triplets_to_include_in_train:]
 
-        test_idx = set(test_idx)
+        test_idx = list(set(test_idx))
         train_idx = list(set(dataset.data_df.index).difference(test_idx))
         splits.append((train_idx, test_idx))
-
+    train_ratio = [len(split[0]) / (len(split[0]) + len(split[1])) for split in splits]
+    if print_split_stats:
+        print(
+            f"train ratio mean, min, max: {np.mean(train_ratio),np.min(train_ratio), np.max(train_ratio)}"
+        )
+        print(f"amount of splits: {len(splits)}")
     return splits
 
 
