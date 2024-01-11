@@ -1,5 +1,6 @@
 from graph_package.configs.directories import Directories
 import torch
+import json
 from typing import List, Tuple, Dict, Optional
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
@@ -88,6 +89,7 @@ def reset_wandb_env():
 
 def init_model(
     model: str = "deepdds",
+    fold: int = 0,
     config: dict = None,
     graph: Optional[KnowledgeGraphDataset] = None,
     logger_enabled: bool = True,
@@ -96,6 +98,13 @@ def init_model(
     """Load model from registry"""
 
     if model == "gnn":
+        if config.dataset.drug_representation in ["distmult", "deepdds"]:
+            load_pretrained_drug_embeddings_into_graph(
+                graph=graph, 
+                model=config.dataset.drug_representation, 
+                dataset_str=config.dataset.name, 
+                fold=fold 
+            )
         model = model_dict[model.lower()](
             graph=graph, dataset=config.dataset.name, **config.model
         )
@@ -184,3 +193,45 @@ def split_dataset(
         val_set = Subset(dataset, split_idx[1])
 
     return train_set, val_set
+
+def save_pretrained_drug_embeddings(model, fold):
+    model_name = model.model._get_name()
+    if model_name.lower() == 'deepdds':
+        drug_ids = torch.arange(len(model.model.entity_vocab), device=model.device)
+        molecules = model.model._get_drug_molecules(drug_ids)
+        features = model.model.drug_conv(
+                molecules, molecules.data_dict["atom_feature"].float()
+            )["node_feature"]
+        features = model.model.drug_readout(molecules, features).tolist()
+    else:
+        drug_ids = torch.arange(model.model.num_entity, device=model.device)
+        features = model.model.entity[drug_ids].tolist()
+    dataset_path = dataset_dict['oneil_almanac']
+    with open(dataset_path.parent / "entity_vocab.json") as f:
+        drug_vocab = json.load(f)
+    reverse_vocab = {i: drug for drug, i in drug_vocab.items()}
+    drug_feature_dict = {reverse_vocab[i]: features[i] for i in drug_ids.tolist()}
+    file_name = f"drug_embedding_{model_name.lower()}_f{fold}_d{np.shape(features)[1]}.json"
+    save_path = Directories.DATA_PATH / "features" / "pretrained_features"
+    save_path.mkdir(parents=True, exist_ok=True)
+    with open(save_path / file_name, "w") as json_file:
+        json.dump(drug_feature_dict, json_file)
+    return
+
+def load_pretrained_drug_embeddings_into_graph(graph, model, dataset_str, fold, dim=83):
+    dataset_path = dataset_dict[dataset_str.lower()]
+    with open(dataset_path.parent / "entity_vocab.json") as f:
+        drug_vocab = json.load(f)
+    file_name = f"drug_embedding_{model}_f{fold}_d{dim}.json"
+    feature_path = Directories.DATA_PATH / "features" / "pretrained_features"
+    with open(feature_path / file_name) as f:
+        node_feature_dict = json.load(f)
+    # Convert to a list in correct order determined by graph node ID
+    node_features = [
+        node_feature_dict[name] for name in drug_vocab.keys() 
+        if name in node_feature_dict.keys()
+    ]
+    # Convert to float arraylike 
+    node_features = np.array(node_features).astype(np.float32)
+    graph.node_feature = torch.as_tensor(node_features, device=graph.device)
+    return 
