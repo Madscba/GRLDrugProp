@@ -16,7 +16,6 @@ from graph_package.src.error_analysis.err_utils.err_utils_load import (
     get_cell_line_info,
     get_drug_info,
 )
-from graph_package.src.main_utils import load_data
 import numpy as np
 
 
@@ -106,9 +105,10 @@ def enrich_df_w_metric_nexp_meantarget_per_group(df, group_by_columns, metric_na
         n_exp: number of experiments for each group
     """
     metric_scores, n_exp, mean_target = {}, {}, {}
-    unique_groups = df.loc[:, group_by_columns[0]].unique()
+
+    unique_groups = df.loc[:, group_by_columns].squeeze().unique()
     for group in unique_groups:
-        group_df = df[df[group_by_columns[0]] == group]
+        group_df = df[df[group_by_columns].squeeze() == group]
         metric_scores[group] = get_metric_from_pred_and_target(group_df, metric_name)
         n_exp[group] = group_df.shape[0]
         mean_target[group] = (group_df["targets"]).mean()
@@ -117,18 +117,15 @@ def enrich_df_w_metric_nexp_meantarget_per_group(df, group_by_columns, metric_na
         [pd.DataFrame(dict_.items()) for dict_ in [metric_scores, n_exp, mean_target]],
         axis=1,
     )
+
+    grouped_df = grouped_df.iloc[:, [0, 1, 3, 5]]
     grouped_df.columns = [
         group_by_columns[0],
         metric_name,
-        group_by_columns[0] + "1",
         "n_exp",
-        group_by_columns[0] + "2",
         "mean_target",
     ]
-    grouped_df.drop(
-        columns=[group_by_columns[0] + "1", group_by_columns[0] + "2"],
-        inplace=True,
-    )
+
     return grouped_df
 
 
@@ -155,7 +152,7 @@ def get_metric_from_pred_and_target(df, metric_name):
 
 
 def generate_difference_df(
-    group_by_columns, grouped_dfs, metric_name, model_names, x_labels
+    group_by_columns, grouped_dfs, metric_name, model_names, x_label_col_name
 ):
     """
     Generate dataframe with the difference between two models
@@ -192,7 +189,8 @@ def generate_difference_df(
     df_diff["n_exp"] = (
         df_diff[n_exp_columns[0]].values + df_diff[n_exp_columns[1]].values
     ) / 2
-    df_diff = df_diff.merge(x_labels, on=group_by_columns[0])
+    # df_diff = df_diff.rename(columns={f"{x_label_col_name}_{model_names[0]}": x_label_col_name )
+    # df_diff = df_diff.merge(x_labels, on=group_by_columns)
     return df_diff
 
 
@@ -409,28 +407,6 @@ def get_task_loss(df, task):
         ) ** 2  # technically it is just squared error, but for avoid naming confusion MSE will be used here.
 
 
-def generate_node_degree(file_name, save_path):
-    """
-    Return node degree of each drugs.
-
-    Generate pickle file containing node degrees for each node if it does not exist.
-
-    Parameters:
-        file_name (str):
-        save_path (str):
-
-    Returns:
-        node_degree (np.array()): list of node degrees.
-    """
-    dataset = load_data(dataset="oneil")
-    node_degree = (dataset.graph.degree_in + dataset.graph.degree_out).numpy()
-    if not save_path.exists():
-        save_path.mkdir(exist_ok=True, parents=True)
-    with open(save_path / file_name, "wb") as f:
-        pickle.dump(node_degree, f)
-    return node_degree
-
-
 def merge_cell_line_and_drug_info(df, cell_line_meta_data, drug_meta_data):
     """
     Merge the meta data from two the two dataframes (cell_line_meta_data, drug_meta_data) with the prediction dataframe df and return it
@@ -486,23 +462,6 @@ def merge_vocabs_with_predictions(df, df_ent_vocab, df_rel_vocab):
     df = df.merge(df_rel_vocab, left_on="context_features_id", right_on="rel_id")
     df = df.drop("rel_id", inplace=False, axis=1)
     return df
-
-
-#
-# def get_node_degree():
-#     """
-#     Retrieve node degree of each drug.
-#
-#     Returns:
-#         node_degree (np.array()): degree (in and out) of each drug.
-#     """
-#     save_path = Directories.DATA_PATH / "gold" / "node_attributes"
-#     file_name = "node_degree.pickle"
-#     if not os.path.exists(save_path / file_name):
-#         generate_node_degree(file_name, save_path)
-#     with open(save_path / file_name, "rb") as file:
-#         node_degree = pickle.load(file)
-#     return node_degree
 
 
 def generate_group_indices_and_names(df: pd.DataFrame):
@@ -636,7 +595,6 @@ def enrich_model_predictions(model_names, pred_dfs, task):
         pred_dfs:
         task: classification "clf" or regression "reg". Value determines what loss is added.
     Returns:
-        combined_df (pd.DataFrame): Dataframe with predictions from all models
         pred_dfs (List[pd.DataFrame]) List of dataframes each dataframe holding the prediction from one model.
     """
     df_ent_vocab = get_ent_vocab()
@@ -662,5 +620,4 @@ def enrich_model_predictions(model_names, pred_dfs, task):
 
         generate_group_indices_and_names(df)
         new_pred_dfs.append(df)
-    combined_df = [pd.concat(new_pred_dfs)]
-    return combined_df, new_pred_dfs
+    return new_pred_dfs
