@@ -1,5 +1,4 @@
 # @package _global_
-hidden_dims: [ 64 ]
 model:
   layer: 'gat_pr_rel'
   enc_kwargs:

@@ -43,7 +43,7 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    if model_name == "gnn":
+    if (model_name == "gnn") & (config.dataset.drug_representation not in ["distmult", "deepdds"]):
         config.dataset.update({"use_node_features": True})
     
     dataset = KnowledgeGraphDataset(**config.dataset)
@@ -66,7 +66,7 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config)]
+        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config, fold=k)]
 
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
@@ -102,16 +102,16 @@ def main(config):
 
         model = init_model(
             model=model_name,
+            fold=k,
             config=config,
             graph=train_set.dataset.graph.edge_mask(train_set.indices)
         )
-
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-
+        
         trainer.validate(model, dataloaders=data_loaders["val"])
 
         trainer.fit(
@@ -128,7 +128,6 @@ def main(config):
         if config.wandb:
             wandb.config.checkpoint_path = checkpoint_callback.best_model_path
             wandb.finish()
-
         dataset.del_inv_triplets()
         if config.remove_old_checkpoints:
             os.remove(checkpoint_callback.best_model_path)

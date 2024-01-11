@@ -1,1 +1,2 @@
 dataset_path: ''
+drug_gcn_hidden_dims: [1024, 512, 156]
