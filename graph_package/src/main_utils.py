@@ -9,11 +9,78 @@ from graph_package.src.pl_modules import BasePL
 from torch.utils.data import random_split, Subset
 from torchdrug.data import DataLoader
 import os
+import random
 from pytorch_lightning import Trainer
 from sklearn.model_selection import StratifiedGroupKFold
 import numpy as np
 import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
+import matplotlib.pyplot as plt
+import pandas as pd
+
+random.seed(4)  # set seed for reproducibility of shuffle get_drug_few_shot_split
+
+
+def generate_histogram_of_node_degrees(dataset, dataset_name):
+    """For group_val = drug_few_shot, generate histogram of node degrees to properly design limited connectivity exp."""
+    degrees = (
+        (dataset.graph.data.degree_in + dataset.graph.data.degree_out).cpu().numpy()
+    )
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, gridspec_kw={"height_ratios": [3, 1]}, figsize=(8, 6)
+    )
+    ax1.hist(degrees, bins=40, color="skyblue", edgecolor="black")
+    ax1.set_title("Degree Distribution Histogram")
+    ax1.set_xlabel("Degrees")
+    ax1.set_ylabel("Frequency")
+    ax1.grid(axis="y", linestyle="--", alpha=0.7)
+    df_degrees = pd.DataFrame(degrees)
+    ax2.boxplot(degrees, vert=False)
+    ax2.set_title("Summary Statistics of Degrees")
+    ax2.set_xlabel("Degrees")
+    ax2.grid(axis="x", linestyle="--", alpha=0.7)
+    plt.tight_layout()
+    output_path = Directories.OUTPUT_PATH
+    plt.savefig(output_path / f"degree_dist_histogram_{dataset_name}.png")
+    plt.show()
+
+
+def get_drug_few_shot_split(
+    dataset, config, n_drugs_per_fold=8, print_split_stats=True
+):
+    """Split into 5 folds"""
+    generate_histogram_of_node_degrees(dataset, dataset_name=config.dataset.name)
+    all_drugs_ids = list(range(0, dataset.graph.num_node))
+    random.shuffle(all_drugs_ids)
+    splits = []
+    df = dataset.data_df
+    for i in range(0, dataset.graph.num_node, n_drugs_per_fold):
+        drug_ids = all_drugs_ids[
+            i : min(i + n_drugs_per_fold, dataset.graph.num_node.cpu().numpy())
+        ]
+        # put x triplets from test drugs in train
+        test_idx = []
+        for drug_id in drug_ids:
+            drug_1_idx = df[df["drug_1_id"] == drug_id].index
+            drug_2_idx = df[df["drug_2_id"] == drug_id].index
+            drug_test_idx = list(set(drug_1_idx).union(set(drug_2_idx)))
+            random.shuffle(drug_test_idx)
+            n_triplets_to_include_in_train = min(
+                len(drug_test_idx), config.max_train_triplets
+            )
+            # take n_triplets_to_include_in_train and put in test, use remainder for test
+            test_idx = test_idx + drug_test_idx[n_triplets_to_include_in_train:]
+
+        test_idx = list(set(test_idx))
+        train_idx = list(set(dataset.data_df.index).difference(test_idx))
+        splits.append((train_idx, test_idx))
+    train_ratio = [len(split[0]) / (len(split[0]) + len(split[1])) for split in splits]
+    if print_split_stats:
+        print(
+            f"train ratio mean, min, max: {np.mean(train_ratio),np.min(train_ratio), np.max(train_ratio)}"
+        )
+        print(f"amount of splits: {len(splits)}")
+    return splits
 
 
 def get_drug_split(dataset, config, n_drugs_per_fold=3):
@@ -32,6 +99,9 @@ def get_drug_split(dataset, config, n_drugs_per_fold=3):
 def get_cv_splits(dataset, config):
     if config.group_val == "drug":
         splits = get_drug_split(dataset, config)
+        return splits
+    elif config.group_val == "drug_few_shot":
+        splits = get_drug_few_shot_split(dataset, config)
         return splits
     else:
         if config.group_val == "drug_combination":
@@ -52,7 +122,8 @@ def pretrain_single_model(model_name, config, data_loaders, k):
         shutil.rmtree(check_point_path)
 
     checkpoint_callback = ModelCheckpoint(
-        dirpath=get_checkpoint_path(config.model.pretrain_model, k), **config.checkpoint_callback
+        dirpath=get_checkpoint_path(config.model.pretrain_model, k),
+        **config.checkpoint_callback,
     )
 
     model = init_model(
@@ -109,11 +180,11 @@ def init_model(
             graph=graph, dataset=config.dataset.name, **config.model
         )
     elif pretrain:
-         pretrain_model = config.model.pretrain_model
-         model = model_dict[pretrain_model](**config.model[pretrain_model])
+        pretrain_model = config.model.pretrain_model
+        model = model_dict[pretrain_model](**config.model[pretrain_model])
     else:
         model = model_dict[model.lower()](**config.model)
-    
+
     pl_module = BasePL(
         model,
         lr=config.lr,
