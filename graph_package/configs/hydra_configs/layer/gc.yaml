@@ -1,0 +1,7 @@
+# @package _global_
+model:
+  layer: 'gc'
+  enc_kwargs: 
+    dataset: ''
+    batch_norm: False
+    feature_dropout: 0.0

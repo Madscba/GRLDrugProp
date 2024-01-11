@@ -1,0 +1,8 @@
+# @package _global_
+model:
+  layer: 'gac'
+  enc_kwargs: 
+    dataset: ''
+    feature_dropout: 0.0
+    n_heads: 1
+

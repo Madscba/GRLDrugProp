@@ -3,7 +3,6 @@
 from pytorch_lightning.loggers import WandbLogger
 from graph_package.src.main_utils import (
     reset_wandb_env,
-    load_data,
     init_model,
     get_model_name,
     get_checkpoint_path,
@@ -26,6 +25,7 @@ from pytorch_lightning import Trainer
 import sys
 import wandb
 import warnings
+import os
 
 warnings.filterwarnings("ignore", category=UserWarning, module="hydra")
 warnings.filterwarnings(
@@ -43,7 +43,10 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    dataset = load_data(dataset_config=config.dataset, task=config.task)
+    if (model_name == "gnn") & (config.dataset.drug_representation not in ["distmult", "deepdds"]):
+        config.dataset.update({"use_node_features": True})
+    
+    dataset = KnowledgeGraphDataset(**config.dataset)
     update_model_kwargs(config, model_name, dataset)
 
     splits = get_cv_splits(dataset, config)
@@ -63,7 +66,7 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config)]
+        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config, fold=k)]
 
         train_set, test_set = split_dataset(
             dataset, split_method="custom", split_idx=(train_idx, test_idx)
@@ -79,7 +82,7 @@ def main(config):
         train_set, val_set = split_dataset(
             dataset, split_method="custom", split_idx=(list(train_idx), list(val_idx))
         )
-        
+
         # add reverse edges to training set
         inv_indices = dataset.make_inv_triplets(train_set.indices)
         train_set.indices = train_set.indices + inv_indices
@@ -94,23 +97,21 @@ def main(config):
         call_backs.append(checkpoint_callback)
 
         if (model_name == "hybridmodel") and config.model.pretrain_model:
-            check_point = pretrain_single_model(config, data_loaders, k)
+            check_point = pretrain_single_model(model_name, config, data_loaders, k)
             config.model.update({"ckpt_path": check_point})
 
         model = init_model(
             model=model_name,
-            task=config.task,
-            model_kwargs=config.model,
-            target=config.dataset.target,
+            fold=k,
+            config=config,
             graph=train_set.dataset.graph.edge_mask(train_set.indices)
         )
-
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-
+        
         trainer.validate(model, dataloaders=data_loaders["val"])
 
         trainer.fit(
@@ -127,8 +128,11 @@ def main(config):
         if config.wandb:
             wandb.config.checkpoint_path = checkpoint_callback.best_model_path
             wandb.finish()
-        
         dataset.del_inv_triplets()
+        if config.remove_old_checkpoints:
+            os.remove(checkpoint_callback.best_model_path)
+        wandb.finish()
+
 
 if __name__ == "__main__":
     load_dotenv(".env")

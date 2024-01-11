@@ -1,0 +1,6 @@
+# @package _global_
+model:
+  layer: 'gat_pr_rel'
+  enc_kwargs:
+    w_per_relation: True
+    num_head: 1

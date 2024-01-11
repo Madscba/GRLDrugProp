@@ -1,0 +1,9 @@
+# @package _global_
+model:
+  layer: 'gat'
+  enc_kwargs: 
+    dataset: ''
+    concat_hidden: False
+    n_heads: 1
+    dropout: 0.6
+
