@@ -85,7 +85,6 @@ class RelationalGraphConv(MessagePassingBase):
         # make an index of size num_edges*num_relations
         node_out = node_out * self.num_relation + relation
 
-
         # sum the edge weights for each node_out
         degree_out = scatter_add(
             graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
@@ -134,6 +133,7 @@ class GraphConv(MessagePassingBase):
         output_dim,
         num_relation,
         dataset,
+        include_cell_line_features=True,
         batch_norm=False,
         feature_dropout=0.0,
     ):
@@ -142,16 +142,24 @@ class GraphConv(MessagePassingBase):
         self.output_dim = output_dim
         self.num_relation = num_relation
         self.dataset = dataset
+        self.include_cell_line_features = include_cell_line_features
 
         if batch_norm:
             self.batch_norm = nn.BatchNorm1d(output_dim)
         else:
             self.batch_norm = None
-        self.ccle = self._load_ccle()
-        cell_feature_size = self.ccle.shape[1]
+
+        if include_cell_line_features:
+            self.ccle = self._load_ccle()
+            cell_feature_size = self.ccle.shape[1]
+            dim = input_dim + cell_feature_size
+
+        else:
+            dim = input_dim
+
         self.activation = F.relu
         self.self_loop = nn.Linear(input_dim, output_dim)
-        self.linear = nn.Linear(input_dim + cell_feature_size, output_dim)
+        self.linear = nn.Linear(dim, output_dim)
         self.feature_dropout = nn.Dropout(feature_dropout)
 
     def _load_ccle(self):
@@ -204,9 +212,12 @@ class GraphConv(MessagePassingBase):
             edge_weight,
             (graph.num_node, graph.num_node * graph.num_relation),
         )
-        transform_input = self.transform_input(input)
-        update = torch.sparse.mm(adjacency, transform_input)
-        return update.view(graph.num_node, self.input_dim + self.ccle.shape[1])
+        # concatenate drug features with cell line features
+        if self.include_cell_line_features:
+            input = self.transform_input(input)
+
+        update = torch.sparse.mm(adjacency, input)
+        return update.view(graph.num_node, input.shape[1])
 
     def combine(self, input, update):
         output = self.linear(update) + self.self_loop(input)
