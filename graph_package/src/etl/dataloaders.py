@@ -207,14 +207,14 @@ class KnowledgeGraphDataset(Dataset):
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
 
-        elif self.drug_representation == "onehot":
+        else:
             for i, (drug, drug_id) in enumerate(drug_vocab.items()):
                 one_hot = np.zeros(len(drug_vocab))
                 one_hot[i] = 1
                 node_feature_dict[drug] = list(one_hot)
 
         # Load PCA nearest neighbor features
-        else:
+        if self.modalities:
             pca_feature_path = (
                 Directories.DATA_PATH
                 / "features"
