@@ -5,4 +5,4 @@ model:
     dataset: ''
     batch_norm: False
     feature_dropout: 0.0
-    include_cell_line_features: False
+    include_cell_line_features: True
