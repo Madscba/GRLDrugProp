@@ -14,8 +14,8 @@ from sklearn.model_selection import StratifiedGroupKFold
 import numpy as np
 import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
-from torch_geometric.explain import Explainer, CaptumExplainer
-from torch_geometric.data import HeteroData
+#from torch_geometric.explain import Explainer, CaptumExplainer
+#from torch_geometric.data import HeteroData
 
 
 
@@ -181,7 +181,7 @@ def init_explainer(
     )
     return explainer 
 
-def get_explaination(explainer: Explainer, hetero_data: HeteroData):
+def get_explaination(explainer, hetero_data):
     """ Silly example with the first 10 triplets (2 drugs, 10 cell lines)"""
 
     index = torch.tensor([2, 5]) # Explain edge labels with index 2 and 10.
