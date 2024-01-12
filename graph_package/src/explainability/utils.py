@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-def explain_attention(df, graph, model):
+def explain_attention(df, graph, model, topk=20):
     n_nodes = graph.node_feature.shape[0]
     self_loop_edges = torch.stack([torch.arange(n_nodes, device=graph.device)], dim=1).view(-1, 1).repeat(1, 2)
     self_loop_edge_list = torch.cat([self_loop_edges, torch.ones(n_nodes,1,dtype=torch.int,device=graph.device)*graph.num_relation], dim=1)
@@ -18,7 +18,7 @@ def explain_attention(df, graph, model):
 
         for head in range(layer.n_heads):
             # Get top 20 attention weights and their indices
-            top_indices = torch.topk(attention[:,head], 20).indices
+            top_indices = torch.topk(attention[:,head], topk).indices[1:]
             attention_top_values = attention[top_indices,head].detach().numpy()
 
             # Retrieve corresponding triplets
@@ -38,13 +38,14 @@ def explain_attention(df, graph, model):
                         'synergy_zip_mean'
                     ].values[0]
                 top_triplets_with_scores.append((triplet, synergy_score))
-            visualize_attention_single(top_triplets_with_scores, attention_top_values)
+            #visualize_attention_single(top_triplets_with_scores, attention_top_values)
+            #visualize_attention(top_triplets_with_scores, attention_top_values, use_neg_synergy=False)
             visualize_synergy2(top_triplets_with_scores, attention_top_values)
-            visualize_attention(top_triplets_with_scores, attention_top_values)
-            visualize_attention2(attention[:,head], top_indices, top_triplets_with_scores)
+            #visualize_attention(top_triplets_with_scores, attention_top_values)
+            #visualize_attention2(attention[:,head], top_indices, top_triplets_with_scores)
         return
 
-def visualize_attention(top_triplets_with_scores, attention_top_values):
+def visualize_attention(top_triplets_with_scores, attention_top_values, use_neg_synergy=True):
 
     # Assuming top_triplets_with_scores contains the top triplets and their synergy scores
     # and attention_top_values contains the top attention values
@@ -53,18 +54,18 @@ def visualize_attention(top_triplets_with_scores, attention_top_values):
 
     # Add nodes and edges with attributes
     for i, ((drug_1, drug_2, context), synergy_score) in enumerate(top_triplets_with_scores):
-        G.add_node(f'Drug {drug_1}', type='drug')
+        G.add_node(f'{drug_1}', type='drug')
         if drug_1==drug_2:
             label = 'Self'
         else:
-            label = f'CCL {context}'
-        G.add_edge(f'Drug {drug_1}', f'Drug {drug_2}', weight=attention_top_values[i], synergy=synergy_score, context=label)
+            label = f'{context}'
+            G.add_node(f'{drug_2}', type='drug')
+        G.add_edge(f'{drug_1}', f'{drug_2}', weight=attention_top_values[i], synergy=synergy_score, context=label)
     
-    use_neg_synergy=True
     if use_neg_synergy:
         # Normalize synergy scores and set up edge attributes for width and style
         baseline_width = 1  # Minimum width
-        width_factor = 3    # Factor to increase/decrease the width based on synergy score
+        width_factor = 4    # Factor to increase/decrease the width based on synergy score
         min_synergy, max_synergy = min(score for _, score in top_triplets_with_scores), max(score for _, score in top_triplets_with_scores)
 
         for u, v, data in G.edges(data=True):
@@ -75,7 +76,7 @@ def visualize_attention(top_triplets_with_scores, attention_top_values):
                 data['style'] = 'solid'
             else:
                 data['width'] = baseline_width + width_factor * (synergy_score / min_synergy)
-                data['style'] = 'dashed'
+                data['style'] = 'dotted'
 
         # Prepare for drawing
         edge_colors = [plt.cm.viridis(G[u][v]['weight']) for u, v in G.edges()]
@@ -98,6 +99,8 @@ def visualize_attention(top_triplets_with_scores, attention_top_values):
         # Draw edges with style based on synergy score
         for (u, v), color, width, style in zip(G.edges(), edge_colors, edge_widths, edge_styles):
             nx.draw_networkx_edges(G, pos, ax=ax, edgelist=[(u, v)], width=width, edge_color=color, style=style)
+    else:
+        nx.draw_networkx_edges(G, pos, ax=ax, width=edge_widths, edge_color=edge_colors)
 
     # Draw edge labels (context)
     edge_labels = nx.get_edge_attributes(G, 'context')
@@ -203,21 +206,21 @@ def visualize_synergy2(top_triplets_with_scores, attention_top_values):
 
     # Add nodes and edges with attributes
     for i, ((drug_1, drug_2, context), synergy_score) in enumerate(top_triplets_with_scores):
-        G.add_node(f'Drug {drug_1}', type='drug')
+        G.add_node(f'{drug_1}', type='drug')
         if drug_1==drug_2:
             label = 'Self'
         else:
-            label = f'CCL {context}'
-            G.add_node(f'Drug {drug_2}', type='drug')    
-        G.add_edge(f'Drug {drug_1}', f'Drug {drug_2}', weight=attention_top_values[i], synergy=synergy_score, context=label)
+            label = f'{context}'
+            G.add_node(f'{drug_2}', type='drug')    
+        G.add_edge(f'{drug_1}', f'{drug_2}', weight=attention_top_values[i], synergy=synergy_score, context=label)
     
     # Normalize attention weights for edge width
-    width_factor = 3  # Adjust the scaling factor as needed
+    width_factor = 10  # Adjust the scaling factor as needed
     max_attention = max(attention_top_values)
     edge_widths = [width_factor * weight / max_attention for weight in attention_top_values]
 
     # Prepare color map for synergy scores
-    cmap = mcolors.LinearSegmentedColormap.from_list('Custom', [(0, 'red'), (0.5, 'white'), (1, 'blue')])
+    cmap = mcolors.LinearSegmentedColormap.from_list('Custom', [(0, 'red'), (0.5, 'lightgrey'), (1, 'blue')])
 
     # Normalize the synergy scores to the [0, 1] range for the colormap
     min_synergy, max_synergy = min(score for _, score in top_triplets_with_scores), max(score for _, score in top_triplets_with_scores)
@@ -269,8 +272,12 @@ def visualize_attention_single(top_triplets_with_scores, attention_top_values):
     # Add nodes and edges with attributes
     for i, ((drug_1, drug_2, context), synergy_score) in enumerate(top_triplets_with_scores):
         G.add_node(f'Drug {drug_1}', type='drug')
-        G.add_node(f'Drug {drug_2}', type='drug')
-        G.add_edge(f'Drug {drug_1}', f'Drug {drug_2}', weight=attention_top_values[i], synergy=synergy_score)
+        if drug_1==drug_2:
+            label = 'Self'
+        else:
+            label = f'CCL {context}'
+            G.add_node(f'Drug {drug_2}', type='drug')
+        G.add_edge(f'Drug {drug_1}', f'Drug {drug_2}', weight=attention_top_values[i], synergy=synergy_score, context=label)
     
     
     # Define color map and edge width based on attention weights and synergy scores
