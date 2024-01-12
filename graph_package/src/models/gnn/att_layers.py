@@ -94,16 +94,16 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         # torch.arange(graph.num_node, device=graph.device) is added to make self-loop
         node_in = torch.cat(
             [graph.edge_list[:, 0], torch.arange(graph.num_node, device=graph.device)]
-        )
+        ).to(torch.int64)
         node_out = torch.cat(
             [graph.edge_list[:, 1], torch.arange(graph.num_node, device=graph.device)]
-        )
+        ).to(torch.int64)
         relation = torch.cat(
             [
                 graph.edge_list[:, 2],
                 (self.num_relations) * torch.ones(graph.num_node, device=graph.device),
             ]
-        ).to(torch.int32)
+        ).to(torch.int64)
         edge_weight = torch.cat(
             [graph.edge_weight, torch.ones(graph.num_node, device=graph.device)]
         )
@@ -207,6 +207,7 @@ class GraphAttentionConv(MessagePassingBase):
         batch_norm (bool, optional): apply batch normalization on nodes or not
         activation (str or function, optional): activation function
     """
+
     eps = 1e-10
 
     def __init__(
@@ -301,12 +302,11 @@ class GraphAttentionConv(MessagePassingBase):
     def message_and_aggregate(self, graph, input):
         # Extract duplets from the graph
         node_in, node_out, relation = graph.edge_list.t()
-        
+
         edge_weight = torch.cat(
             [graph.edge_weight, torch.ones(graph.num_node, device=graph.device)]
         )
         edge_weight = edge_weight.unsqueeze(-1)
-
 
         # add cell line embeddings for each node
         combined = self.transform_input(input)
@@ -339,11 +339,10 @@ class GraphAttentionConv(MessagePassingBase):
 
         weight = F.leaky_relu(e, negative_slope=self.negative_slope)
 
-
         max_attention_per_node = scatter_max(
             weight, node_out, dim=0, dim_size=graph.num_node
         )[0][node_out]
-        
+
         # see [Hamilton] eq 5.20
         attention = (weight - max_attention_per_node).exp()
         attention = attention * edge_weight
@@ -360,7 +359,6 @@ class GraphAttentionConv(MessagePassingBase):
         attention = attention.unsqueeze(-1).expand_as(value)
         message = (attention * value).flatten(1)
         return message
-    
 
     def aggregate(self, graph, message):
         # add self loop
