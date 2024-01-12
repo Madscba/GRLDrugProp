@@ -18,17 +18,51 @@ from graph_package.src.error_analysis.err_utils.err_utils_load import (
 )
 import numpy as np
 
+PLOT_COLORS = ["red", "blue", "orange"]
 
-def generate_barplot_w_performance_metric_grouped_by_entity(
-    pred_dfs,
-    model_names,
-    group_by_columns,
-    title,
-    xlabel_col_name,
-    add_bar_info: bool = True,
-    run_name: str = "",
-    metric_name: str = "MSE",
-    task: str = "reg",
+ENTITY_ERR_DICT = {
+    "drug_pair": {
+        "group_by": ["drug_pair_idx"],
+        "x_label_column_name": "drug_pair_name",
+    },
+    "drug": {
+        "group_by": ["drug_molecules_left_id"],
+        "x_label_column_name": "drug_name_left",
+    },
+    "disease": {
+        "group_by": ["disease_idx"],
+        "x_label_column_name": "disease_id",
+    },
+    "tissue": {
+        "group_by": ["tissue_id"],
+        "x_label_column_name": "tissue_name",
+    },
+    "cancer_cell": {
+        "group_by": ["context_features_id"],
+        "x_label_column_name": "cancer_cell_name",
+    },
+    "drug_target": {
+        "group_by": ["drug_targets_idx"],
+        "x_label_column_name": "drug_targets_name",
+    },
+}
+
+
+def generate_error_plots_per_entity(
+    df,
+    task,
+    comparison,
+    entity,
+    model_name
+    # pred_dfs,
+    # model_names,
+    # group_by_columns,
+    # title,
+    # xlabel_col_name,
+    # add_bar_info: bool = True,
+    # run_name: str = "",
+    # metric_name: str = "MSE",
+    # task: str = "reg",
 ):
     """
     Generate and save barplot
@@ -40,55 +74,44 @@ def generate_barplot_w_performance_metric_grouped_by_entity(
     Returns:
         None
     """
-    plt_colors = ["red", "blue", "orange"]
+    metric_name = "AUC_ROC" if task == "clf" else "MSE"
     save_path = Directories.OUTPUT_PATH / "err_diagnostics"
+
     if not save_path.exists():
         save_path.mkdir(exist_ok=True, parents=True)
 
-    # Goal is to say something about the difficulty of specific entities relative to others of the same kind
-    grouped_dfs = []
-    for i, df in enumerate(pred_dfs):
-        if metric_name == "AUC_ROC":
-            df = filter_away_groups_without_pos_and_neg_cases(df, group_by_columns)
+    if metric_name == "AUC_ROC":
+        df = filter_away_groups_without_pos_and_neg_cases(df, entity)
 
-        x_labels = df.groupby(group_by_columns)[xlabel_col_name].max().reset_index()
-        grouped_df = enrich_df_w_metric_nexp_meantarget_per_group(
-            df, group_by_columns, metric_name
-        )
-        grouped_df = grouped_df.merge(x_labels, on=group_by_columns[0])
-        grouped_dfs.append(grouped_df.copy())
+    sorted_df, top10_df = sort_df_by_metric(df, metric_name, task, comparison)
 
-        generate_bar_plot(
-            grouped_df,
-            i,
+    for idx, df in enumerate([sorted_df, top10_df]):
+        # todo add correlation and avg mt and n_exp to plot and save
+        plot_individual(
+            df,
+            entity,
             metric_name,
-            model_names,
-            plt_colors,
-            save_path,
-            title,
-            xlabel_col_name,
-            add_bar_info,
-            run_name,
             task,
+            comparison,
+            model_name,
+            save_path,
+            ["full", "top10"][idx],
         )
 
-    if len(pred_dfs) == 2:
-        df_diff = generate_difference_df(
-            group_by_columns, grouped_dfs, metric_name, model_names, x_labels
-        )
-        generate_bar_plot(
-            df_diff,
-            0,
-            metric_name,
-            ["absolute_difference"],
-            plt_colors,
-            save_path,
-            f"{xlabel_col_name}_diff",
-            xlabel_col_name,
-            add_bar_info,
-            run_name,
-            task=task,
-        )
+    # plot_full_and_top10_together(
+    #     sorted_df,
+    #     top10_df,
+    #     i,
+    #     metric_name,
+    #     model_names,
+    #     plt_colors,
+    #     save_path,
+    #     title,
+    #     x_label_col_name,
+    #     add_bar_info,
+    #     run_name,
+    #     task,
+    # )
 
 
 def enrich_df_w_metric_nexp_meantarget_per_group(df, group_by_columns, metric_name):
@@ -189,12 +212,14 @@ def generate_difference_df(
     df_diff["n_exp"] = (
         df_diff[n_exp_columns[0]].values + df_diff[n_exp_columns[1]].values
     ) / 2
-    # df_diff = df_diff.rename(columns={f"{x_label_col_name}_{model_names[0]}": x_label_col_name )
-    # df_diff = df_diff.merge(x_labels, on=group_by_columns)
+    df_diff = df_diff.rename(
+        columns={f"{x_label_col_name}_{model_names[0]}": x_label_col_name}
+    )
+    df_diff.drop(columns=[f"{x_label_col_name}_{model_names[1]}"], inplace=True)
     return df_diff
 
 
-def generate_bar_plot(
+def plot_full_and_top10_together(
     grouped_df,
     i,
     metric_name,
@@ -207,7 +232,7 @@ def generate_bar_plot(
     run_name,
     task,
 ):
-    sorted_df, top10_df = sort_df_by_metric(grouped_df, metric_name, task, model_names)
+    # sorted_df, top10_df = sort_df_by_metric(grouped_df, metric_name, task, model_names)
 
     top10_df.reset_index(inplace=True)
     plt.figure(figsize=(16, 10))
@@ -265,50 +290,54 @@ def generate_bar_plot(
     plt.show()
     plt.clf()
 
-    plot_individual(
-        add_bar_info,
-        i,
-        metric_name,
-        model_names,
-        plt_colors,
-        run_name,
-        save_path,
-        title,
-        sorted_df,
-        top10_df,
-        xlabel_col_name,
-        avg_exp_and_mean_target,
-    )
-
 
 def plot_individual(
-    add_bar_info,
-    i,
+    df,
+    entity,
     metric_name,
-    model_names,
-    plt_colors,
-    run_name,
+    task,
+    comparison,
+    model_name,
     save_path,
-    title,
-    sorted_df,
-    top10_df,
-    xlabel_col_name,
-    avg_exp_and_mean_target,
+    scope,
+    # add_bar_info,
+    # i,
+    # metric_name,
+    # model_names,
+    # plt_colors,
+    # run_name,
+    # save_path,
+    # title,
+    # sorted_df,
+    # top10_df,
+    # xlabel_col_name,
+    # avg_exp_and_mean_target,
 ):
+    x_label_col_name = ENTITY_ERR_DICT[entity]["x_label_column_name"]
+
     plt.figure(figsize=(8, 5))
     plt.subplot(1, 1, 1)
     # sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-    sorted_df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
+    df[metric_name].plot(kind="bar", ax=plt.gca(), color=PLOT_COLORS[0])
     # plt.gca().set_ylim(0, 1)
     # plt.xticks(rotation=45)
     plt.gca().set_ylabel(metric_name)
-    # plt.gca().set_xticks(range(len(sorted_df)))
-    # plt.gca().set_xticklabels(sorted_df[xlabel_col_name])
+    if scope != "full":
+        plt.gca().set_xticks(range(len(df)))
+        plt.gca().set_xticklabels(df[x_label_col_name])
+        title = f"{entity}_{model_name}_{comparison}"
+    else:
+        plt.xticks([])
+        title = f"{entity}_{model_name}_{comparison} top10 errors"
     plt.title(f"{title}\n {metric_name}")
     # plt.ylim(-7, 0)
-    df_corr = get_err_correlations(sorted_df, metric_name, avg_exp_and_mean_target)
-    corr_str = f"corr: MSE/n_exp {df_corr.iloc[0, 1]}\ncorr: MSE/mt {df_corr.iloc[0, 2]}\ncorr: MSE/abs_dev_mt {df_corr.iloc[0, 3]}\ncorr: mt/n_exp {df_corr.iloc[2, 1]}\ncorr: mt/abs_dev_mt {df_corr.iloc[2, 3]}"
-    avg_exp_and_mean_target_str = f"avg n_exp: {avg_exp_and_mean_target[0]}\navg mt: {avg_exp_and_mean_target[1]:.2f}"
+    # avg_exp_and_mean_target = [
+    #     np.round(np.mean(df[exp_data].values), 2)
+    #     for exp_data in ["n_exp", "mean_target"]
+    # ]
+    # df_corr = get_err_correlations(df, metric_name, avg_exp_and_mean_target)
+    # corr_str = f"corr: MSE/n_exp {df_corr.iloc[0, 1]}\ncorr: MSE/mt {df_corr.iloc[0, 2]}\ncorr: MSE/abs_dev_mt {df_corr.iloc[0, 3]}\ncorr: mt/n_exp {df_corr.iloc[2, 1]}\ncorr: mt/abs_dev_mt {df_corr.iloc[2, 3]}"
+    # avg_exp_and_mean_target_str = f"avg n_exp: {avg_exp_and_mean_target[0]}\navg mt: {avg_exp_and_mean_target[1]:.2f}"
     # plt.text(
     #     sorted_df.shape[0] * 0.5,
     #     sorted_df[metric_name].max() * 0.92,
@@ -328,30 +357,9 @@ def plot_individual(
     #         mt = np.round(top10_df.loc[index, ["mean_target"]].values[0], 2)
     #         bar_text = f"n:\n{top10_df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
     #         plt.text(index, value, bar_text, ha="center", va="bottom")
-    plt.legend([model_names[i]])
+    plt.legend([model_name])
     plt.tight_layout()
-    plt.savefig(save_path / f"{run_name}_{title}_bar_{model_names[i]}_full")
-
-    plt.figure(figsize=(8, 5))
-    plt.subplot(1, 1, 1)
-    # sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-    top10_df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-    # plt.gca().set_ylim(0, 1)
-    # plt.xticks(rotation=45)
-    plt.gca().set_xticks(range(len(top10_df)))
-    plt.gca().set_ylabel(metric_name)
-    plt.gca().set_xticklabels(top10_df[xlabel_col_name])
-    plt.title(f"{title}\ntop 10 w. worst {metric_name}")
-    # plt.ylim(-7, 0)
-    # if add_bar_info:
-    #     for index, value in enumerate(top10_df[metric_name]):
-    #         mt = np.round(top10_df.loc[index, ["mean_target"]].values[0], 2)
-    #         bar_text = f"n:\n{top10_df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
-    #         plt.text(index, value, bar_text, ha="center", va="bottom")
-    plt.legend([model_names[i]])
-    plt.tight_layout()
-    plt.savefig(save_path / f"{run_name}_{title}_bar_{model_names[i]}_top10")
-    plt.clf()
+    plt.savefig(save_path / f"{title}_{scope}_bar")
 
 
 def check_accepted_sample_ratio(original_size, filtered_size, group_by_columns):
@@ -362,7 +370,7 @@ def check_accepted_sample_ratio(original_size, filtered_size, group_by_columns):
         )
 
 
-def sort_df_by_metric(df, metric_name, task, model_names):
+def sort_df_by_metric(df, metric_name, task, comparison):
     """
     Sort values by the metric given. Return sorted values with the tail containing performance on the worst entities.
     Args:
@@ -376,7 +384,7 @@ def sort_df_by_metric(df, metric_name, task, model_names):
     ascending_order = task != "clf"
     df = df.sort_values(by=metric_name, ascending=ascending_order)
     # Get entitities with top 10 worst performance
-    if "diff" in "".join(model_names) and task == "clf":
+    if "diff" in comparison and task == "clf":
         top10_df = df.head(10)
     else:
         top10_df = df.tail(10)
