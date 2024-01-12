@@ -2,7 +2,10 @@ import json
 import torch
 import pandas as pd
 from graph_package.configs.directories import Directories
-from graph_package.configs.definitions import dataset_dict
+from graph_package.configs.definitions import (
+    dataset_dict,
+    drug_representation_path_dict,
+)
 from graph_package.src.etl.medallion.gold import (
     create_drug_id_vocabs,
     create_cell_line_id_vocabs,
@@ -126,87 +129,12 @@ class KnowledgeGraphDataset(Dataset):
             drug_vocab = json.load(f)
         node_feature_dict = {}
         # In case only drug features are used
-        if self.drug_representation == "morgan":
-            drug_feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "drug_features"
-                / "drug_ECFP_fp_2D.csv"
-            )
+        # todo check that all repr works. (maccs, dismtult, onehot)
+        if self.drug_representation in drug_representation_path_dict:
+            drug_feature_path = drug_representation_path_dict[self.drug_representation]
             drug_features = pd.read_csv(drug_feature_path, index_col=0)
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
-        elif self.drug_representation == "morgan83_rad6":
-            drug_feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "drug_features"
-                / "drug_ECFP_fp_2D_83.csv"
-            )
-            drug_features = pd.read_csv(drug_feature_path, index_col=0)
-            for drug in drug_features.index:
-                node_feature_dict[drug] = drug_features.loc[drug].to_list()
-        elif self.drug_representation == "morgan83_rad3":
-            drug_feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "drug_features"
-                / "drug_ECFP_fp_2D_83_rad3.csv"
-            )
-            drug_features = pd.read_csv(drug_feature_path, index_col=0)
-            for drug in drug_features.index:
-                node_feature_dict[drug] = drug_features.loc[drug].to_list()
-        elif self.drug_representation == "maccs":
-            drug_feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "drug_features"
-                / "drug_MACCS_fp_2D_.csv"
-            )
-            drug_features = pd.read_csv(drug_feature_path, index_col=0)
-            for drug in drug_features.index:
-                node_feature_dict[drug] = drug_features.loc[drug].to_list()
-        elif self.drug_representation == "minhash":
-            drug_feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "drug_features"
-                / "drug_MINHASH_fp_2D.csv"
-            )
-            drug_features = pd.read_csv(drug_feature_path, index_col=0)
-            for drug in drug_features.index:
-                node_feature_dict[drug] = drug_features.loc[drug].to_list()
-        elif self.drug_representation == "minhash83":
-            drug_feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "drug_features"
-                / "drug_MINHASH_fp_2D_83.csv"
-            )
-            drug_features = pd.read_csv(drug_feature_path, index_col=0)
-            for drug in drug_features.index:
-                node_feature_dict[drug] = drug_features.loc[drug].to_list()
-        elif self.drug_representation == "minhash83_rad3":
-            drug_feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "drug_features"
-                / "drug_MINHASH_fp_2D_83_rad3.csv"
-            )
-            drug_features = pd.read_csv(drug_feature_path, index_col=0)
-            for drug in drug_features.index:
-                node_feature_dict[drug] = drug_features.loc[drug].to_list()
-        elif self.drug_representation == "rdkit":
-            drug_feature_path = (
-                Directories.DATA_PATH
-                / "features"
-                / "drug_features"
-                / "drug_rdkit_descriptor_2D.csv"
-            )
-            drug_features = pd.read_csv(drug_feature_path, index_col=0)
-            for drug in drug_features.index:
-                node_feature_dict[drug] = drug_features.loc[drug].to_list()
-
         else:
             for i, (drug, drug_id) in enumerate(drug_vocab.items()):
                 one_hot = np.zeros(len(drug_vocab))
