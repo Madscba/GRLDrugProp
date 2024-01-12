@@ -1,4 +1,4 @@
-# DONT CHANGE THIS FILE
+# @package _global_
 defaults:
   - _self_
   - model: deepdds # override model by writing model=rescal or model=hybridmodel as command line argument to main.py
@@ -18,9 +18,13 @@ remove_old_checkpoints: True
 task: 'reg' #clf (does not work for css)
 
 dataset:  
-  name: 'oneil' # deepdds_original, oneil_legacy, oneil_almanac
+  name: 'oneil_almanac' # deepdds_original, oneil_legacy, oneil_almanac
   target: 'zip_mean' # zip_max, css, loewe (legacy)
-  drug_representation: "" #
+  use_node_features: False
+  use_edge_features: False  
+  drug_representation: morgan # morgan, onehot
+  modalities: False # All, Gene, Side Effect, Disease, Pharmacologic Class
+  edge_weights: False # continous, discrete, False
 
 checkpoint_callback:
   mode: 'min'
