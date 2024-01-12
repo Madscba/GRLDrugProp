@@ -1,16 +1,17 @@
 from torch import nn
 import torch
-from graph_package.src.models import RESCAL, DeepDDS
+from graph_package.src.models import DeepDDS
+from graph_package.src.models.distmult import DistMult
 from collections import OrderedDict
 
 
 class HybridModel(nn.Module):
     def __init__(
         self,
-        rescal: dict,
+        distmult: dict,
         deepdds: dict,
         ckpt_path=None,
-        pretrain_model="rescal",
+        pretrain_model="distmult",
         comb_weight = 0.95,
         comb_weight_req_grad=True,
     ) -> None:
@@ -19,21 +20,21 @@ class HybridModel(nn.Module):
         self.deepdds = self.load_model(
             DeepDDS, deepdds, ckpt_path, freeze=pretrain_model == "deepdds"
         )
-        self.rescal = self.load_model(
-            RESCAL, rescal, ckpt_path, freeze=pretrain_model == "rescal"
+        self.distmult = self.load_model(
+            DistMult, distmult, ckpt_path, freeze=pretrain_model == "distmult"
         )
 
         if not pretrain_model:
-            deepdds_init_weight=rescal_init_weight=0.5
+            deepdds_init_weight=distmult_init_weight=0.5
         else:
             deepdds_init_weight = comb_weight if pretrain_model=='deepdds' else 1-comb_weight
-            rescal_init_weight = 1-deepdds_init_weight
+            distmult_init_weight = 1-deepdds_init_weight
 
         self.deepdds_weight = nn.Parameter(
             torch.tensor([deepdds_init_weight]), requires_grad=comb_weight_req_grad
         )
-        self.rescal_weight = nn.Parameter(
-            torch.tensor([rescal_init_weight]), requires_grad=comb_weight_req_grad
+        self.distmult_weight = nn.Parameter(
+            torch.tensor([distmult_init_weight]), requires_grad=comb_weight_req_grad
         )
 
     def load_model(self, model_construct, model_kwargs, ckpt_path, freeze=False):
@@ -52,8 +53,8 @@ class HybridModel(nn.Module):
 
     def forward(self, input):
         deepdds_out = self.deepdds(input)
-        rescal_out = self.rescal(input)
-        return self.deepdds_weight * deepdds_out + self.rescal_weight * rescal_out
+        distmult_out = self.distmult(input)
+        return self.deepdds_weight * deepdds_out + self.distmult_weight * distmult_out
 
     def __str__(self) -> str:
         return "hybridmodel"

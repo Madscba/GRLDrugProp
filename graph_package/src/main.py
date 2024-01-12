@@ -88,6 +88,7 @@ def main(config):
             check_point = pretrain_single_model(model_name, config, data_loaders, k)
             config.model.update({"ckpt_path": check_point})
 
+
         model = init_model(
             model=model_name,
             fold=k,

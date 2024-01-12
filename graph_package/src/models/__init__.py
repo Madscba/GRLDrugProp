@@ -8,4 +8,4 @@ from graph_package.src.models.complex import ComplEx
 from graph_package.src.models.rotate import RotatE
 from graph_package.src.models.gnn.gnn import GNN
 
-__all__ = ["RESCAL", "DeepDDS", "HybridModel", "TransE", "DistMult", "ComplEx", "RotatE","GNN"]
+__all__ = ["RESCAL", "DeepDDS", "HybridModel", "TransE", "DistMult", "ComplEx", "RotatE", "GNN"]

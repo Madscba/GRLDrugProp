@@ -264,7 +264,7 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
         config.model.update(update_deepdds_args(config))
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
-        config.model.rescal.update(update_shallow_embedding_args(dataset))
+        config.model.distmult.update(update_shallow_embedding_args(dataset))
     elif model_name == "gnn":
         pass
         # config.model.update(update_rgcn_args(config))
