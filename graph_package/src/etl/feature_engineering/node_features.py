@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from graph_package.utils.helpers import logger
-from graph_package.src.etl.medallion.silver import (
+from graph_package.src.etl.medallion.gold import (
     get_drug_info,
     filter_drugs_in_graph
 )
@@ -147,7 +147,7 @@ def fit_pca_node_feature(adjacency_matrix, components, node_type, relation):
 def make_node_features(datasets=["ONEIL", "ALMANAC"], components=16, min_degree=4, node_types="all"):
     """Function for generating PCA feature vectors based on Hetionet"""
     # Defining paths
-    datasets_name = "oneil_almanac" if datasets == ["ONEIL", "ALMANAC"] else "oneil"
+    datasets_name = "oneil_almanac_old" if datasets == ["ONEIL", "ALMANAC"] else "oneil"
     save_path = Directories.DATA_PATH / "features" / "node_features"
     save_path.mkdir(parents=True, exist_ok=True)
 
@@ -156,7 +156,10 @@ def make_node_features(datasets=["ONEIL", "ALMANAC"], components=16, min_degree=
         Directories.DATA_PATH / "silver" / datasets_name / f"{datasets_name}.csv"
     )
     drugs = pd.read_csv(data_path)
-    drug_info = get_drug_info(drugs)
+    unique_drug_names = sorted(
+        list(set(drugs["drug_row"].tolist() + drugs["drug_col"].tolist()))
+    )
+    drug_info = get_drug_info(drugs, unique_drug_names)
     drug_ids, filtered_drug_dict, edges = filter_drugs_in_graph(drug_info)
 
     # For each node_type and relation, build adjacency matrix and get pca feature vectors
