@@ -202,7 +202,7 @@ def visualize_synergy2(top_triplets_with_scores, attention_top_values):
     # Assuming top_triplets_with_scores contains the top triplets and their synergy scores
     # and attention_top_values contains the top attention values
     # Create a graph
-    G = nx.Graph()
+    G = nx.DiGraph()
 
     # Add nodes and edges with attributes
     for i, ((drug_1, drug_2, context), synergy_score) in enumerate(top_triplets_with_scores):
@@ -212,10 +212,12 @@ def visualize_synergy2(top_triplets_with_scores, attention_top_values):
         else:
             label = f'{context}'
             G.add_node(f'{drug_2}', type='drug')    
-        G.add_edge(f'{drug_1}', f'{drug_2}', weight=attention_top_values[i], synergy=synergy_score, context=label)
+       # G.add_edge(f'{drug_1}', f'{drug_2}', weight=attention_top_values[i], synergy=synergy_score, context=label)
+        G.add_edge(f'{drug_1}', f'{drug_2}', key=f'edge_{i}', weight=attention_top_values[i], synergy=synergy_score, context=label)
+
     
     # Normalize attention weights for edge width
-    width_factor = 10  # Adjust the scaling factor as needed
+    width_factor = 5  # Adjust the scaling factor as needed
     max_attention = max(attention_top_values)
     edge_widths = [width_factor * weight / max_attention for weight in attention_top_values]
 
@@ -240,10 +242,43 @@ def visualize_synergy2(top_triplets_with_scores, attention_top_values):
     pos = nx.spring_layout(G)
     nx.draw_networkx_nodes(G, pos, ax=ax, node_size=500, node_color='lightblue')
     nx.draw_networkx_labels(G, pos, ax=ax)
+    #nx.draw(G, with_labels=True, connectionstyle='arc3, rad = 0.1')
+
+     # Draw edges
+    #for i, triplet in enumerate(top_triplets_with_scores): 
+    #    u = str(triplet[0][0])
+    #    v = str(triplet[0][1])
+    #    nx.draw_networkx_edges(G, pos, ax=ax, edgelist=[(u, v)], width=edge_widths[i], edge_color=edge_colors[i])
 
     # Draw edges
-    for (u, v), color, width in zip(G.edges(), edge_colors, edge_widths):
-        nx.draw_networkx_edges(G, pos, ax=ax, edgelist=[(u, v)], width=width, edge_color=color)
+    # Create a dictionary to track the number of edges between each pair of nodes
+    edge_count = {}
+    # Draw each edge with a unique curvature
+    for i, ((drug_1, drug_2, context), _) in enumerate(top_triplets_with_scores):
+        if drug_1==drug_2:
+            label='Self'
+        else:
+            label=f'{context}'
+        # Check if this pair of nodes already has an edge
+        if (drug_1, drug_2) not in edge_count and (drug_2, drug_1) not in edge_count:
+            edge_count[(drug_1, drug_2)] = 0
+        else:
+            # If the edge exists in either direction, increment the count
+            if (drug_2, drug_1) in edge_count:
+                edge_count[(drug_2, drug_1)] += 1
+            else:
+                edge_count[(drug_1, drug_2)] += 1
+        
+        # Set the curvature based on the count of edges
+        curvature = 0.1 * edge_count.get((drug_1, drug_2), 0)
+
+        # Draw the curved edge
+        style = f'arc3, rad={curvature}'
+        nx.draw_networkx_edges(G, pos, ax=ax, edgelist=[(str(drug_1), str(drug_2))], 
+                               width=edge_widths[i], edge_color=edge_colors[i], connectionstyle=style)
+
+    #for (u, v), color, width in zip(G.edges(), edge_colors, edge_widths):
+    #    nx.draw_networkx_edges(G, pos, ax=ax, edgelist=[(u, v)], width=width, edge_color=color)
 
     # Draw context labels
     edge_labels = nx.get_edge_attributes(G, 'context')
