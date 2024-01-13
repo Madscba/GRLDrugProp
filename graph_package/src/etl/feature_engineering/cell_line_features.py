@@ -31,7 +31,7 @@ def make_cell_line_features():
     save_path.mkdir(parents=True, exist_ok=True)
     if not (save_path / "raw" / "OmicsCNGene.csv").exists():
         logger.error(
-            "Please download the file OmicsCNGene.csv.csv gene expressions from https://depmap.org/portal/download/all/ .\n \
+            "Please download the file OmicsCNGene.csv gene expressions from https://depmap.org/portal/download/all/ .\n \
                 Store it in ~/data/features/cell_line_features/raw"
         )
 
