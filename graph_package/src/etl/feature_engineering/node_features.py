@@ -147,7 +147,7 @@ def fit_pca_node_feature(adjacency_matrix, components, node_type, relation):
 def make_node_features(datasets=["ONEIL", "ALMANAC"], components=16, min_degree=4, node_types="all"):
     """Function for generating PCA feature vectors based on Hetionet"""
     # Defining paths
-    datasets_name = "oneil_almanac_old" if datasets == ["ONEIL", "ALMANAC"] else "oneil"
+    datasets_name = "oneil_almanac" if datasets == ["ONEIL", "ALMANAC"] else "oneil"
     save_path = Directories.DATA_PATH / "features" / "node_features"
     save_path.mkdir(parents=True, exist_ok=True)
 
