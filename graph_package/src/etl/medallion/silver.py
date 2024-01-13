@@ -164,7 +164,7 @@ def generate_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
         df_study_cleaned = df_study.dropna(
             subset=["drug_row", "drug_col", "synergy_zip"]
         )
-        df_study_cleaned = filter_from_hetionet(df_study_cleaned)
+        #df_study_cleaned = filter_from_hetionet(df_study_cleaned)
         unique_block_ids = df_study_cleaned["block_id"].unique().tolist()
         download_response_info(unique_block_ids, study, overwrite=False)
         df_study_cleaned = df_study_cleaned.loc[
@@ -201,4 +201,4 @@ def download_response_info(list_entities, study_names="oneil", overwrite=False):
 
 
 if __name__ == "__main__":
-    generate_oneil_almanac_dataset(studies=["oneil_almanac","oneil"])
+    generate_oneil_almanac_dataset(studies=["oneil"])
