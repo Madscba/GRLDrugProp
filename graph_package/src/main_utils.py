@@ -155,9 +155,6 @@ def get_cv_splits(dataset, config):
         return kfold.split(dataset, dataset.get_labels(dataset.indices), group)
 
 def pretrain_single_model(model_name, config, data_loaders, k):
-    check_point_path = Directories.CHECKPOINT_PATH / model_name
-    if os.path.isdir(check_point_path):
-        shutil.rmtree(check_point_path)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=get_checkpoint_path(config.model.pretrain_model, k),
