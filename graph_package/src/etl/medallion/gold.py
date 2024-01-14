@@ -236,7 +236,7 @@ def filter_cell_lines(data_df):
     return data_df
 
 
-def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool = False):
+def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac", overwrite: bool = False):
     """From the relevant block dict from data/silver/<study_name>/block_dict.json fetch mono responses
     and per drug and cell line and aggregate inhibition per concentration.
     Params:
@@ -255,7 +255,6 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
         het = True if study_name in ["oneil_het", "oneil_almanac_het"] else False
         study = study_name[:-4] if het else study_name
         df_block = load_block_as_df(study)
-        df = load_oneil() if study == "oneil" else load_oneil_almanac()
         df_block = df_block.merge(
             df.loc[:, ["drug_row", "drug_col", "cell_line_name", "block_id"]],
             how="left",
@@ -263,9 +262,6 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
         )
 
         df_block = df_block.dropna(subset=["drug_row", "drug_col", "cell_line_name"])
-        if het:
-            df_block = filter_from_hetionet(df_block)
-        del df
         filter_both = (df_block["conc_r"] > 0) & (df_block["conc_c"] > 0)
         filter_zero = (df_block["conc_r"] == 0) & (df_block["conc_c"] == 0)
 
@@ -338,6 +334,7 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
             save_path.mkdir(parents=True, exist_ok=True)
             if het:
                 df = filter_from_hetionet(df)
+            generate_mono_responses(df=df, study_name=study_name)
             rename_dict = {
                 "block_id": "block_id",
                 "drug_row": "drug_1_name",
@@ -363,7 +360,6 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
                 with open(save_path / name, "w") as json_file:
                     json.dump(vocab, json_file)
             df.to_csv(save_path / f"{study_name}.csv", index=False)
-            generate_mono_responses(study_name=study_name)
 
 
 if __name__ == "__main__":
