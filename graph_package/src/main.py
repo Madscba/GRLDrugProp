@@ -42,10 +42,12 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    if (model_name == "gnn") & (config.dataset.drug_representation not in ["distmult", "deepdds"]):
+    if (model_name == "gnn") & (
+        config.dataset.drug_representation not in ["distmult", "deepdds"]
+    ):
         config.dataset.update({"use_node_features": True})
-    
-    dataset = KnowledgeGraphDataset(**config.dataset)
+
+    dataset = KnowledgeGraphDataset(task=config.task, **config.dataset)
     update_model_kwargs(config, model_name, dataset)
 
     splits = get_cv_splits(dataset, config)
@@ -65,7 +67,9 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config, fold=k)]
+        call_backs = [
+            TestDiagnosticCallback(model_name=model_name, config=config, fold=k)
+        ]
 
         train_set, val_set, test_set = split_train_val_test(
             dataset, train_idx, test_idx, config
@@ -93,14 +97,14 @@ def main(config):
             model=model_name,
             fold=k,
             config=config,
-            graph=train_set.dataset.graph.edge_mask(train_set.indices)
+            graph=train_set.dataset.graph.edge_mask(train_set.indices),
         )
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-        
+
         trainer.validate(model, dataloaders=data_loaders["val"])
 
         trainer.fit(
