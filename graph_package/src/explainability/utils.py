@@ -41,7 +41,7 @@ def explain_attention(df, graph, model, topk=20):
             #visualize_attention_single(top_triplets_with_scores, attention_top_values)
             #visualize_attention(top_triplets_with_scores, attention_top_values, use_neg_synergy=False)
             visualize_synergy2(top_triplets_with_scores, attention_top_values)
-            #visualize_attention(top_triplets_with_scores, attention_top_values)
+            visualize_attention(top_triplets_with_scores, attention_top_values)
             #visualize_attention2(attention[:,head], top_indices, top_triplets_with_scores)
         return
 
