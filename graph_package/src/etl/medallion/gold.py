@@ -322,7 +322,7 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
 def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
 
     """
-    Make ONEIL and ONEIL-ALMANAC datasets
+    Make ONEIL and ONEIL-ALMANAC datasets with and without filtering on Hetionet
     """
 
     for study in studies:
@@ -363,4 +363,4 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
 
 
 if __name__ == "__main__":
-    make_oneil_almanac_dataset()
+    make_oneil_almanac_dataset(studies=["oneil"])
