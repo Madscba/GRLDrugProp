@@ -63,8 +63,8 @@ class BasePL(LightningModule):
                 logger=self.logger_enabled,
             )
             self.log(
-                "rescal_weight",
-                self.model.rescal_weight.item(),
+                "distmult_weight",
+                self.model.distmult_weight.item(),
                 on_step=True,
                 on_epoch=True,
                 prog_bar=True,

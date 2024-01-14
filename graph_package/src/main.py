@@ -7,10 +7,10 @@ from graph_package.src.main_utils import (
     get_model_name,
     get_checkpoint_path,
     get_dataloaders,
-    split_dataset,
     update_model_kwargs,
     pretrain_single_model,
     get_cv_splits,
+    split_train_val_test,
 )
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
@@ -20,7 +20,6 @@ from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 from pytorch_lightning.utilities.warnings import PossibleUserWarning
 import hydra
 from dotenv import load_dotenv
-from sklearn.model_selection import train_test_split as train_val_split
 from pytorch_lightning import Trainer
 import sys
 import wandb
@@ -43,10 +42,12 @@ def main(config):
         wandb.login()
 
     model_name = get_model_name(config, sys_args=sys.argv)
-    if (model_name == "gnn") & (config.dataset.drug_representation not in ["distmult", "deepdds"]):
+    if (model_name == "gnn") & (
+        config.dataset.drug_representation not in ["distmult", "deepdds"]
+    ):
         config.dataset.update({"use_node_features": True})
-    
-    dataset = KnowledgeGraphDataset(**config.dataset)
+
+    dataset = KnowledgeGraphDataset(task=config.task, **config.dataset)
     update_model_kwargs(config, model_name, dataset)
 
     splits = get_cv_splits(dataset, config)
@@ -66,21 +67,12 @@ def main(config):
             )
             loggers.append(WandbLogger())
 
-        call_backs = [TestDiagnosticCallback(model_name=model_name, config=config, fold=k)]
+        call_backs = [
+            TestDiagnosticCallback(model_name=model_name, config=config, fold=k)
+        ]
 
-        train_set, test_set = split_dataset(
-            dataset, split_method="custom", split_idx=(train_idx, test_idx)
-        )
-
-        train_idx, val_idx = train_val_split(
-            train_set.indices,
-            test_size=0.1,
-            random_state=config.seed,
-            stratify=dataset.get_labels(train_set.indices),
-        )
-
-        train_set, val_set = split_dataset(
-            dataset, split_method="custom", split_idx=(list(train_idx), list(val_idx))
+        train_set, val_set, test_set = split_train_val_test(
+            dataset, train_idx, test_idx, config
         )
 
         # add reverse edges to training set
@@ -100,18 +92,19 @@ def main(config):
             check_point = pretrain_single_model(model_name, config, data_loaders, k)
             config.model.update({"ckpt_path": check_point})
 
+
         model = init_model(
             model=model_name,
             fold=k,
             config=config,
-            graph=train_set.dataset.graph.edge_mask(train_set.indices)
+            graph=train_set.dataset.graph.edge_mask(train_set.indices),
         )
         trainer = Trainer(
             logger=loggers,
             callbacks=call_backs,
             **config.trainer,
         )
-        
+
         trainer.validate(model, dataloaders=data_loaders["val"])
 
         trainer.fit(
@@ -125,6 +118,7 @@ def main(config):
             dataloaders=data_loaders["test"],
             ckpt_path=checkpoint_callback.best_model_path,
         )
+
         if config.wandb:
             wandb.config.checkpoint_path = checkpoint_callback.best_model_path
             wandb.finish()

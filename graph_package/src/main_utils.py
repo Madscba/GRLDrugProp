@@ -7,6 +7,7 @@ from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
 from graph_package.configs.directories import Directories
 from graph_package.src.pl_modules import BasePL
 from torch.utils.data import random_split, Subset
+from sklearn.model_selection import train_test_split as train_val_split
 from torchdrug.data import DataLoader
 import os
 import random
@@ -82,6 +83,41 @@ def get_drug_few_shot_split(
         print(f"amount of splits: {len(splits)}")
     return splits
 
+def get_cell_line_few_shot_split(
+    dataset, config, n_cell_lines_per_fold=25, print_split_stats=True
+):
+    """Split into 5 folds"""
+    num_cell_lines = dataset.graph.num_relation.cpu().numpy()
+    all_cell_line_ids = list(range(0, num_cell_lines))
+    splits = []
+    df = dataset.data_df
+    for i in range(0, num_cell_lines, n_cell_lines_per_fold):
+        cell_line_ids = all_cell_line_ids[
+            i : min(i + n_cell_lines_per_fold, num_cell_lines)
+        ]
+        # put x triplets from test drugs in train
+        test_idx = []
+        for cell_line_id in cell_line_ids:
+            cell_line_idx = list(df[df["context_id"] == cell_line_id].index)
+            random.shuffle(list(cell_line_idx))
+            n_triplets_to_include_in_train = min(
+                len(cell_line_idx), config.max_train_triplets
+            )
+            # take n_triplets_to_include_in_train and put in test, use remainder for test
+            test_idx = test_idx + cell_line_idx[n_triplets_to_include_in_train:]
+
+        test_idx = list(set(test_idx))
+        train_idx = list(set(dataset.data_df.index).difference(test_idx))
+        splits.append((train_idx, test_idx))
+    train_ratio = [len(split[0]) / (len(split[0]) + len(split[1])) for split in splits]
+    if print_split_stats:
+        print(
+            f"train ratio mean, min, max: {np.mean(train_ratio),np.min(train_ratio), np.max(train_ratio)}"
+        )
+        print(f"amount of splits: {len(splits)}")
+    return splits
+
+
 
 def get_drug_split(dataset, config, n_drugs_per_fold=3):
     splits = []
@@ -103,6 +139,9 @@ def get_cv_splits(dataset, config):
     elif config.group_val == "drug_few_shot":
         splits = get_drug_few_shot_split(dataset, config)
         return splits
+    elif config.group_val =="cell_line_few_shot":
+        splits = get_cell_line_few_shot_split(dataset,config)
+        return splits
     else:
         if config.group_val == "drug_combination":
             group = dataset.data_df.groupby(["drug_1_id", "drug_2_id"]).ngroup()
@@ -114,7 +153,6 @@ def get_cv_splits(dataset, config):
             n_splits=config.n_splits, shuffle=True, random_state=config.seed
         )
         return kfold.split(dataset, dataset.get_labels(dataset.indices), group)
-
 
 def pretrain_single_model(model_name, config, data_loaders, k):
     check_point_path = Directories.CHECKPOINT_PATH / model_name
@@ -226,7 +264,7 @@ def update_model_kwargs(config: dict, model_name: str, dataset):
         config.model.update(update_deepdds_args(config))
     elif model_name == "hybridmodel":
         config.model.deepdds.update(update_deepdds_args(config))
-        config.model.rescal.update(update_shallow_embedding_args(dataset))
+        config.model.distmult.update(update_shallow_embedding_args(dataset))
     elif model_name == "gnn":
         pass
         # config.model.update(update_rgcn_args(config))
@@ -264,6 +302,39 @@ def split_dataset(
         val_set = Subset(dataset, split_idx[1])
 
     return train_set, val_set
+
+
+def split_train_val_test(dataset, train_idx, test_idx, config):
+    train_set, test_set = split_dataset(
+            dataset, split_method="custom", split_idx=(train_idx, test_idx)    
+    )
+
+    if config.group_val == "drug_few_shot": 
+        test_idx, val_idx = train_val_split(
+            test_set.indices,
+            test_size=0.4,
+            random_state=config.seed,
+            stratify=dataset.get_labels(test_set.indices),
+        )
+        
+        test_set, val_set = split_dataset(
+            dataset, split_method="custom", split_idx=(list(test_idx), list(val_idx))
+        )
+    
+    else:
+        train_idx, val_idx = train_val_split(
+            train_set.indices,
+            test_size=0.1,
+            random_state=config.seed,
+            stratify=dataset.get_labels(train_set.indices),
+        )
+
+        train_set, val_set = split_dataset(
+            dataset, split_method="custom", split_idx=(list(train_idx), list(val_idx))
+        )
+
+    return train_set, val_set, test_set
+
 
 def save_pretrained_drug_embeddings(model, fold):
     model_name = model.model._get_name()

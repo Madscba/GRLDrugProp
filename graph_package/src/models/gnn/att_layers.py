@@ -94,16 +94,16 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         # torch.arange(graph.num_node, device=graph.device) is added to make self-loop
         node_in = torch.cat(
             [graph.edge_list[:, 0], torch.arange(graph.num_node, device=graph.device)]
-        )
+        ).to(torch.int64)
         node_out = torch.cat(
             [graph.edge_list[:, 1], torch.arange(graph.num_node, device=graph.device)]
-        )
+        ).to(torch.int64)
         relation = torch.cat(
             [
                 graph.edge_list[:, 2],
                 (self.num_relations) * torch.ones(graph.num_node, device=graph.device),
             ]
-        ).to(torch.int32)
+        ).to(torch.int64)
         edge_weight = torch.cat(
             [graph.edge_weight, torch.ones(graph.num_node, device=graph.device)]
         )
@@ -189,7 +189,6 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         return output
 
 
-
 class GraphAttentionConv(MessagePassingBase):
     """
     This is a PyTorch implementation of the GAT operator from the paper 'Graph Attention Networks?'_.
@@ -209,12 +208,15 @@ class GraphAttentionConv(MessagePassingBase):
         activation (str or function, optional): activation function
     """
 
+    eps = 1e-10
+
     def __init__(
         self,
         input_dim,
         output_dim,
         num_relation,
         dataset,
+        cell_line_features="ccle",
         n_heads: int = 1,
         negative_slope: int = 0.2,
         feature_dropout: int = 0.0,
@@ -229,7 +231,11 @@ class GraphAttentionConv(MessagePassingBase):
         self.concat_hidden = concat_hidden
         self.negative_slope = negative_slope
         self.n_heads = n_heads
-        self.ccle = self._load_ccle()
+        self.encoding = (
+            self._load_ccle()
+            if cell_line_features == "ccle"
+            else self.load_cell_line_onehot()
+        )
         if batch_norm:
             self.batch_norm = nn.BatchNorm1d(output_dim)
         else:
@@ -237,14 +243,14 @@ class GraphAttentionConv(MessagePassingBase):
 
         self.n_hidden = output_dim
 
-        dim = self.input_dim + self.ccle.shape[1]
+        dim = self.input_dim + self.encoding.shape[1]
 
         self.output_dim = self.n_hidden
         self.W = nn.Parameter(torch.empty(size=(output_dim, dim)))
         self.self_loop = nn.Parameter(torch.empty(size=(output_dim, input_dim)))
         nn.init.xavier_uniform_(self.W.data)
-        self.attention = nn.Parameter(torch.zeros(n_heads, output_dim * 2 // n_heads))
-        nn.init.xavier_uniform_(self.attention.data)
+        self.query = nn.Parameter(torch.zeros(n_heads, output_dim * 2 // n_heads))
+        nn.init.xavier_uniform_(self.query.data)
         self.activation = nn.ELU()
 
     def _load_ccle(self):
@@ -268,24 +274,39 @@ class GraphAttentionConv(MessagePassingBase):
         )
         return ccle
 
+    def load_cell_line_onehot(self):
+        # Define the path to the cell line features file
+        vocab_path = (
+            Directories.DATA_PATH / "gold" / self.dataset / "relation_vocab.json"
+        )
+        with open(vocab_path) as f:
+            entity_vocab = json.load(f)
+
+        return torch.eye(len(entity_vocab), device=device)
+
     def transform_input(self, input: torch.Tensor):
         """
         Combine the input tensor with the CCLE tensor,
         by making a tensor of shape (num_relations, num_nodes, input_dim + ccle_dim)
         """
-        ccle = self.ccle
-        input_reshaped = input.unsqueeze(1).expand(-1, ccle.shape[0], -1)
-        ccle_reshaped = ccle.unsqueeze(0).expand(input.shape[0], -1, -1)
-        combined = torch.cat((input_reshaped, ccle_reshaped), dim=2)
+        encoding = self.encoding
+        input_reshaped = input.unsqueeze(1).expand(-1, encoding.shape[0], -1)
+        encoding_reshaped = encoding.unsqueeze(0).expand(input.shape[0], -1, -1)
+        combined = torch.cat((input_reshaped, encoding_reshaped), dim=2)
         # Reshape the combined tensor to the desired shape
         combined = combined.reshape(
-            ccle.shape[0], input.shape[0], input.shape[1] + ccle.shape[1]
+            encoding.shape[0], input.shape[0], input.shape[1] + encoding.shape[1]
         )
         return combined
 
     def message_and_aggregate(self, graph, input):
         # Extract duplets from the graph
         node_in, node_out, relation = graph.edge_list.t()
+
+        edge_weight = torch.cat(
+            [graph.edge_weight, torch.ones(graph.num_node, device=graph.device)]
+        )
+        edge_weight = edge_weight.unsqueeze(-1)
 
         # add cell line embeddings for each node
         combined = self.transform_input(input)
@@ -314,29 +335,38 @@ class GraphAttentionConv(MessagePassingBase):
         )
 
         # Calculate the attention score e_ij with shape [n_nodes, n_nodes, n_heads]
-        e = torch.einsum("nhj, hj -> nh", Wh_concat, self.attention)
+        e = torch.einsum("nhj, hj -> nh", Wh_concat, self.query)
 
-        a = F.leaky_relu(e, negative_slope=self.negative_slope)
+        weight = F.leaky_relu(e, negative_slope=self.negative_slope)
 
-        a = scatter_softmax(a, node_out, dim=0)
+        max_attention_per_node = scatter_max(
+            weight, node_out, dim=0, dim_size=graph.num_node
+        )[0][node_out]
 
-        a = F.dropout(a, self.dropout, training=self.training)
+        # see [Hamilton] eq 5.20
+        attention = (weight - max_attention_per_node).exp()
+        attention = attention * edge_weight
+        # Comment from source: why mean? because with mean we have normalized message scale across different node degrees
+        # I don't know if we want some cell-line specific normalizartion?
+        normalizer = scatter_mean(attention, node_out, dim=0, dim_size=graph.num_node)[
+            node_out
+        ]
 
-        value = Wh_in[node_in].view(-1, self.n_heads, self.attention.shape[-1] // 2)
+        attention = attention / (normalizer + self.eps)
+        # see eq. 5.19 [Hamilton], this is 'h'
+        value = loop_states[node_in].view(-1, self.n_heads, self.query.shape[-1] // 2)
+        # Copies a_{v,u} for each dimension of output
+        attention = attention.unsqueeze(-1).expand_as(value)
+        message = (attention * value).flatten(1)
+        return message
 
-        a = a.unsqueeze(-1).expand_as(value)
-
-        message = a * value
-
-        h_prime = scatter_mean(message, node_out, dim=0)
-
-        # Calculate output for each attention head following eq. 4 [Velickovic] (without non-linearity)
-
-        # Whether to mean across the multiple attention heads or not
-        if self.concat_hidden:
-            return h_prime.flatten(1)
-        else:
-            return h_prime.mean(dim=1)
+    def aggregate(self, graph, message):
+        # add self loop
+        node_out = torch.cat(
+            [graph.edge_list[:, 1], torch.arange(graph.num_node, device=graph.device)]
+        )
+        update = scatter_mean(message, node_out, dim=0, dim_size=graph.num_node)
+        return update
 
     def combine(self, input, update):
         output = update
@@ -344,6 +374,7 @@ class GraphAttentionConv(MessagePassingBase):
             output = self.batch_norm(output)
         output = self.activation(output)
         return output
+
 
 class GraphAttentionLayer(MessagePassingBase):
     """
@@ -525,56 +556,95 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
             self.n_hidden = output_dim
 
         self.output_dim = output_dim
-        # Weight matrix for linear transformation
-        self.W = nn.Linear(self.input_dim,  self.n_hidden * n_heads * (self.num_relation+1))
-        # Attention mechanism
-        self.attention = nn.Parameter(torch.empty(size=((self.num_relation+1), n_heads , output_dim * 2 // n_heads)))
-        nn.init.xavier_uniform_(self.attention.data)
+        self.W = nn.Linear(self.input_dim, self.n_hidden * n_heads)
+
+        # Define parameters for each relation type and each head
+        self.attentions = nn.ModuleList()
+        for _ in range(num_relation):
+            head_attentions = nn.ModuleList(
+                [nn.Linear(2 * self.n_hidden, 1) for _ in range(n_heads)]
+            )
+            self.attentions.append(head_attentions)
+
         self.activation = nn.ELU() if self.concat_hidden else None
+
+    def _add_relation_specific_self_loops(self, n_nodes, device):
+        # Creating self-loop edges for each node and each relation
+        self_loop_edges = (
+            torch.stack(
+                [
+                    torch.arange(n_nodes, device=device)
+                    for _ in range(self.num_relation)
+                ],
+                dim=1,
+            )
+            .view(-1, 1)
+            .repeat(1, 2)
+        )
+        relation_indices = torch.repeat_interleave(
+            torch.arange(self.num_relation, device=device), n_nodes
+        ).view(-1, 1)
+        self_loop_edge_list = torch.cat([self_loop_edges, relation_indices], dim=1)
+        return self_loop_edge_list
 
     def message_and_aggregate(self, graph, input):
         # Extract triplets from the graph and create self-loop edges
         n_nodes = input.shape[0]
-        self_loop_edges = torch.stack([torch.arange(n_nodes, device=graph.device)], dim=1).view(-1, 1).repeat(1, 2)
-        self_loop_edge_list = torch.cat([self_loop_edges, torch.ones(n_nodes,1,dtype=torch.int,device=graph.device)*self.num_relation], dim=1)
+        self_loop_edge_list = self._add_relation_specific_self_loops(
+            n_nodes, graph.device
+        )
         edge_list = torch.cat([graph.edge_list, self_loop_edge_list], dim=0)
-        
         node_in, node_out, relation = edge_list.t()
 
-        # Handling edge weights, assigning small positive weights to self-edges
-        self_loop_weights = torch.ones(n_nodes, device=graph.device)
+        # Handling edge weights, assigning small positive weights to self-loops
+        num_self_loops = n_nodes * self.num_relation
+        self_loop_weights = torch.ones(num_self_loops, device=graph.device) * 0.1
         edge_weight = torch.cat([graph.edge_weight, self_loop_weights])
 
-        # Linear transformation with reshaping for relations
-        Wh = self.W(input).view(-1, self.n_heads, self.n_hidden, self.num_relation+1)
+        # Linear transformation
+        Wh = self.W(input)
+        Wh = Wh.view(-1, self.n_heads, self.n_hidden)
 
-        # Calculate attention coefficients for all attention heads and relations
-        Wh_i = Wh[node_in, :, :, relation]  # Source node features
-        Wh_j = Wh[node_out, :, :, relation]  # Target node features
+        # Initialize output
+        h_prime = torch.zeros(
+            (input.size(0), self.n_heads, self.n_hidden, self.num_relation),
+            device=graph.device,
+        )
 
-        Wh_concat = torch.cat([Wh_i, Wh_j], dim=2) # Concatenate source and target features
+        # Apply attention mechanism for each relation and each head
+        for rel in range(self.num_relation):
+            rel_mask = relation == rel
+            edges = torch.stack([node_in[rel_mask], node_out[rel_mask]])
+            weights = edge_weight[rel_mask].unsqueeze(1)
 
-        # Calculate attention coefficients e_ij for each node pair following eq. 3 [Velickovic] with leaky rely
-        e = torch.einsum("nhd, nhd -> nh", self.attention[relation], Wh_concat)
-        e = F.leaky_relu(e, negative_slope=self.negative_slope)
+            for head in range(self.n_heads):
+                Wh_i = Wh[edges[0], head, :]  # Features of source nodes
+                Wh_j = Wh[edges[1], head, :]  # Features of target nodes
 
-        # Multiply synergy scores to the attention coefficients including self-loop
-        e *= edge_weight.unsqueeze(1)
+                # Calculate attention coefficients e_ij for each node pair following eq. 3 [Velickovic] with leaky rely
+                Wh_concat = torch.cat([Wh_i, Wh_j], dim=-1)
+                e = self.attentions[rel][head](Wh_concat)
+                e = F.leaky_relu(e, negative_slope=self.negative_slope)
 
-        # Normalize attention coefficients and apply dropout
-        a = scatter_softmax(e, node_out, dim=0)
-        a = F.dropout(a, p=self.dropout, training=self.training)
+                # Multiply synergy scores to the attention coefficients including self-loop
+                e *= weights
 
-        # Expand 'a' to have the same number of dimensions as 'Wh_j'
-        a = a.unsqueeze(-1).expand_as(Wh_i)
+                # Now normalize following eq. 3 [Velickovic]
+                a = scatter_softmax(e, edges[1], dim=0)
+                a = F.dropout(a, p=self.dropout, training=self.training)
 
-        # Aggregate the attention-weighted node features for each source node and compute final output features
-        # following eq. 4 [Velickovic]
-        h_prime = scatter_add(a * Wh_i, node_in, dim=0, dim_size=input.size(0))
+                # Compute final output features for every node for the attention head following eq. 4 [Velickovic]
+                h_prime[:, head, :, rel] = scatter_add(
+                    a * Wh_j, edges[1], dim=0, dim_size=input.size(0)
+                )
 
+        # Mean across relations
+        h_prime = h_prime.mean(dim=-1)
+
+        # Whether to mean across the multiple attention heads or not
         if self.concat_hidden:
             # eq. 5 [Velickovic]
-            return h_prime.view(input.shape[0], self.n_heads * self.n_hidden)
+            return h_prime.reshape(input.shape[0], self.n_heads * self.n_hidden)
         else:
             return h_prime.mean(dim=1)
 
@@ -585,6 +655,7 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
         if self.activation:
             output = self.activation(output)
         return output
+
 
 class GraphAttentionLayerPerCellLine(RelationalGraphAttentionConv):
     def __init__(self, *args, **kwargs):
