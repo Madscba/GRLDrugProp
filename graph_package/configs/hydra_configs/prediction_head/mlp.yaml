@@ -8,7 +8,7 @@ model:
       cell_line_features: ccle
       custom_lr_setup:
         value: False
-        lr_ph_cell_mlp: 0.01
-        lr_ph_global_mlp: 0.0002
+        lr_ph_cell_mlp: 0.001
+        lr_ph_global_mlp: 0.001
       batch_norm: False #this value overwrites enc_kwargs.batch_norm in gnn.yaml
       feature_dropout: 0.0 #this value overwrites enc_kwargs.feature_dropout in gnn.yaml
