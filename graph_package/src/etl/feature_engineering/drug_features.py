@@ -1,5 +1,5 @@
 from graph_package.configs.directories import Directories
-from graph_package.src.etl.medallion.silver import get_drug_info
+from graph_package.src.etl.medallion.gold import get_drug_info
 import pandas as pd
 from graph_package.src.error_analysis.utils import get_drug_info as get_drug_info_full
 
@@ -137,7 +137,8 @@ def get_drug_SMILES_repr():
         Directories.DATA_PATH / "silver" / datasets_name / f"{datasets_name}.csv"
     )
     drugs = pd.read_csv(data_path)
-    drug_info = get_drug_info(drugs, add_SMILES=True)
+    unique_drug_names = set(drugs["drug_row"]).union(set(drugs["drug_col"]))
+    drug_info = get_drug_info(drugs, unique_drug_names, add_SMILES=True)
     df_drug_info = pd.DataFrame(drug_info).T.reset_index()
     df_drug_info = df_drug_info.rename(columns={"index": "drug_name"})
     drug_SMILES = [d.split(";")[0] for d in df_drug_info["SMILES"]]

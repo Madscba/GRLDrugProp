@@ -1,8 +1,9 @@
 from graph_package.configs.directories import Directories
-from graph_package.src.etl.medallion.load import load_jsonl
 import pandas as pd
 import numpy as np
 import os
+import requests
+import bz2
 from graph_package.utils.helpers import init_logger
 from graph_package.src.etl.feature_engineering.cell_line_features import (
     make_cell_line_features,
@@ -15,10 +16,146 @@ from graph_package.src.etl.medallion.load import (
     load_oneil_almanac,
     load_block_as_df,
     load_mono_response,
+    load_jsonl
 )
 
 logger = init_logger()
 
+def partial_name_match(filtered_drug_dict):
+    # Check for different name conventions and edge cases
+    filtered_drugs = [drug for drug in filtered_drug_dict.keys()]
+    fd_lower = [d.lower() for d in filtered_drugs]
+    fd_cap = [d.capitalize() for d in filtered_drugs]
+    fd_title = [d.title() for d in filtered_drugs]
+    final_drugs = (
+        filtered_drugs
+        + fd_lower
+        + fd_cap
+        + fd_title
+        + ["5-Aminolevulinic acid hydrochloride"]
+    )
+    return final_drugs
+
+
+def download_hetionet(data_path):
+    url = "https://media.githubusercontent.com/media/hetio/hetionet/main/hetnet/json/hetionet-v1.0.json.bz2?download=true"
+    response = requests.get(url)
+    if response.status_code == 200:
+        logger.info("Downloading Hetionet json file from GitHub..")
+        # Decompress the content
+        decompressed_content = bz2.decompress(response.content)
+
+        # Decode bytes to string
+        decompressed_content_str = decompressed_content.decode("utf-8")
+
+        # Save the decompressed content to a file
+        with open(data_path / "hetionet-v1.0.json", "w") as file:
+            file.write(decompressed_content_str)
+    else:
+        logger.info(
+            f"Failed to download Hetionet json file. Status code: {response.status_code}"
+        )
+
+
+def filter_drugs_in_graph(drug_info):
+    """
+    Function for filtering drugs in DrugComb found in Hetionet
+    """
+
+    # Load Hetionet from json
+    data_path = Directories.DATA_PATH / "hetionet"
+    data_path.mkdir(exist_ok=True, parents=True)
+    if not os.path.exists(data_path / "hetionet-v1.0.json"):
+        download_hetionet(data_path)
+    with open(data_path / "hetionet-v1.0.json") as f:
+        graph = json.load(f)
+    nodes = graph["nodes"]
+    edges = graph["edges"]
+
+    # Select subset of drug IDs corresponding to drug IDs that exist in the graph
+    drugs_in_graph = {}
+    for node in nodes:
+        if node["kind"] == "Compound":
+            drugs_in_graph[node["name"]] = {}
+            drugs_in_graph[node["name"]]["inchikey"] = node["data"]["inchikey"][9:]
+            drugs_in_graph[node["name"]]["DB"] = node["identifier"]
+
+    # Check each drug in drug_info and add it to filtered dict if found in drugs_in_graph
+    filtered_drug_dict = {}
+    logger.info("Filtering drugs in Hetionet..")
+    for drug_name, identifiers in drug_info.items():
+        for graph_drug_name, graph_identifiers in drugs_in_graph.items():
+            # Match on drug names
+            if (
+                graph_drug_name.lower() in drug_name.lower()
+                or graph_drug_name in drug_name.title()
+            ):
+                filtered_drug_dict[drug_name] = graph_identifiers
+            else:
+                for identifier_key, identifier_value in identifiers.items():
+                    # Match on drug synonyms
+                    if identifier_key == "synonyms":
+                        if graph_drug_name in identifier_value:
+                            filtered_drug_dict[drug_name] = graph_identifiers
+                    # Match on drugbank ID or inchikey
+                    elif graph_identifiers.get(identifier_key) == identifier_value:
+                        filtered_drug_dict[drug_name] = graph_identifiers
+
+    drug_ids = [filtered_drug_dict[drug]["DB"] for drug in filtered_drug_dict.keys()]
+    logger.info(f"{len(drug_ids)} of {len(drug_info)} drugs found in Hetionet")
+    drug_edges = [
+        e
+        for e in edges
+        if (e["target_id"][0] == "Compound") or (e["source_id"][0] == "Compound")
+    ]
+    return drug_ids, filtered_drug_dict, drug_edges
+
+
+def get_drug_info(drugs: pd.DataFrame, unique_drug_names: list, add_SMILES: bool = False):
+    """
+    Filter drugs from DrugComb to match drugs in Hetionet
+    """
+    dict_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "drug_dict.json"
+
+    # Load drug dict from DrugComb with metadata on drugs
+    with open(dict_path) as f:
+        drug_dict = json.load(f)
+
+    # Make info dict with drug name, DrugBank ID and inchikey for each drug
+    drug_info = {}
+    for drug in unique_drug_names:
+        if add_SMILES:
+            drug_info[drug] = {}
+            drug_info[drug]["SMILES"] = drug_dict[drug]["smiles"]
+        else:
+            # Check for different name conventions and edge cases
+            drug_name_v1 = drug.capitalize() if not drug[0].isupper() else drug
+            drug_name_v2 = drug_name_v1.title() if not drug_name_v1[0].isalpha() else drug
+            drug_info[drug] = {}
+            drug_info[drug]["synonyms"] = drug_dict[drug]["synonyms"].split(";") + [drug_name_v1, drug_name_v2]
+            drug_info[drug]["inchikey"] = drug_dict[drug]["inchikey"]
+            drug_info[drug]["DB"] = drug_dict[drug]["drugbank_id"]
+
+    return drug_info
+
+
+def filter_from_hetionet(drugs, drug_identifiers = ["drug_row", "drug_col"]):
+
+    unique_drug_names = set(drugs[drug_identifiers[0]]).union(set(drugs[drug_identifiers[1]]))
+
+    # Get drug info
+    drug_info = get_drug_info(drugs, unique_drug_names)
+
+    # Find drugs in Hetionet
+    _, filtered_drug_dict, _ = filter_drugs_in_graph(drug_info)
+
+    # Filter drugs from ONEIL-ALMANAC that exists in Hetionet
+    potential_drug_names = partial_name_match(filtered_drug_dict)
+    filtered_df = drugs[
+        drugs[drug_identifiers[0]].isin(potential_drug_names)
+        & drugs[drug_identifiers[1]].isin(potential_drug_names)
+    ]
+    return filtered_df
 
 def agg_loewe_and_make_binary(df: pd.DataFrame):
     sub_df = df.groupby(["drug_1_name", "drug_2_name", "context"]).mean().reset_index()
@@ -99,7 +236,7 @@ def filter_cell_lines(data_df):
     return data_df
 
 
-def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool = False):
+def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac", overwrite: bool = False):
     """From the relevant block dict from data/silver/<study_name>/block_dict.json fetch mono responses
     and per drug and cell line and aggregate inhibition per concentration.
     Params:
@@ -115,9 +252,9 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
     if (not (data_path / m_file_name).exists()) | overwrite:
         if (data_path / m_file_name).exists():
             os.remove(data_path / m_file_name)
-
-        df_block = load_block_as_df(study_name)
-        df = load_oneil() if study_name == "oneil" else load_oneil_almanac()
+        het = True if study_name in ["oneil_het", "oneil_almanac_het"] else False
+        study = study_name[:-4] if het else study_name
+        df_block = load_block_as_df(study)
         df_block = df_block.merge(
             df.loc[:, ["drug_row", "drug_col", "cell_line_name", "block_id"]],
             how="left",
@@ -125,8 +262,6 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
         )
 
         df_block = df_block.dropna(subset=["drug_row", "drug_col", "cell_line_name"])
-
-        del df
         filter_both = (df_block["conc_r"] > 0) & (df_block["conc_c"] > 0)
         filter_zero = (df_block["conc_r"] == 0) & (df_block["conc_c"] == 0)
 
@@ -178,51 +313,54 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
                 )
             )
             df_mono.loc[idx] = stat_array
-        df_mono.to_csv(data_path / m_file_name, index=True)
+        save_path = Directories.DATA_PATH / "gold" / study_name
+        save_path.mkdir(exist_ok=True, parents=True)
+        df_mono.to_csv(save_path / m_file_name, index=True)
 
 
 
-def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
+def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
 
     """
-    Make ONEIL and ONEIL-ALMANAC datasets
+    Make ONEIL and ONEIL-ALMANAC datasets with and without filtering on Hetionet
     """
 
     for study in studies:
-        logger.info(f"Making {study} dataset.")
-        save_path = Directories.DATA_PATH / "gold" / study
-        save_path.mkdir(parents=True, exist_ok=True)
-        df = load_oneil() if study == "oneil" else load_oneil_almanac()
-        
-        rename_dict = {
-            "block_id": "block_id",
-            "drug_row": "drug_1_name",
-            "drug_col": "drug_2_name",
-            "cell_line_name": "context",
-        }
+        for het in [False, True]:
+            df = load_oneil() if study == "oneil" else load_oneil_almanac()
+            study_name = study + "_het" if het else study
+            logger.info(f"Making {study_name} dataset.")
+            save_path = Directories.DATA_PATH / "gold" / study_name
+            save_path.mkdir(parents=True, exist_ok=True)
+            if het:
+                df = filter_from_hetionet(df)
+            generate_mono_responses(df=df, study_name=study_name)
+            rename_dict = {
+                "block_id": "block_id",
+                "drug_row": "drug_1_name",
+                "drug_col": "drug_2_name",
+                "cell_line_name": "context",
+            }
 
-        df.rename(columns=rename_dict, inplace=True)
-        columns_to_keep = list(rename_dict.values()) + ["css_col", "css_row"]
-        df = df[columns_to_keep]
+            df.rename(columns=rename_dict, inplace=True)
+            columns_to_keep = list(rename_dict.values()) + ["css_col", "css_row"]
+            df = df[columns_to_keep]
 
-        df = get_max_zip_response(df, study)
+            df = get_max_zip_response(df, study)
 
-        df["css"] = (df["css_col"] + df["css_row"]) / 2
+            df["css"] = (df["css_col"] + df["css_row"]) / 2
+    
+            df = filter_cell_lines(df)
 
-  
-        df = filter_cell_lines(df)
-
-        df, drug_vocab = create_drug_id_vocabs(df)
-        df, cell_line_vocab = create_cell_line_id_vocabs(df)
-        for vocab, name in zip(
-            (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
-        ):
-            with open(save_path / name, "w") as json_file:
-                json.dump(vocab, json_file)
-        df.to_csv(save_path / f"{study}.csv", index=False)
-        
-        generate_mono_responses(study_name=study)
+            df, drug_vocab = create_drug_id_vocabs(df)
+            df, cell_line_vocab = create_cell_line_id_vocabs(df)
+            for vocab, name in zip(
+                (drug_vocab, cell_line_vocab), ["entity_vocab.json", "relation_vocab.json"]
+            ):
+                with open(save_path / name, "w") as json_file:
+                    json.dump(vocab, json_file)
+            df.to_csv(save_path / f"{study_name}.csv", index=False)
 
 
 if __name__ == "__main__":
-    make_oneil_almanac_dataset()
+    make_oneil_almanac_dataset(studies=["oneil"])
