@@ -14,14 +14,21 @@ from graph_package.src.error_analysis.err_utils.err_utils_data_manipulation impo
 )
 
 
-def get_saved_pred(
-    model_names: t.List[str], task: str, path_to_prediction_folder: Path[""]
-):
+def get_saved_pred(e_conf: t.Dict):
     """Err diagnostics function to get saved predictions given model names and path"""
-    pred_file_names = [f"{model}_model_pred_dict.pkl" for model in model_names]
+    p_pre = Directories.OUTPUT_PATH / "model_predictions"
+    path_to_prediction_folder_and_pred_file_name_tuple = [
+        (
+            p_pre / c["day_of_prediction"] / "_".join([c["task"], c["target"]]),
+            c["prediction_file_name"],
+        )
+        for _, c in e_conf.items()
+    ]
+
+    # pred_file_names = [err_config[i]["prediction_file_name"] for model in model_names]
     pred_dfs = [
         get_prediction_dataframe(pred_file, save_path=path_to_prediction_folder)
-        for pred_file in pred_file_names
+        for path_to_prediction_folder, pred_file in path_to_prediction_folder_and_pred_file_name_tuple
     ]
     return pred_dfs
 

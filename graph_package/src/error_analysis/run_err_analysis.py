@@ -63,11 +63,9 @@ def run_err_diag(
         )
 
 
-def load_and_prepare_predictions_for_comp(
-    model_names, entity, comparison, path_to_prediction_folder, task
-):
+def load_and_prepare_predictions_for_comp(model_names, entity, comparison, err_configs):
     # load predictions (triplets, predictions, targets) from trained model(s),
-    pred_dfs = get_saved_pred(model_names, task, path_to_prediction_folder)
+    pred_dfs = get_saved_pred(err_configs)
 
     # enrich predictions with vocabularies and meta data
     pred_dfs = enrich_model_predictions(model_names, pred_dfs, task)
@@ -75,6 +73,15 @@ def load_and_prepare_predictions_for_comp(
     metric_name = "AUC_ROC" if task == "clf" else "MSE"
     group_by_column = ENTITY_ERR_DICT[entity]["group_by"]
     x_label_col_name = ENTITY_ERR_DICT[entity]["x_label_column_name"]
+
+    # todo add a check for entity = "drug":
+    if entity == "drug":
+        if len(pred_dfs) > 1:
+            df_drug_without_dupl = [
+                get_drug_level_df([pred_dfs[i]], task) for i in range(len(pred_dfs))
+            ]
+        else:
+            df_drug_without_dupl = [get_drug_level_df(pred_dfs, task)]
 
     # prepare df(s) for relevant comparison
     if comparison == "individual":
@@ -127,9 +134,7 @@ def load_and_prepare_predictions_for_comp(
     return grouped_dfs
 
 
-def main_error_diagnostics(
-    task, path_to_prediction_folder, comparison, model_names, entities
-):
+def main_error_diagnostics(err_configs, comparison, model_names, entities):
     if comparison == "individual":
         for i in range(len(model_names)):
             for entity in entities:
@@ -137,31 +142,24 @@ def main_error_diagnostics(
                     [model_names[i]],
                     entity,
                     comparison,
-                    path_to_prediction_folder,
-                    task,
+                    {0: err_configs[i]},
                 )
                 generate_error_plots_per_entity(
-                    df, task, comparison, entity, model_names[i]
+                    df,
+                    {0: err_configs[i]},
+                    entity,
+                    comparison,
+                    model_names[i],
                 )
-                # run_err_diag(
-                #     df,
-                #     model_names[i],
-                #     path_to_prediction_folder,
-                #     task,
-                #     entity,
-                #     comparison,
-                # )
+
     else:
         for entity in entities:
             dfs = load_and_prepare_predictions_for_comp(
-                model_names, entity, comparison, path_to_prediction_folder, task
+                model_names, entity, comparison, err_configs
             )
             generate_error_plots_per_entity(
-                dfs, task, comparison, entity, "&".join(model_names)
+                dfs, {0: err_configs[0]}, entity, comparison, "&".join(model_names)
             )
-            # run_err_diag(
-            #     dfs, model_names, path_to_prediction_folder, task, entity, comparison
-            # )
 
 
 if __name__ == "__main__":
@@ -175,11 +173,28 @@ if __name__ == "__main__":
         / "_".join([task, target])
     )
 
+    model_1_config = {
+        "task": "reg",
+        "target": "zip_mean",
+        "day_of_prediction": "10_12_2023",
+        "prediction_file_name": f"rescal_model_pred_dict.pkl",
+        "plot_config": {"add_bar_info": True},
+    }
+
+    # Note that if multiple model_configs are given and the comparison is not individual,
+    # the first models plotting config will be used.
+
+    err_configs = {
+        0: model_1_config,
+        1: model_1_config,
+    }
     # todo validate: that models names can be 1 or more. check that every comparison works. And that each entity works
-    comparison = "individual"  # "individual", "concatenate" or "difference"
+    comparison = "concatenate"  # "individual", "concatenate" or "difference"
     model_names = ["rescal", "deepdds"]
     entities = ["drug_pair", "drug", "disease", "tissue", "cancer_cell", "drug_target"]
 
-    main_error_diagnostics(
-        task, path_to_prediction_folder, comparison, model_names, entities
-    )
+    assert len(model_names) == len(
+        err_configs
+    ), "Number of models and configs must be equal"
+
+    main_error_diagnostics(err_configs, comparison, model_names, entities)

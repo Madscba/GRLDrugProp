@@ -8,6 +8,7 @@ import pandas as pd
 from sklearn.metrics import (
     roc_auc_score,
 )
+import seaborn as sns
 
 from graph_package.src.error_analysis.err_utils.err_utils_load import (
     get_model_pred_path,
@@ -50,9 +51,9 @@ ENTITY_ERR_DICT = {
 
 def generate_error_plots_per_entity(
     df,
-    task,
-    comparison,
+    e_conf,
     entity,
+    comparison,
     model_name
     # pred_dfs,
     # model_names,
@@ -74,7 +75,7 @@ def generate_error_plots_per_entity(
     Returns:
         None
     """
-    metric_name = "AUC_ROC" if task == "clf" else "MSE"
+    metric_name = "AUC_ROC" if e_conf[0]["task"] == "clf" else "MSE"
     save_path = Directories.OUTPUT_PATH / "err_diagnostics"
 
     if not save_path.exists():
@@ -83,19 +84,33 @@ def generate_error_plots_per_entity(
     if metric_name == "AUC_ROC":
         df = filter_away_groups_without_pos_and_neg_cases(df, entity)
 
-    sorted_df, top10_df = sort_df_by_metric(df, metric_name, task, comparison)
+    sorted_df, top10_df, top_and_bottom5 = sort_df_by_metric(
+        df, metric_name, e_conf, comparison
+    )
 
-    for idx, df in enumerate([sorted_df, top10_df]):
+    # correlation_analysis()
+
+    avg_exp_and_mean_target = [
+        np.round(np.mean(sorted_df[exp_data].values), 2)
+        for exp_data in ["n_exp", "mean_target"]
+    ]
+    df_corr = get_err_correlations(sorted_df, metric_name, avg_exp_and_mean_target)
+    generate_corr_heatmap(
+        df_corr, save_path, entity, metric_name, model_name, comparison
+    )
+
+    # bar plots
+    for idx, df in enumerate([sorted_df, top10_df, top_and_bottom5]):
         # todo add correlation and avg mt and n_exp to plot and save
-        plot_individual(
+        generate_bar_plot(
             df,
             entity,
             metric_name,
-            task,
+            e_conf,
             comparison,
             model_name,
             save_path,
-            ["full", "top10"][idx],
+            ["full", "top10", "top_and_bottom5"][idx],
         )
 
     # plot_full_and_top10_together(
@@ -112,6 +127,17 @@ def generate_error_plots_per_entity(
     #     run_name,
     #     task,
     # )
+
+
+def generate_corr_heatmap(
+    df_corr, save_path, entity, metric_name, model_name, comparison
+):
+    plt.figure(figsize=(8, 5))
+    sns.heatmap(df_corr, annot=True, cmap="Blues")
+    plt.title(f"{entity}_{model_name}_{comparison}_{metric_name}_corr")
+    plt.tight_layout()
+    plt.savefig(save_path / f"{entity}_{model_name}_{comparison}_{metric_name}_corr")
+    plt.clf()
 
 
 def enrich_df_w_metric_nexp_meantarget_per_group(df, group_by_columns, metric_name):
@@ -206,6 +232,9 @@ def generate_difference_df(
     df_diff[metric_name] = abs(
         df_diff[metrics_columns[0]] - df_diff[metrics_columns[1]]
     )
+    df_diff[metric_name + "_w_sign"] = abs(
+        df_diff[metrics_columns[0]] - df_diff[metrics_columns[1]]
+    )
     df_diff["mean_target"] = (
         df_diff[mean_target_columns[0]].values + df_diff[mean_target_columns[1]].values
     ) / 2
@@ -291,11 +320,11 @@ def plot_full_and_top10_together(
     plt.clf()
 
 
-def plot_individual(
+def generate_bar_plot(
     df,
     entity,
     metric_name,
-    task,
+    e_conf,
     comparison,
     model_name,
     save_path,
@@ -313,22 +342,32 @@ def plot_individual(
     # xlabel_col_name,
     # avg_exp_and_mean_target,
 ):
+    task, plot_conf = e_conf[0]["task"], e_conf[0]["plot_config"]
     x_label_col_name = ENTITY_ERR_DICT[entity]["x_label_column_name"]
+
+    # todo extract plotting arguments and use:
+    # title = plot_conf['plotting_config'].get("title", "Default Title")  # Use "Default Title" if "title" is not present
 
     plt.figure(figsize=(8, 5))
     plt.subplot(1, 1, 1)
-    # sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
     df[metric_name].plot(kind="bar", ax=plt.gca(), color=PLOT_COLORS[0])
-    # plt.gca().set_ylim(0, 1)
-    # plt.xticks(rotation=45)
     plt.gca().set_ylabel(metric_name)
-    if scope != "full":
+    if scope == "top10":
         plt.gca().set_xticks(range(len(df)))
         plt.gca().set_xticklabels(df[x_label_col_name])
-        title = f"{entity}_{model_name}_{comparison}"
-    else:
+        if "title" in plot_conf:
+            title = plot_conf["title"]
+        else:
+            title = f"{entity}_{model_name}_{comparison} top10 errors"
+    elif scope == "full":
         plt.xticks([])
-        title = f"{entity}_{model_name}_{comparison} top10 errors"
+        if "title" in plot_conf:
+            title = plot_conf["title"]
+        else:
+            title = f"{entity}_{model_name}_{comparison}"
+    else:
+        title = f"{entity}_{model_name}_{comparison} top and bottom 5 errors"
+
     plt.title(f"{title}\n {metric_name}")
     # plt.ylim(-7, 0)
     # avg_exp_and_mean_target = [
@@ -352,14 +391,18 @@ def plot_individual(
     #     ha="center",
     #     va="bottom",
     # )
-    # if add_bar_info:
-    #     for index, value in enumerate(top10_df[metric_name]):
-    #         mt = np.round(top10_df.loc[index, ["mean_target"]].values[0], 2)
-    #         bar_text = f"n:\n{top10_df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
-    #         plt.text(index, value, bar_text, ha="center", va="bottom")
+    add_bar_info = plot_conf.get("add_bar_info", False)
+
+    if add_bar_info and scope != "full":
+        for i, value in enumerate(df[metric_name]):
+            index = df.index[i]
+            mt = np.round(df.loc[index, ["mean_target"]].values[0], 2)
+            bar_text = f"n:\n{df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
+            plt.text(i, value, bar_text, ha="center", va="bottom")
     plt.legend([model_name])
     plt.tight_layout()
-    plt.savefig(save_path / f"{title}_{scope}_bar")
+    # plt.savefig(save_path / f"{title}_{scope}_bar")
+    plt.clf()
 
 
 def check_accepted_sample_ratio(original_size, filtered_size, group_by_columns):
@@ -370,7 +413,7 @@ def check_accepted_sample_ratio(original_size, filtered_size, group_by_columns):
         )
 
 
-def sort_df_by_metric(df, metric_name, task, comparison):
+def sort_df_by_metric(df, metric_name, e_conf, comparison):
     """
     Sort values by the metric given. Return sorted values with the tail containing performance on the worst entities.
     Args:
@@ -381,6 +424,8 @@ def sort_df_by_metric(df, metric_name, task, comparison):
     Returns:
         df (pd.DataFrame): sorted dataframe
     """
+    task = e_conf[0]["task"]
+
     ascending_order = task != "clf"
     df = df.sort_values(by=metric_name, ascending=ascending_order)
     # Get entitities with top 10 worst performance
@@ -388,7 +433,8 @@ def sort_df_by_metric(df, metric_name, task, comparison):
         top10_df = df.head(10)
     else:
         top10_df = df.tail(10)
-    return df, top10_df
+    top_and_bottom5 = pd.concat([df.head(5), df.tail(5)])
+    return df, top10_df, top_and_bottom5
 
 
 def get_err_correlations(df, metric_name, avg_exp_and_mean_target) -> pd.DataFrame:
@@ -397,7 +443,13 @@ def get_err_correlations(df, metric_name, avg_exp_and_mean_target) -> pd.DataFra
     mt = df["mean_target"]
     abs_mt_deviation_from_avg_mt = abs(df["mean_target"] - avg_exp_and_mean_target[1])
     df_corr = pd.DataFrame(
-        [metric_val, n_exp, mt, abs_mt_deviation_from_avg_mt]
+        [metric_val, n_exp, mt, abs_mt_deviation_from_avg_mt],
+        columns=[
+            f"{metric_name}",
+            "n_exp",
+            "mean_target",
+            "abs_dev_mt                                                                                                                 ",
+        ],
     ).T.corr()
     return round(df_corr, 2)
 
