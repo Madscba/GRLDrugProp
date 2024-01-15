@@ -304,7 +304,7 @@ def split_train_val_test(dataset, train_idx, test_idx, config):
         dataset, split_method="custom", split_idx=(train_idx, test_idx)
     )
 
-    if config.group_val == "drug_few_shot":
+    if config.group_val in ("drug_few_shot", "cell_line_few_shot", "drug_combination"):
         test_idx, val_idx = train_val_split(
             test_set.indices,
             test_size=0.4,
