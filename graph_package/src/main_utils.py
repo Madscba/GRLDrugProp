@@ -327,7 +327,7 @@ def split_train_val_test(dataset, train_idx, test_idx, config):
         train_set, val_set = split_dataset(
             dataset, split_method="custom", split_idx=(list(train_idx), list(val_idx))
         )
-
+    train_set.indices = list(train_set.indices)
     return train_set, val_set, test_set
 
 
