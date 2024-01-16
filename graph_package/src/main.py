@@ -110,7 +110,7 @@ def main(config):
         trainer.fit(
             model,
             train_dataloaders=data_loaders["train"],
-            val_dataloaders=data_loaders["val"],
+            val_dataloaders=data_loaders["val"]
         )
 
         trainer.test(

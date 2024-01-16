@@ -1,7 +1,7 @@
 deepdds:
   dataset_path: ''
 distmult: 
-  dim: 256 
+  dim: 512 
   ent_tot: ''
   rel_tot: ''
 

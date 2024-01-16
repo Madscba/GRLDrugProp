@@ -166,7 +166,7 @@ def generate_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
         )
         #df_study_cleaned = filter_from_hetionet(df_study_cleaned)
         unique_block_ids = df_study_cleaned["block_id"].unique().tolist()
-        download_response_info(unique_block_ids, study, overwrite=False)
+        download_response_info(unique_block_ids, study, overwrite=True)
         df_study_cleaned = df_study_cleaned.loc[
             :, ~df_study_cleaned.columns.str.startswith("Unnamed")
         ]

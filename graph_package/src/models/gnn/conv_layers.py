@@ -133,7 +133,7 @@ class GraphConv(MessagePassingBase):
         output_dim,
         num_relation,
         dataset,
-        include_cell_line_features=True,
+        cell_line_features=True,
         batch_norm=False,
         feature_dropout=0.0,
     ):
@@ -142,16 +142,20 @@ class GraphConv(MessagePassingBase):
         self.output_dim = output_dim
         self.num_relation = num_relation
         self.dataset = dataset
-        self.include_cell_line_features = include_cell_line_features
+        self.cell_line_features = cell_line_features
 
         if batch_norm:
             self.batch_norm = nn.BatchNorm1d(output_dim)
         else:
             self.batch_norm = None
 
-        if include_cell_line_features:
-            self.ccle = self._load_ccle()
-            cell_feature_size = self.ccle.shape[1]
+        if cell_line_features:
+            self.encoding = (
+            self._load_ccle()
+            if cell_line_features == "ccle"
+            else self.load_cell_line_onehot()
+        )
+            cell_feature_size = self.encoding.shape[1]
             dim = input_dim + cell_feature_size
 
         else:
@@ -161,6 +165,16 @@ class GraphConv(MessagePassingBase):
         self.self_loop = nn.Linear(input_dim, output_dim)
         self.linear = nn.Linear(dim, output_dim)
         self.feature_dropout = nn.Dropout(feature_dropout)
+    
+    def load_cell_line_onehot(self):
+        # Define the path to the cell line features file
+        vocab_path = (
+            Directories.DATA_PATH / "gold" / self.dataset / "relation_vocab.json"
+        )
+        with open(vocab_path) as f:
+            entity_vocab = json.load(f)
+
+        return torch.eye(len(entity_vocab), device=device)
 
     def _load_ccle(self):
         feature_path = (
@@ -188,8 +202,8 @@ class GraphConv(MessagePassingBase):
         Combine the input tensor with the CCLE tensor,
         by making a tensor of shape (num_relations*num_nodes, input_dim + ccle_dim)
         """
-        ccle = self.ccle
-        input_reshaped = input.unsqueeze(1).expand(-1, self.ccle.shape[0], -1)
+        ccle = self.encoding
+        input_reshaped = input.unsqueeze(1).expand(-1, self.encoding.shape[0], -1)
         ccle_reshaped = ccle.unsqueeze(0).expand(input.shape[0], -1, -1)
         combined = torch.cat((input_reshaped, ccle_reshaped), dim=2)
 
@@ -200,7 +214,14 @@ class GraphConv(MessagePassingBase):
     def message_and_aggregate(self, graph, input):
         assert graph.num_relation == self.num_relation
         node_in, node_out, relation = graph.edge_list.t()
-        node_out = node_out * self.num_relation + relation
+        if self.cell_line_features:
+            input = self.transform_input(input)
+            node_out = node_out * self.num_relation + relation
+            adj_size = graph.num_node * graph.num_relation
+        
+        else:
+            adj_size = graph.num_node
+
         degree_out = scatter_add(
             graph.edge_weight, node_out, dim_size=graph.num_node * graph.num_relation
         )
@@ -210,11 +231,9 @@ class GraphConv(MessagePassingBase):
         adjacency = utils.sparse_coo_tensor(
             torch.stack([node_in, node_out]),
             edge_weight,
-            (graph.num_node, graph.num_node * graph.num_relation),
+            (graph.num_node, adj_size),
         )
         # concatenate drug features with cell line features
-        if self.include_cell_line_features:
-            input = self.transform_input(input)
 
         update = torch.sparse.mm(adjacency, input)
         return update.view(graph.num_node, input.shape[1])

@@ -1,7 +1,4 @@
 # @package _global_
-defaults:
-  - _self_
-  - model: deepdds # override model by writing model=rescal or model=hybridmodel as command line argument to main.py
 
 run_name: 'NO_NAME'
 wandb: False
