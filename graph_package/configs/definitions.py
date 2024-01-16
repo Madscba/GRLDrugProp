@@ -33,6 +33,10 @@ dataset_dict = {
     / "gold"
     / "oneil_almanac"
     / "oneil_almanac.csv",
+    "oneil_almanac_het": Directories.DATA_PATH
+    / "gold"
+    / "oneil_almanac_het"
+    / "oneil_almanac_het.csv",
 }
 
 
