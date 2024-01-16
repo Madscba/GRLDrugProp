@@ -1,7 +1,4 @@
 # @package _global_
-defaults:
-  - _self_
-  - model: deepdds # override model by writing model=rescal or model=hybridmodel as command line argument to main.py
 
 run_name: 'NO_NAME'
 wandb: False
@@ -20,7 +17,7 @@ remove_old_checkpoints: True
 task: 'reg' #clf (does not work for css)
 
 dataset:  
-  name: 'oneil_almanac' # deepdds_original, oneil_legacy, oneil_almanac
+  name: 'oneil_almanac_het' # deepdds_original, oneil_legacy, oneil_almanac
   target: 'zip_mean' # zip_max, css, loewe (legacy)
   use_node_features: False
   use_edge_features: False  
