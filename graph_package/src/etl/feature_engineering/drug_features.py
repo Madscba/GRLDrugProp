@@ -7,8 +7,18 @@ from rdkit import Chem
 from chemopy import Fingerprint
 from rdkit.Chem import Descriptors
 from pathlib import Path
+from e3fp.conformer.util import smiles_to_dict
+from e3fp.config.params import default_params
+from e3fp.pipeline import params_to_dicts,fprints_from_smiles, fprints_from_mol, confs_from_smiles
+from python_utilities.parallel import Parallelizer
 
-
+from tqdm.notebook import tqdm
+from itertools import islice
+import os
+from python_utilities.parallel import Parallelizer
+import pickle
+from glob import glob
+import numpy as np
 def get_feature_path() -> Path:
     path_to_drug_feature_folder = Directories.DATA_PATH / "features" / "drug_features"
     path_to_drug_feature_folder.mkdir(parents=True, exist_ok=True)
@@ -20,13 +30,15 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False, dim=None):
 
     We could consider a more advanced fingerprint method:
     Smiles string as input
-    https://github.com/HannesStark/3DInfomax
     Returns:
 
     """
     drug_SMILES, drug_names = get_drug_SMILES_repr()
-    mols = get_molecules_from_SMILES(drug_SMILES)
     save_path = get_feature_path()
+    ###
+
+    mols = get_molecules_from_SMILES(drug_SMILES)
+
 
     # morgan_fingerprint:
     generate_and_save_morgan_fp(dim, drug_names, mols, save_path)
@@ -37,6 +49,8 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False, dim=None):
     generate_and_save_maccs_fp(drug_names, mols, save_path)
 
     generate_and_save_rdkit_descriptor(drug_names, mols, save_path)
+
+    generate_and_save_e3fp_3d_fp(dim, drug_SMILES, drug_names, save_path)
     #
     # if get_extended_repr:
     #     # To obtain 11 2D molecular fingerprints with default folding size, one can use the following:
@@ -46,6 +60,47 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False, dim=None):
     #     pd.DataFrame(drug_2d_fingerprint, index=drug_names).to_csv(
     #         save_path / "drug_all_fp_2D.csv"
     #     )
+
+
+def generate_and_save_e3fp_3d_fp(dim, drug_SMILES, drug_names, save_path):
+    confgen_params, fprint_params = params_to_dicts(default_params)
+    del confgen_params['protonate']
+    del confgen_params['standardise']
+    fprint_params['include_disconnected'] = True
+    fprint_params['stereo'] = False
+    fprint_params['first'] = 1
+    if dim:
+        fprint_params['bits'] = dim
+    else:
+        fprint_params['bits'] = 512
+    confgen_params['first'] = 20
+
+    drug_SMILES_ = [(sm.split(";")[0], d_name) for sm, d_name in zip(drug_SMILES, drug_names)]
+    kwargs = {"confgen_params": confgen_params, "fprint_params": fprint_params}
+    parallelizer = Parallelizer(parallel_mode="processes", num_proc=3)
+    fprints_list = parallelizer.run(fprints_from_smiles, drug_SMILES_, kwargs=kwargs)
+    representation = [np.zeros((fprint_params['bits'])) for i in range(len(fprints_list))]
+    fprints_ = [(i, fprints_list[i][0][0].indices) if fprints_list[i][0] else (i, np.array([])) for i in
+                range(len(fprints_list))]
+    drugs_without_repr = 0
+    for i, fprint in fprints_:
+        if fprint.size > 0:
+            representation[i][fprint] = 1
+        else:
+            try:
+                mol = confs_from_smiles(drug_SMILES[i], drug_names[i], confgen_params=confgen_params)
+                tmp_fprint = fprints_from_mol(mol, fprint_params=fprint_params)[0].indices
+                representation[i][tmp_fprint] = 1
+            except:
+                drugs_without_repr += 1
+                print("no 3D repr found for", drug_names[i])
+                pass
+    print("Drugs without E3FP repr", drugs_without_repr)
+
+    if dim:
+        pd.DataFrame(representation, index=drug_names).to_csv(save_path / f"drug_E3FP_fp_3D_{dim}.csv")
+    else:
+        pd.DataFrame(representation, index=drug_names).to_csv(save_path / "drug_E3FP_fp_3D.csv")
 
 
 def generate_and_save_rdkit_descriptor(drug_names, mols, save_path):

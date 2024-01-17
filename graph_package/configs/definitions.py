@@ -45,6 +45,7 @@ drug_representation_path_dict = {
     "morgan": d_feature_path / "drug_ECFP_fp_2D.csv",
     "morgan83_rad6": d_feature_path / "drug_ECFP_fp_2D_83.csv",
     "morgan83_rad3": d_feature_path / "drug_ECFP_fp_2D_83_rad3.csv",
+    "e3fp": d_feature_path / "drug_E3FP_fp_3D.csv",
     "maccs": d_feature_path / "drug_MACCS_fp_2D_.csv",
     "minhash": d_feature_path / "drug_MINHASH_fp_2D.csv",
     "minhash83": d_feature_path / "drug_MINHASH_fp_2D_83.csv",
