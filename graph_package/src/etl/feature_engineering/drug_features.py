@@ -35,22 +35,18 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False, dim=None):
     """
     drug_SMILES, drug_names = get_drug_SMILES_repr()
     save_path = get_feature_path()
-    ###
 
     mols = get_molecules_from_SMILES(drug_SMILES)
 
-
-    # morgan_fingerprint:
     generate_and_save_morgan_fp(dim, drug_names, mols, save_path)
 
-    # calculate_minhash_atompair_fp
     generate_and_save_minhash_fp(dim, drug_names, mols, save_path)
 
     generate_and_save_maccs_fp(drug_names, mols, save_path)
 
     generate_and_save_rdkit_descriptor(drug_names, mols, save_path)
 
-    generate_and_save_e3fp_3d_fp(dim, drug_SMILES, drug_names, save_path)
+    generate_and_save_e3fp_3d_fp(drug_SMILES, drug_names, save_path) #can take hours to run!
     #
     # if get_extended_repr:
     #     # To obtain 11 2D molecular fingerprints with default folding size, one can use the following:
@@ -62,17 +58,14 @@ def make_drug_fingerprint_features(get_extended_repr: bool = False, dim=None):
     #     )
 
 
-def generate_and_save_e3fp_3d_fp(dim, drug_SMILES, drug_names, save_path):
+def generate_and_save_e3fp_3d_fp(drug_SMILES, drug_names, save_path):
     confgen_params, fprint_params = params_to_dicts(default_params)
     del confgen_params['protonate']
     del confgen_params['standardise']
     fprint_params['include_disconnected'] = True
     fprint_params['stereo'] = False
     fprint_params['first'] = 1
-    if dim:
-        fprint_params['bits'] = dim
-    else:
-        fprint_params['bits'] = 512
+    fprint_params['bits'] = 512
     confgen_params['first'] = 20
 
     drug_SMILES_ = [(sm.split(";")[0], d_name) for sm, d_name in zip(drug_SMILES, drug_names)]
@@ -97,10 +90,8 @@ def generate_and_save_e3fp_3d_fp(dim, drug_SMILES, drug_names, save_path):
                 pass
     print("Drugs without E3FP repr", drugs_without_repr)
 
-    if dim:
-        pd.DataFrame(representation, index=drug_names).to_csv(save_path / f"drug_E3FP_fp_3D_{dim}.csv")
-    else:
-        pd.DataFrame(representation, index=drug_names).to_csv(save_path / "drug_E3FP_fp_3D.csv")
+
+    pd.DataFrame(representation, index=drug_names).to_csv(save_path / "drug_E3FP_fp_3D.csv")
 
 
 def generate_and_save_rdkit_descriptor(drug_names, mols, save_path):
