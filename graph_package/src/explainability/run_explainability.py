@@ -43,9 +43,8 @@ def explain(config):
         )
         model.load_state_dict(state_dict)
         model.eval()
-        explain_attention(df=train_set.dataset.data_df, graph=dataset.graph, model=model, topk=2000)
-        explain_attention(df=train_set.dataset.data_df, graph=dataset.graph, model=model, topk=200)
-        explain_attention(df=train_set.dataset.data_df, graph=dataset.graph, model=model, topk=20)
+        explain_attention(df=train_set.dataset.data_df, graph=dataset.graph, model=model, topk=50)
+        #explain_attention(df=train_set.dataset.data_df, graph=dataset.graph, model=model, topk=200)
 
 def get_train_data_split(train_idx, test_idx, dataset, seed):
     train_set, _ = split_dataset(
