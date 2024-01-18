@@ -3,7 +3,7 @@ import sys
 import torch
 import hydra
 from graph_package.src.models.hybridmodel import remove_prefix_from_keys
-from graph_package.src.explainability.utils import explain_attention
+from graph_package.src.explainability.utils import explain_attention, explain_ccl_attention
 from graph_package.configs.directories import Directories
 from graph_package.src.main_utils import (
     init_model, 
@@ -29,6 +29,9 @@ def explain(config):
     splits = get_cv_splits(dataset, config)
     for k, (train_idx, test_idx) in enumerate(splits):
         train_set = get_train_data_split(train_idx, test_idx, dataset, config.seed)
+        # add reverse edges to training set
+        inv_indices = dataset.make_inv_triplets(train_set.indices)
+        train_set.indices = train_set.indices + inv_indices
         checkpoint_path = str(Directories.CHECKPOINT_PATH / "gnn" / f"fold_{k}")
         all_items = os.listdir(checkpoint_path)
         files = [item for item in all_items if os.path.isfile(os.path.join(checkpoint_path, item))]
@@ -43,7 +46,21 @@ def explain(config):
         )
         model.load_state_dict(state_dict)
         model.eval()
-        explain_attention(df=train_set.dataset.data_df, graph=dataset.graph, model=model, topk=50)
+        _, attention = model.gnn_layers[0](dataset.graph, dataset.graph.node_feature, return_att=True)
+        explain_ccl_attention(
+            df=train_set.dataset.data_df, 
+            graph=dataset.graph, 
+            attention=attention,
+            n_heads=model.gnn_layers[0].n_heads, 
+            topk=50
+        )
+        explain_attention(
+            df=train_set.dataset.data_df, 
+            graph=dataset.graph, 
+            attention=attention,
+            n_heads=model.gnn_layers[0].n_heads, 
+            topk=50
+        )
         #explain_attention(df=train_set.dataset.data_df, graph=dataset.graph, model=model, topk=200)
 
 def get_train_data_split(train_idx, test_idx, dataset, seed):

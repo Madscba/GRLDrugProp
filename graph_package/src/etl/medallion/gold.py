@@ -13,6 +13,7 @@ from tqdm import tqdm
 from graph_package.src.etl.medallion.load import (
     load_oneil,
     load_oneil_almanac,
+    load_silver_csv,
     load_block_as_df,
     load_mono_response,
 )
@@ -61,10 +62,21 @@ def get_drug_cell_line_ids(df: pd.DataFrame):
 
 
 def get_max_zip_response(df: pd.DataFrame, study: str = "oneil"):
-    block_dict = load_jsonl(
-        Directories.DATA_PATH / "silver" / study / "block_dict.json"
-    )
-    block_df = pd.DataFrame(block_dict)
+    if study=="drugcomb":
+        block_dict_almanac = load_jsonl(
+            Directories.DATA_PATH / "silver" / "oneil_almanac" / "block_dict.json"
+        )
+        block_dict_rest = load_jsonl(
+            Directories.DATA_PATH / "silver" / "rest_of_drugcomb" / "block_dict.json"
+        )
+        block_df_almanac = pd.DataFrame(block_dict_almanac)
+        block_df_rest = pd.DataFrame(block_df_rest)
+        block_df = pd.concat([block_df_almanac, block_df_rest])
+    else:
+        block_dict = load_jsonl(
+            Directories.DATA_PATH / "silver" / study / "block_dict.json"
+        )
+        block_df = pd.DataFrame(block_dict)
     block_df = (
         block_df.groupby(["block_id", "conc_c", "conc_r"])
         .agg({"synergy_zip": "mean"})
@@ -182,25 +194,23 @@ def generate_mono_responses(study_name: str = "oneil_almanac", overwrite: bool =
 
 
 
-def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
+def make_oneil_almanac_dataset(studies=["oneil", "oneil_almanac", "drugcomb"]):
 
     """
-    Make ONEIL and ONEIL-ALMANAC datasets
+    Make ONEIL, ONEIL-ALMANAC and DrugComb datasets
     """
 
     for study in studies:
         logger.info(f"Making {study} dataset.")
         save_path = Directories.DATA_PATH / "gold" / study
         save_path.mkdir(parents=True, exist_ok=True)
-        df = load_oneil() if study == "oneil" else load_oneil_almanac()
-        
+        df = load_silver_csv(study)
         rename_dict = {
             "block_id": "block_id",
             "drug_row": "drug_1_name",
             "drug_col": "drug_2_name",
             "cell_line_name": "context",
         }
-
         df.rename(columns=rename_dict, inplace=True)
         columns_to_keep = list(rename_dict.values()) + ["css_col", "css_row"]
         df = df[columns_to_keep]
