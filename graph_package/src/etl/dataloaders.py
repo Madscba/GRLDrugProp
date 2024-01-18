@@ -32,7 +32,7 @@ class KnowledgeGraphDataset(Dataset):
         target: str = "zip_mean",
         task: str = "reg",
         use_node_features: bool = False,
-        modalities: str = "None",
+        modalities: str = False,
         drug_representation: str = "morgan",
         use_edge_features: bool = False,
     ):

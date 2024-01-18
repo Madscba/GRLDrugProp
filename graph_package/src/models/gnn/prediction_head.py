@@ -42,6 +42,7 @@ class MLP(nn.Module):
 
         if self.use_mono_response:
             self.mono_r_index, self.mono_r = self._load_mono_response(self.dataset)
+
             global_mlp_input_dim = 2 * dim + 64 + 3 * 2
         else:
             global_mlp_input_dim = 2 * dim + 64
