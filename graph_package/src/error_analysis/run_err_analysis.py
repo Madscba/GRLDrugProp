@@ -178,7 +178,7 @@ if __name__ == "__main__":
         "target": "zip_mean",
         "day_of_prediction": "10_12_2023",
         "prediction_file_name": f"rescal_model_pred_dict.pkl",
-        "plot_config": {"add_bar_info": True},
+        "bar_plot_config": {"add_bar_info": True},
     }
 
     # Note that if multiple model_configs are given and the comparison is not individual,
@@ -186,12 +186,12 @@ if __name__ == "__main__":
 
     err_configs = {
         0: model_1_config,
-        1: model_1_config,
+        # 1: model_1_config,
     }
     # todo validate: that models names can be 1 or more. check that every comparison works. And that each entity works
-    comparison = "concatenate"  # "individual", "concatenate" or "difference"
-    model_names = ["rescal", "deepdds"]
-    entities = ["drug_pair", "drug", "disease", "tissue", "cancer_cell", "drug_target"]
+    comparison = "individual"  # "individual", "concatenate" or "difference"
+    model_names = ["deepdds"]
+    entities = ["tissue"] # drug_pair, drug "disease", "tissue", "cancer_cell", "drug_target"]
 
     assert len(model_names) == len(
         err_configs

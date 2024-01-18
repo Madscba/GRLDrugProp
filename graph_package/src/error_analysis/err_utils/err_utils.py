@@ -3,6 +3,7 @@ from scipy.special import expit
 from graph_package.configs.directories import Directories
 
 import matplotlib.pyplot as plt
+import seaborn as sns
 import pickle
 import pandas as pd
 from sklearn.metrics import (
@@ -19,7 +20,15 @@ from graph_package.src.error_analysis.err_utils.err_utils_load import (
 )
 import numpy as np
 
-PLOT_COLORS = ["red", "blue", "orange"]
+MODEL_COLORS = {
+    'deepdds': '#EDB732',
+    'distmult': '#479A5F',
+    'hybrid': '#A46750',
+    'gc': '#DA4C4C',
+    'rgc': '#C565C7',
+    'rgac': '#5387DD'
+}
+
 
 ENTITY_ERR_DICT = {
     "drug_pair": {
@@ -96,7 +105,7 @@ def generate_error_plots_per_entity(
     ]
     df_corr = get_err_correlations(sorted_df, metric_name, avg_exp_and_mean_target)
     generate_corr_heatmap(
-        df_corr, save_path, entity, metric_name, model_name, comparison
+        df_corr, save_path, entity, metric_name, model_name, comparison, e_conf
     )
 
     # bar plots
@@ -130,13 +139,18 @@ def generate_error_plots_per_entity(
 
 
 def generate_corr_heatmap(
-    df_corr, save_path, entity, metric_name, model_name, comparison
+    df_corr, save_path, entity, metric_name, model_name, comparison, e_conf
 ):
+    plot_conf = e_conf[0]["plotting_config"] if "plotting_config" in e_conf[0] else {}
+    title = plot_conf['plotting_config'] if "title" in plot_conf else ""  #Default is no title. Otherwise use: f"{entity}_{model_name}_{comparison}_{scope}"
+    # sns.set_theme(style="dark")
+
     plt.figure(figsize=(8, 5))
-    sns.heatmap(df_corr, annot=True, cmap="Blues")
-    plt.title(f"{entity}_{model_name}_{comparison}_{metric_name}_corr")
+    plt.title(f"{title}")
+    sns.heatmap(df_corr, annot=True, cmap="Blues", square=True)
+    plt.title(f"{title}")
     plt.tight_layout()
-    plt.savefig(save_path / f"{entity}_{model_name}_{comparison}_{metric_name}_corr")
+    plt.savefig(save_path / f"{entity}_{model_name}_{comparison}_corr.png")
     plt.clf()
 
 
@@ -153,7 +167,7 @@ def enrich_df_w_metric_nexp_meantarget_per_group(df, group_by_columns, metric_na
         metric_scores: performance measure for each group
         n_exp: number of experiments for each group
     """
-    metric_scores, n_exp, mean_target = {}, {}, {}
+    metric_scores, n_exp, mean_target, mean_pred, clin_phase = {}, {}, {}, {}, {}
 
     unique_groups = df.loc[:, group_by_columns].squeeze().unique()
     for group in unique_groups:
@@ -161,18 +175,22 @@ def enrich_df_w_metric_nexp_meantarget_per_group(df, group_by_columns, metric_na
         metric_scores[group] = get_metric_from_pred_and_target(group_df, metric_name)
         n_exp[group] = group_df.shape[0]
         mean_target[group] = (group_df["targets"]).mean()
+        mean_pred[group] = (group_df["predictions"]).mean()
+        clin_phase[group] = (pd.concat([group_df["clinical_phase"], group_df["clinical_phase_right"]])).mean()
 
     grouped_df = pd.concat(
-        [pd.DataFrame(dict_.items()) for dict_ in [metric_scores, n_exp, mean_target]],
+        [pd.DataFrame(dict_.items()) for dict_ in [metric_scores, n_exp, mean_target, mean_pred, clin_phase]],
         axis=1,
     )
 
-    grouped_df = grouped_df.iloc[:, [0, 1, 3, 5]]
+    grouped_df = grouped_df.iloc[:, [0, 1, 3, 5, 7, 9]]
     grouped_df.columns = [
         group_by_columns[0],
         metric_name,
         "n_exp",
         "mean_target",
+        "mean_pred",
+        "mean_clin_phase",
     ]
 
     return grouped_df
@@ -342,67 +360,73 @@ def generate_bar_plot(
     # xlabel_col_name,
     # avg_exp_and_mean_target,
 ):
-    task, plot_conf = e_conf[0]["task"], e_conf[0]["plot_config"]
+    # sns.set_theme(style="whitegrid")
     x_label_col_name = ENTITY_ERR_DICT[entity]["x_label_column_name"]
+    plot_conf = e_conf[0]["bar_plot_config"] if "bar_plot_config" in e_conf[0] else {}
 
-    # todo extract plotting arguments and use:
-    # title = plot_conf['plotting_config'].get("title", "Default Title")  # Use "Default Title" if "title" is not present
+    add_bar_info = plot_conf.get("add_bar_info", False)
+    add_descriptive_legend = plot_conf.get("add_descriptive_legend",False)
+
+    #Retrieve plotting config arguments
+    title = plot_conf.get("title","")
+    x_label = plot_conf.get("x_label",x_label_col_name)
+    y_label = plot_conf.get("y_label",None)
+    y_lim = plot_conf.get("y_lim",None)
+    x_lim = plot_conf.get("x_lim",None)
+
+    model_name = model_name.lower()
+    plt_color = MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue"
+    print(f"Plotting {model_name} with color {plt_color}, scope {scope} and comparison {comparison}")
+
+    #Set plt config args
+    if x_label:
+        plt.xlabel(x_label)
+    if y_label:
+        plt.ylabel(y_label)
+    if x_lim:
+        plt.xlim(x_lim)
+    if y_lim:
+        y_lim.ylim(y_lim)
+    plt.title(f"{title}")
 
     plt.figure(figsize=(8, 5))
-    plt.subplot(1, 1, 1)
-    df[metric_name].plot(kind="bar", ax=plt.gca(), color=PLOT_COLORS[0])
+    df.reset_index(inplace=True)
+    sns.barplot(x=df.index, y=df[metric_name], color=plt_color, palette="Set3")
+    # df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_color)
+
     plt.gca().set_ylabel(metric_name)
-    if scope == "top10":
+    if scope == "top10" or scope == "top_and_bottom5":
         plt.gca().set_xticks(range(len(df)))
         plt.gca().set_xticklabels(df[x_label_col_name])
-        if "title" in plot_conf:
-            title = plot_conf["title"]
-        else:
-            title = f"{entity}_{model_name}_{comparison} top10 errors"
+        plt.xticks(rotation=90)
     elif scope == "full":
         plt.xticks([])
-        if "title" in plot_conf:
-            title = plot_conf["title"]
-        else:
-            title = f"{entity}_{model_name}_{comparison}"
-    else:
-        title = f"{entity}_{model_name}_{comparison} top and bottom 5 errors"
+        plt.xlabel(x_label)
 
-    plt.title(f"{title}\n {metric_name}")
-    # plt.ylim(-7, 0)
-    # avg_exp_and_mean_target = [
-    #     np.round(np.mean(df[exp_data].values), 2)
-    #     for exp_data in ["n_exp", "mean_target"]
-    # ]
-    # df_corr = get_err_correlations(df, metric_name, avg_exp_and_mean_target)
-    # corr_str = f"corr: MSE/n_exp {df_corr.iloc[0, 1]}\ncorr: MSE/mt {df_corr.iloc[0, 2]}\ncorr: MSE/abs_dev_mt {df_corr.iloc[0, 3]}\ncorr: mt/n_exp {df_corr.iloc[2, 1]}\ncorr: mt/abs_dev_mt {df_corr.iloc[2, 3]}"
-    # avg_exp_and_mean_target_str = f"avg n_exp: {avg_exp_and_mean_target[0]}\navg mt: {avg_exp_and_mean_target[1]:.2f}"
-    # plt.text(
-    #     sorted_df.shape[0] * 0.5,
-    #     sorted_df[metric_name].max() * 0.92,
-    #     corr_str,
-    #     ha="center",
-    #     va="bottom",
-    # )
-    # plt.text(
-    #     sorted_df.shape[0] * 0.8,
-    #     sorted_df[metric_name].max() * 0.92,
-    #     avg_exp_and_mean_target_str,
-    #     ha="center",
-    #     va="bottom",
-    # )
-    add_bar_info = plot_conf.get("add_bar_info", False)
+
+
+
 
     if add_bar_info and scope != "full":
-        for i, value in enumerate(df[metric_name]):
-            index = df.index[i]
-            mt = np.round(df.loc[index, ["mean_target"]].values[0], 2)
-            bar_text = f"n:\n{df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
-            plt.text(i, value, bar_text, ha="center", va="bottom")
+        if scope == "top10":
+            for i, value in enumerate(df[metric_name]):
+                index = df.index[i]
+                mt = np.round(df.loc[index, ["mean_target"]].values[0], 2)
+                bar_text = f"n:\n{df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
+                plt.text(i, value, bar_text, ha="center", va="bottom")
+        elif scope == "top_and_bottom5":
+            for i, value in enumerate(df[metric_name]):
+                bar_text = f":{value:.1f}"
+                plt.text(i, value, bar_text, ha="center", va="bottom")
+
     plt.legend([model_name])
     plt.tight_layout()
-    # plt.savefig(save_path / f"{title}_{scope}_bar")
+    plt.savefig(save_path / f"{entity}_{scope}_{model_name}_{comparison}_barchart.png")
     plt.clf()
+    if entity == "drug_pair" and scope == "full":
+        df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_color)
+        plt.savefig(save_path / f"{entity}_{scope}2_{model_name}_{comparison}_barchart.pdf")
+        plt.clf()
 
 
 def check_accepted_sample_ratio(original_size, filtered_size, group_by_columns):
@@ -440,17 +464,13 @@ def sort_df_by_metric(df, metric_name, e_conf, comparison):
 def get_err_correlations(df, metric_name, avg_exp_and_mean_target) -> pd.DataFrame:
     metric_val = df[metric_name]
     n_exp = df["n_exp"]
-    mt = df["mean_target"]
+    mean_target = df["mean_target"]
+    mean_pred = df["mean_pred"]
+    mean_clin_ph = df["mean_clin_phase"]
     abs_mt_deviation_from_avg_mt = abs(df["mean_target"] - avg_exp_and_mean_target[1])
-    df_corr = pd.DataFrame(
-        [metric_val, n_exp, mt, abs_mt_deviation_from_avg_mt],
-        columns=[
-            f"{metric_name}",
-            "n_exp",
-            "mean_target",
-            "abs_dev_mt                                                                                                                 ",
-        ],
-    ).T.corr()
+    df_corr = pd.DataFrame([metric_val.values, n_exp.values, mean_target.values, abs_mt_deviation_from_avg_mt.values, mean_pred.values, mean_clin_ph.values]).T
+    df_corr.columns = [f"{metric_name}","n_exp","mean_target","abs_dev_mean_target", "mean_prediction","mean_clin_phase"]
+    df_corr = df_corr.corr()
     return round(df_corr, 2)
 
 
