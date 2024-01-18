@@ -14,55 +14,6 @@ from graph_package.src.error_analysis.err_utils.err_utils_load import (
 import pandas as pd
 
 
-def run_err_diag(
-    pred_df, model_names, path_to_prediction_folder, task, entity, comparison
-):
-    """
-    Load predictions, enrich with entity information and provide diagnostic bar plots on entity level:
-    Single drugs, drug pairs, triplets, disease, tissue, cancer cell line, drug target
-
-    Parameters:
-        model_names List[str]: Models for which to generate err diagnostic plots.
-
-    Returns:
-        None
-    """
-    entity_args = ENTITY_ERR_DICT[entity]
-    metric_name = "AUC_ROC" if task == "clf" else "MSE"
-    run_name = path_to_prediction_folder.name
-
-    generate_error_plots_per_entity(
-        df_list,
-        plt_legend,  # legend_list[idx],
-        group_by_columns=entity_args["group_by"],
-        title=f"{entity}_{comparison}",
-        xlabel_col_name=entity_args["x_label_column_name"],
-        run_name=run_name,
-        metric_name=metric_name,
-        task=task,
-    )
-
-    ##Investigate single drug
-    drug_titles = [f"drug_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        if len(df_list) > 1:
-            df_drug_without_dupl = [
-                get_drug_level_df([df_list[i]], task) for i in range(len(df_list))
-            ]
-        else:
-            df_drug_without_dupl = [get_drug_level_df(df_list, task)]
-        generate_error_plots_per_entity(
-            df_drug_without_dupl,
-            legend_list[idx],
-            ["drug_molecules_left_id"],
-            drug_titles[idx],
-            "drug_name_left",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
-
-
 def load_and_prepare_predictions_for_comp(model_names, entity, comparison, err_configs):
     # load predictions (triplets, predictions, targets) from trained model(s),
     pred_dfs = get_saved_pred(err_configs)

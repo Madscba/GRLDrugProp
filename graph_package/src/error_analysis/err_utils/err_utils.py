@@ -64,15 +64,6 @@ def generate_error_plots_per_entity(
     entity,
     comparison,
     model_name
-    # pred_dfs,
-    # model_names,
-    # group_by_columns,
-    # title,
-    # xlabel_col_name,
-    # add_bar_info: bool = True,
-    # run_name: str = "",
-    # metric_name: str = "MSE",
-    # task: str = "reg",
 ):
     """
     Generate and save barplot
@@ -97,7 +88,6 @@ def generate_error_plots_per_entity(
         df, metric_name, e_conf, comparison
     )
 
-    # correlation_analysis()
 
     avg_exp_and_mean_target = [
         np.round(np.mean(sorted_df[exp_data].values), 2)
@@ -110,7 +100,6 @@ def generate_error_plots_per_entity(
 
     # bar plots
     for idx, df in enumerate([sorted_df, top10_df, top_and_bottom5]):
-        # todo add correlation and avg mt and n_exp to plot and save
         generate_bar_plot(
             df,
             entity,
@@ -121,21 +110,6 @@ def generate_error_plots_per_entity(
             save_path,
             ["full", "top10", "top_and_bottom5"][idx],
         )
-
-    # plot_full_and_top10_together(
-    #     sorted_df,
-    #     top10_df,
-    #     i,
-    #     metric_name,
-    #     model_names,
-    #     plt_colors,
-    #     save_path,
-    #     title,
-    #     x_label_col_name,
-    #     add_bar_info,
-    #     run_name,
-    #     task,
-    # )
 
 
 def generate_corr_heatmap(
@@ -266,78 +240,6 @@ def generate_difference_df(
     return df_diff
 
 
-def plot_full_and_top10_together(
-    grouped_df,
-    i,
-    metric_name,
-    model_names,
-    plt_colors,
-    save_path,
-    title,
-    xlabel_col_name,
-    add_bar_info,
-    run_name,
-    task,
-):
-    # sorted_df, top10_df = sort_df_by_metric(grouped_df, metric_name, task, model_names)
-
-    top10_df.reset_index(inplace=True)
-    plt.figure(figsize=(16, 10))
-    plt.subplot(1, 2, 1)
-    # sorted_df.plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-    sorted_df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-    plt.gca().set_xticklabels([])
-    plt.gca().set_ylabel(metric_name)
-    # plt.xticks(rotation=90)
-    # plt.gca().set_xticks(range(len(sorted_df)))
-    # plt.gca().set_xticklabels(sorted_df[xlabel_col_name])
-    avg_exp_and_mean_target = [
-        np.round(np.mean(sorted_df[exp_data].values), 2)
-        for exp_data in ["n_exp", "mean_target"]
-    ]
-    df_corr = get_err_correlations(sorted_df, metric_name, avg_exp_and_mean_target)
-    corr_str = f"corr: MSE/n_exp {df_corr.iloc[0,1]}\ncorr: MSE/mt {df_corr.iloc[0,2]}\ncorr: MSE/abs_dev_mt {df_corr.iloc[0,3]}\ncorr: mt/n_exp {df_corr.iloc[2,1]}\ncorr: mt/abs_dev_mt {df_corr.iloc[2,3]}"
-    avg_exp_and_mean_target_str = f"avg n_exp: {avg_exp_and_mean_target[0]}\navg mt: {avg_exp_and_mean_target[1]:.2f}"
-    plt.text(
-        sorted_df.shape[0] * 0.5,
-        sorted_df[metric_name].max() * 0.92,
-        corr_str,
-        ha="center",
-        va="bottom",
-    )
-    plt.text(
-        sorted_df.shape[0] * 0.8,
-        sorted_df[metric_name].max() * 0.92,
-        avg_exp_and_mean_target_str,
-        ha="center",
-        va="bottom",
-    )
-    plt.title(f"{title}\n {metric_name}")
-    plt.legend([model_names[i]])
-    plt.subplot(1, 2, 2)
-    top10_df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_colors[i])
-    # plt.gca().set_ylim(0, 1)
-    # plt.xticks(rotation=45)
-    plt.gca().set_xticks(range(len(top10_df)))
-    plt.gca().set_xticklabels(top10_df[xlabel_col_name])
-    plt.title(f"{title}\ntop 10 w. lowest {metric_name}")
-    if add_bar_info:
-        for index, value in enumerate(top10_df[metric_name]):
-            mt = np.round(top10_df.loc[index, ["mean_target"]].values[0], 2)
-            bar_text = f"n:\n{top10_df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
-            plt.text(index, value, bar_text, ha="center", va="bottom")
-    plt.legend([model_names[i]])
-    plt.tight_layout()
-    plt.savefig(save_path / f"{run_name}_{title}_bar_{model_names[i]}")
-    df_corr.to_excel(save_path / f"corr_{run_name}_{title}_bar_{model_names[i]}.xlsx")
-    sorted_df.to_excel(save_path / f"df_{run_name}_{title}_bar_{model_names[i]}.xlsx")
-    pd.DataFrame(avg_exp_and_mean_target).to_excel(
-        save_path / f"avg_mt_n_exp_{run_name}_{title}_bar_{model_names[i]}.xlsx"
-    )
-    plt.show()
-    plt.clf()
-
-
 def generate_bar_plot(
     df,
     entity,
@@ -347,18 +249,6 @@ def generate_bar_plot(
     model_name,
     save_path,
     scope,
-    # add_bar_info,
-    # i,
-    # metric_name,
-    # model_names,
-    # plt_colors,
-    # run_name,
-    # save_path,
-    # title,
-    # sorted_df,
-    # top10_df,
-    # xlabel_col_name,
-    # avg_exp_and_mean_target,
 ):
     # sns.set_theme(style="whitegrid")
     x_label_col_name = ENTITY_ERR_DICT[entity]["x_label_column_name"]
@@ -402,9 +292,6 @@ def generate_bar_plot(
     elif scope == "full":
         plt.xticks([])
         plt.xlabel(x_label)
-
-
-
 
 
     if add_bar_info and scope != "full":
