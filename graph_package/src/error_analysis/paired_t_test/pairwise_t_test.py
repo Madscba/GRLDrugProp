@@ -105,7 +105,7 @@ if __name__ == "__main__":
     alpha = alpha / m
 
     #create dataframe that stores results
-    results_df = pd.DataFrame(columns=["model1", "model2", "t_statistic", "p_value", "reject_null_hypothesis"])
+    results_df = pd.DataFrame(columns=["model1", "model2", "t_statistic", "p_value", "alpha_bonferroni","reject_null_hypothesis"])
     for combination in combinations_list:
         m1_idx, m2_idx = combination
         df_m1, df_m2 = pred_dfs[m1_idx], pred_dfs[m2_idx]
@@ -120,7 +120,7 @@ if __name__ == "__main__":
         #sanity check with scipy
         # t_statistic_, p_value_, reject_null_hypothesis_ = paired_t_test(m1_mse, m2_mse)
 
-        results_df.loc[-1] = [model_names[m1_idx], model_names[m2_idx], t_statistic, p_value, reject_null_hypothesis]
+        results_df.loc[-1] = [model_names[m1_idx], model_names[m2_idx], t_statistic, p_value, alpha, reject_null_hypothesis]
         if perform_residual_analysis:
             residual_analysis(residual_mse)
 
