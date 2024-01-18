@@ -81,6 +81,40 @@ def perform_manual_paired_two_sided_t_test(residuals_mse):
         reject_null_hypothesis = False
     return t_stat, p_val, reject_null_hypothesis
 
+def check_if_samples_are_paired(df_m1, df_m2):
+    assert len(df_m1) == len(df_m2), "Samples are not paired, they have different lengths"
+    triplet_col = ['drug_molecules_left_id','drug_molecules_right_id','context_features_id']
+    assert (df_m1[triplet_col] == df_m2[triplet_col]).all().all() , "Samples are not paired, they have different triplets"
+def run_pairwise_two_sided_ttests(model_names, path_to_prediction_folder, alpha:float=0.05, perform_residual_analysis:bool=False):
+    pred_dfs = get_saved_pred(model_names, path_to_prediction_folder)
+
+    # prepare pairwise combinations
+    model_indices = np.arange(len(model_names))
+    combinations_list = list(combinations(model_indices, 2))
+    # Bonferroni correction, reject null hypothesis if p-value < alpha / m
+    alpha /= len(combinations_list)
+
+    results_df = pd.DataFrame(
+        columns=["model1", "model2", "t_statistic", "p_value", "alpha_bonferroni", "reject_null_hypothesis"])
+    for combination in combinations_list:
+        m1_idx, m2_idx = combination
+        df_m1, df_m2 = pred_dfs[m1_idx], pred_dfs[m2_idx]
+        m1_mse = (df_m1["targets"].values - df_m1["predictions"].values) ** 2
+        m2_mse = (df_m2["targets"].values - df_m2["predictions"].values) ** 2
+        check_if_samples_are_paired(df_m1, df_m2)
+        paired_residuals = m1_mse - m2_mse
+
+        t_statistic, p_value, reject_null_hypothesis = perform_manual_paired_two_sided_t_test(paired_residuals)
+
+        # sanity check with scipy
+        # t_statistic_, p_value_, reject_null_hypothesis_ = paired_t_test(m1_mse, m2_mse)
+
+        results_df.loc[-1] = [model_names[m1_idx], model_names[m2_idx], t_statistic, p_value, alpha,
+                              reject_null_hypothesis]
+        if perform_residual_analysis:
+            residual_analysis(paired_residuals)
+
+
 if __name__ == "__main__":
     #put prediction files in the folder, where each prediction file is named after the model:
     #ex : rescal_model_pred_dict.pkl
@@ -89,42 +123,10 @@ if __name__ == "__main__":
     )
     model_names = ["rescal", "deepdds"]
     alpha = 0.05
-    two_sided = True
     perform_residual_analysis = True
 
-    #load data
-    pred_dfs = get_saved_pred(model_names, path_to_prediction_folder)
+    run_pairwise_two_sided_ttests(model_names, path_to_prediction_folder, alpha, perform_residual_analysis)
 
-    #prepare pairwise combinations
-    model_indices = np.arange(len(model_names))
-    combinations_list = list(combinations(model_indices, 2))
-
-    #Bonferroni correction
-    #reject null hypothesis if p-value < alpha / m
-    m = len(combinations_list)
-    alpha = alpha / m
-
-    #create dataframe that stores results
-    results_df = pd.DataFrame(columns=["model1", "model2", "t_statistic", "p_value", "alpha_bonferroni","reject_null_hypothesis"])
-    for combination in combinations_list:
-        m1_idx, m2_idx = combination
-        df_m1, df_m2 = pred_dfs[m1_idx], pred_dfs[m2_idx]
-        df_m2 = pred_dfs[m2_idx]
-        m1_mse = (df_m1["targets"].values - df_m1["predictions"].values) ** 2
-        m2_mse = (df_m2["targets"].values - df_m2["predictions"].values) ** 2
-
-        residual_mse = m1_mse - m2_mse
-
-        t_statistic, p_value, reject_null_hypothesis = perform_manual_paired_two_sided_t_test(residual_mse)
-
-        #sanity check with scipy
-        # t_statistic_, p_value_, reject_null_hypothesis_ = paired_t_test(m1_mse, m2_mse)
-
-        results_df.loc[-1] = [model_names[m1_idx], model_names[m2_idx], t_statistic, p_value, alpha, reject_null_hypothesis]
-        if perform_residual_analysis:
-            residual_analysis(residual_mse)
-
-    a = 2
     #iterate over every pairwise combination of models
 
 
