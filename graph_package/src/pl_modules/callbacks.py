@@ -10,6 +10,8 @@ from pytorch_lightning.callbacks import Callback
 from omegaconf import DictConfig
 from pathlib import Path
 from pytorch_lightning.trainer import Trainer
+from torch.nn.functional import softplus
+import torch
 from pytorch_lightning.core import LightningModule
 import torch
 from torch.nn import functional as F
@@ -31,15 +33,18 @@ class TestDiagnosticCallback(Callback):
             batch,
             batch_idx,
         ) = pl_module.test_step_outputs.values()
-        print("conf_matrix:\n", df_cm)
+        
+        std = torch.sqrt(softplus(pl_module.loss_func.var.cpu().detach()))
+        
+        std_per_cell_line = std[batch[0][:,2]]
 
         save_performance_plots(
             df_cm, metrics, preds, target, self.config, self.model_name, save_path=Path("")
         )
-        
         save_model_pred(
-            batch_idx, batch, preds, target, self.config, self.model_name, save_path=Path("")
+            batch_idx, batch, preds, target, std_per_cell_line, self.config, self.model_name, save_path=Path("")
         )
+
         # save pretrained drug embeddings
         if self.model_name in ["deepdds", "distmult"]:
             save_pretrained_drug_embeddings(model=pl_module,fold=self.fold)
