@@ -45,11 +45,11 @@ class BasePL(LightningModule):
         preds = self(inputs)
         preds = preds.view(-1)
         if self.task == "reg":
-            cell_line_ids  = inputs[:,2]
+            cell_line_ids = inputs[:, 2]
             loss = self.loss_func(preds, target, cell_line_ids)
-        else: 
+        else:
             loss = self.loss_func(preds, target)
-    
+
         return loss, target, preds
 
     def training_step(self, batch, batch_idx):
@@ -156,9 +156,22 @@ class BasePL(LightningModule):
                                 "params": self.model.prediction_head.global_mlp.parameters(),
                                 "lr": lr_setup.lr_ph_global_mlp,
                             },
+                            {"params": self.loss_func.parameters(), "lr": self.lr},
                         ]
                     )
-            return Adam(self.model.parameters(), lr=self.lr)
+            return Adam(
+                [
+                    {"params": self.model.parameters()},
+                    {"params": self.loss_func.parameters()},
+                ],
+                lr=self.lr,
+            )
 
         else:
-            return Adam(self.model.parameters(), lr=self.lr)
+            return Adam(
+                [
+                    {"params": self.model.parameters()},
+                    {"params": self.loss_func.parameters()},
+                ],
+                lr=self.lr,
+            )
