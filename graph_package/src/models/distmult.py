@@ -1,6 +1,6 @@
 from torch import nn
 from torchdrug.models import DistMult as distmult
-
+import torch.nn.functional as F
 class DistMult(distmult):
     """
     DistMult embedding proposed in `Embedding Entities and Relations for Learning and Inference in Knowledge Bases`_.
@@ -20,7 +20,8 @@ class DistMult(distmult):
         ent_tot,
         rel_tot, 
         dim,
-        max_score=30
+        max_score=30,
+        feature_dropout: float = 0.0,
     ):
         super().__init__(
             num_entity=ent_tot, 
@@ -28,6 +29,7 @@ class DistMult(distmult):
             embedding_dim=dim
         )
         self.max_score = max_score
+        self.feature_dropout_p = feature_dropout
         nn.init.xavier_uniform_(self.entity)
         nn.init.xavier_uniform_(self.relation)
 
@@ -48,6 +50,8 @@ class DistMult(distmult):
         h = self.entity[h_index]
         r = self.relation[r_index]
         t = self.entity[t_index]
+        if self.feature_dropout_p:
+            h, r, t = F.dropout(h,p=self.feature_dropout_p), F.dropout(r,p=self.feature_dropout_p),F.dropout(t,p=self.feature_dropout_p)
         score = (h * r * t).sum(dim=-1)
         return score
     
