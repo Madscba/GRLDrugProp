@@ -14,6 +14,7 @@ from tqdm import tqdm
 from graph_package.src.etl.medallion.load import (
     load_oneil,
     load_oneil_almanac,
+    load_silver_csv,
     load_block_as_df,
     load_mono_response,
     load_jsonl
@@ -198,10 +199,21 @@ def get_drug_cell_line_ids(df: pd.DataFrame):
 
 
 def get_max_zip_response(df: pd.DataFrame, study: str = "oneil"):
-    block_dict = load_jsonl(
-        Directories.DATA_PATH / "silver" / study / "block_dict.json"
-    )
-    block_df = pd.DataFrame(block_dict)
+    if study=="drugcomb2":
+        block_dict_almanac = load_jsonl(
+        Directories.DATA_PATH / "silver" / "oneil_almanac" / "block_dict.json"
+        )
+        block_dict_rest = load_jsonl(
+        Directories.DATA_PATH / "silver" / "rest_of_drugcomb" / "block_dict.json"
+        )
+        block_df_almanac = pd.DataFrame(block_dict_almanac)
+        block_df_rest = pd.DataFrame(block_dict_rest)
+        block_df = pd.concat([block_df_almanac, block_df_rest])
+    else:
+        block_dict = load_jsonl(
+            Directories.DATA_PATH / "silver" / study / "block_dict.json"
+        )
+        block_df = pd.DataFrame(block_dict)
     block_df = (
         block_df.groupby(["block_id", "conc_c", "conc_r"])
         .agg({"synergy_zip": "mean"})
@@ -249,10 +261,10 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
     data_path = Directories.DATA_PATH / "gold" / study_name
     data_path.mkdir(exist_ok=True, parents=True)
     m_file_name = "mono_response.csv"
-    if (not (data_path / m_file_name).exists()) | overwrite:
+    het = True if study_name in ["oneil_het", "oneil_almanac_het", "drugcomb_het"] else False
+    if ((not (data_path / m_file_name).exists()) | overwrite ) and (not het):
         if (data_path / m_file_name).exists():
             os.remove(data_path / m_file_name)
-        het = True if study_name in ["oneil_het", "oneil_almanac_het"] else False
         study = study_name[:-4] if het else study_name
         df_block = load_block_as_df(study)
         df_block = df_block.merge(
@@ -315,19 +327,39 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
             df_mono.loc[idx] = stat_array
         save_path = Directories.DATA_PATH / "gold" / study_name
         save_path.mkdir(exist_ok=True, parents=True)
+        if study == "drugcomb":
+            # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
+            almanac = "oneiL_almanac_het" if het else "oneiL_almanac"
+            df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / almanac / "mono_response.csv")
+            df_mono = pd.concat([df_mono, df_mono_oneil_almanac], ignore_index=True)
+            df_mono.drop_duplicates(inplace=True)
         df_mono.to_csv(save_path / m_file_name, index=True)
+        
+    # We dont need to generate the monoresponses since the _het datasets are subsets
+    elif het:
+        study = study_name[:-4] if het else study_name
+        df_mono_study = pd.read_csv(Directories.DATA_PATH / "gold" / study / "mono_response.csv")
+        unique_drugs = set(df["drug_row"]).union(set(df["drug_col"]))
+        # Filter drugs and cell lines not found in _het dataset
+        df_mono_study = df_mono_study[df_mono_study["drug"].isin(unique_drugs)]
+        df_mono_study = df_mono_study[df_mono_study["cell_line"].isin(df.cell_line_name.unique())]
+        save_path = Directories.DATA_PATH / "gold" / study_name
+        save_path.mkdir(exist_ok=True, parents=True)
+        df_mono_study.to_csv(save_path / m_file_name, index=True)
 
 
 
-def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
+def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac","drugcomb"]):
 
     """
-    Make ONEIL and ONEIL-ALMANAC datasets with and without filtering on Hetionet
+    Make ONEIL, ONEIL-ALMANAC and DrugComb datasets with and without filtering on Hetionet
+    
+    NOTE: The ONEIL-ALMANAC dataset should be created before the DrugComb dataset
     """
 
     for study in studies:
         for het in [False, True]:
-            df = load_oneil() if study == "oneil" else load_oneil_almanac()
+            df = load_silver_csv(study)
             study_name = study + "_het" if het else study
             logger.info(f"Making {study_name} dataset.")
             save_path = Directories.DATA_PATH / "gold" / study_name
@@ -352,6 +384,14 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
     
             df = filter_cell_lines(df)
 
+            # Concat ONEIL-ALMANAC to remaining of DrugComb
+            if study=="drugcomb":
+                oneil_almanac = "oneil_almanac_het" if het else "oneil_almanac"
+                oneil_almanac_path = Directories.DATA_PATH / "gold" / oneil_almanac / f"{oneil_almanac}.csv"
+                oneil_almanac_df = pd.read_csv(oneil_almanac_path)
+                oneil_almanac_df = oneil_almanac_df.loc[:, df.columns.to_list()]
+                df = pd.concat([df,oneil_almanac_df],ignore_index=True)
+
             df, drug_vocab = create_drug_id_vocabs(df)
             df, cell_line_vocab = create_cell_line_id_vocabs(df)
             for vocab, name in zip(
@@ -363,4 +403,4 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac"]):
 
 
 if __name__ == "__main__":
-    make_oneil_almanac_dataset(studies=["oneil"])
+    make_oneil_almanac_dataset(studies=["drugcomb"])

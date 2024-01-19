@@ -14,6 +14,17 @@ import jsonlines
 
 logger = init_logger()
 
+def load_silver_csv(study):
+    if True:
+        data_path = Directories.DATA_PATH / "silver" / study/ f"{study}.csv"
+        return pd.read_csv(data_path)
+    else:
+        data_path_almanac = Directories.DATA_PATH / "silver" / "oneil_almanac"/ "oneil_almanac.csv"
+        df_almanac = pd.read_csv(data_path_almanac)
+        study = f"rest_of_{study}"
+        data_path = Directories.DATA_PATH / "silver" / study/ f"{study}.csv"
+        df_rest = pd.read_csv(data_path)
+        return pd.concat([df_almanac, df_rest])
 
 def load_oneil():
     data_path = Directories.DATA_PATH / "silver" / "oneil" / "oneil.csv"
@@ -40,9 +51,26 @@ def load_cell_info_drugcomb():
 
 
 def load_block_as_df(study_name: str):
-    data_path = Directories.DATA_PATH / "silver" / study_name / "block_dict.json"
-    block_dict_json = load_jsonl(data_path)
-    df_block = pd.DataFrame(block_dict_json)
+    if study_name=="drugcomb2":
+        if False:
+            block_dict_almanac = load_jsonl(
+            Directories.DATA_PATH / "silver" / "oneil_almanac" / "block_dict.json"
+            )
+            block_dict_rest = load_jsonl(
+            Directories.DATA_PATH / "silver" / "rest_of_drugcomb" / "block_dict.json"
+            )
+            block_df_almanac = pd.DataFrame(block_dict_almanac)
+            block_df_rest = pd.DataFrame(block_dict_rest)
+            df_block = pd.concat([block_df_almanac, block_df_rest])
+        else:
+            block_dict_rest = load_jsonl(
+            Directories.DATA_PATH / "silver" / "rest_of_drugcomb" / "block_dict.json"
+            )
+            df_block = pd.DataFrame(block_dict_rest)
+    else:
+        data_path = Directories.DATA_PATH / "silver" / study_name / "block_dict.json"
+        block_dict_json = load_jsonl(data_path)
+        df_block = pd.DataFrame(block_dict_json)
     df_block = df_block.loc[:, ["conc_r", "conc_c", "inhibition", "block_id"]]
     return df_block
 
