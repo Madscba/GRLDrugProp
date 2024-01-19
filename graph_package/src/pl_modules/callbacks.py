@@ -35,6 +35,6 @@ class TestDiagnosticCallback(Callback):
             batch_idx, batch, preds, target, self.config, self.model_name, save_path=Path("")
         )
         # save pretrained drug embeddings
-        if self.model_name in ["deepdds", "distmult"]:
+        if self.config.save_embedding:
             save_pretrained_drug_embeddings(model=pl_module,fold=self.fold)
         pl_module.test_step_outputs.clear()
