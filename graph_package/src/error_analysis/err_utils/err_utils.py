@@ -93,7 +93,7 @@ def generate_error_plots_per_entity(
         np.round(np.mean(sorted_df[exp_data].values), 2)
         for exp_data in ["n_exp", "mean_target"]
     ]
-    df_corr = get_err_correlations(sorted_df, metric_name, avg_exp_and_mean_target)
+    df_corr = get_err_correlations(sorted_df, metric_name, avg_exp_and_mean_target,model_name, comparison)
     generate_corr_heatmap(
         df_corr, save_path, entity, metric_name, model_name, comparison, e_conf
     )
@@ -347,17 +347,32 @@ def sort_df_by_metric(df, metric_name, e_conf, comparison):
     top_and_bottom5 = pd.concat([df.head(5), df.tail(5)])
     return df, top10_df, top_and_bottom5
 
+def get_err_correlations(df, metric_name, avg_exp_and_mean_target, model_name, comparison) -> pd.DataFrame:
+    models = model_name.split("&")
+    if len(models)==2:
+        #create df_corr for the series of each model that is indexed by _modelname1 and _modelname2
+        df_new = pd.DataFrame()
+        df_new[f"abs_{metric_name}_diff"] = df[metric_name]
+        df_new[f"n_exp"] = df["n_exp_"+models[0]]
+        df_new[f"mean_target"] = df["mean_target_"+models[0]]
+        df_new[f"mean_clin_phase"] = df["mean_clin_phase_"+models[0]]
 
-def get_err_correlations(df, metric_name, avg_exp_and_mean_target) -> pd.DataFrame:
-    metric_val = df[metric_name]
-    n_exp = df["n_exp"]
-    mean_target = df["mean_target"]
-    mean_pred = df["mean_pred"]
-    mean_clin_ph = df["mean_clin_phase"]
-    abs_mt_deviation_from_avg_mt = abs(df["mean_target"] - avg_exp_and_mean_target[1])
-    df_corr = pd.DataFrame([metric_val.values, n_exp.values, mean_target.values, abs_mt_deviation_from_avg_mt.values, mean_pred.values, mean_clin_ph.values]).T
-    df_corr.columns = [f"{metric_name}","n_exp","mean_target","abs_dev_mean_target", "mean_prediction","mean_clin_phase"]
-    df_corr = df_corr.corr()
+        for model in models:
+            df_new[f"{metric_name}_{model}"] = df[metric_name+"_"+model]
+            df_new[f"mean_pred_{model}"] = df["mean_pred_"+model]
+        df_corr = df_new.corr()
+
+
+    else:
+        metric_val = df[metric_name]
+        n_exp = df["n_exp"]
+        mean_target = df["mean_target"]
+        mean_pred = df["mean_pred"]
+        mean_clin_ph = df["mean_clin_phase"]
+        abs_mt_deviation_from_avg_mt = abs(df["mean_target"] - avg_exp_and_mean_target[1])
+        df_new = pd.DataFrame([metric_val.values, n_exp.values, mean_target.values, abs_mt_deviation_from_avg_mt.values, mean_pred.values, mean_clin_ph.values]).T
+        df_new.columns = [f"{metric_name}","n_exp","mean_target","abs_dev_mean_target", "mean_prediction","mean_clin_phase"]
+        df_corr = df_new.corr()
     return round(df_corr, 2)
 
 
