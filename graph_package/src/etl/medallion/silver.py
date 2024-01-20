@@ -48,7 +48,7 @@ def generate_rest_of_drugcomb_dataset():
     )
     # Remove ONEIL & ALMANAC and generate block-dict for remaining 
     df = df[df["study_name"].isin(list(set(cancer_studies)-set(["ONEIL", "ALMANAC"])))]
-    study = "rest_of_drugcomb"
+    study = "drugcomb"
     study_path = Directories.DATA_PATH / "silver" / study
     study_path.mkdir(exist_ok=True, parents=True)
     unique_block_ids = df["block_id"].unique().tolist()
