@@ -14,7 +14,7 @@ from graph_package.src.main_utils import (
 )
 from graph_package.configs.definitions import model_dict, dataset_dict
 from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
-from graph_package.src.pl_modules.callbacks import TestDiagnosticCallback
+from graph_package.src.pl_modules.callbacks import TestDiagnosticCallback, LossFnCallback
 from graph_package.configs.directories import Directories
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 from pytorch_lightning.utilities.warnings import PossibleUserWarning
@@ -70,8 +70,17 @@ def main(config):
             loggers.append(WandbLogger())
 
         call_backs = [
-            TestDiagnosticCallback(model_name=model_name, config=config, fold=k)
+            TestDiagnosticCallback(model_name=model_name, config=config, fold=k),
+            LossFnCallback(epochs_wo_var=config.epochs_wo_var)
+
         ]
+
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
+        )
+        
+        call_backs.append(checkpoint_callback)
+        
 
         train_set, val_set, test_set = split_train_val_test(
             dataset, train_idx, test_idx, config
@@ -84,11 +93,6 @@ def main(config):
         data_loaders = get_dataloaders(
             [train_set, val_set, test_set], batch_sizes=config.batch_sizes
         )
-
-        checkpoint_callback = ModelCheckpoint(
-            dirpath=get_checkpoint_path(model_name, k), **config.checkpoint_callback
-        )
-        call_backs.append(checkpoint_callback)
 
         if (model_name == "hybridmodel") and config.model.pretrain_model:
             check_point = pretrain_single_model(model_name, config, data_loaders, k)
@@ -128,6 +132,9 @@ def main(config):
         if config.remove_old_checkpoints:
             os.remove(checkpoint_callback.best_model_path)
         wandb.finish()
+        
+        if (k+1)==config.max_folds:
+            break
 
 
 if __name__ == "__main__":

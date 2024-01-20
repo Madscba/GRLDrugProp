@@ -18,6 +18,7 @@ import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import matplotlib.pyplot as plt
 import pandas as pd
+from torchdrug.data import Graph
 
 random.seed(4)  # set seed for reproducibility of shuffle get_drug_few_shot_split
 
@@ -195,7 +196,7 @@ def init_model(
     model: str = "deepdds",
     fold: int = 0,
     config: dict = None,
-    graph: Optional[KnowledgeGraphDataset] = None,
+    graph: Graph = None,
     logger_enabled: bool = True,
     pretrain: bool = False,
 ):
@@ -220,6 +221,7 @@ def init_model(
 
     pl_module = BasePL(
         model,
+        graph.num_relation,
         lr=config.lr,
         task=config.task,
         logger_enabled=logger_enabled,

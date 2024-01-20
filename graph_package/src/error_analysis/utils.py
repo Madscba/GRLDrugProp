@@ -201,7 +201,7 @@ def get_confusion_matrix_heatmap(
     return fig
 
 
-def save_model_pred(batch_idx, batch, preds, target, config, model_name, save_path=""):
+def save_model_pred(batch_idx, batch, preds, target, std_per_cell_line, config, model_name, save_path=""):
     """
     Save model predictions, alongside batch_idx, batch triplets
 
@@ -220,6 +220,7 @@ def save_model_pred(batch_idx, batch, preds, target, config, model_name, save_pa
         "batch": batch,
         "predictions": [preds],
         "targets": [target],
+        "var_per_cell_line": [std_per_cell_line],
     }
 
     save_path = get_model_pred_path(save_path, config)

@@ -1,18 +1,18 @@
 from pytorch_lightning import LightningModule
 from graph_package.src.pl_modules.metrics import RegMetrics, ClfMetrics
-from torchmetrics import MeanSquaredError
 from torch.optim import Adam
-from torch.nn import ModuleDict, BCEWithLogitsLoss, MSELoss
-from torchmetrics import AUROC
+from torch.nn import BCEWithLogitsLoss
+from graph_package.src.pl_modules.loss_functions import MSECellLineVar
 import torch
 
-loss_func_dict = {"clf": BCEWithLogitsLoss(), "reg": MSELoss()}
+loss_func_dict = {"clf": BCEWithLogitsLoss, "reg": MSECellLineVar}
 
 
 class BasePL(LightningModule):
     def __init__(
         self,
         model,
+        num_relation,
         lr: float = 0.001,
         task: str = "clf",
         logger_enabled: bool = True,
@@ -23,7 +23,11 @@ class BasePL(LightningModule):
         super().__init__()
         self.lr = lr
         self.task = task
-        self.loss_func = loss_func_dict[task]
+        self.loss_func = (
+            loss_func_dict[task](num_relation)
+            if task == "reg"
+            else loss_func_dict[task]()
+        )
         metric = ClfMetrics if task == "clf" else RegMetrics
         self.val_metrics = metric("val", target)
         self.test_metrics = metric("test", target)
@@ -40,7 +44,12 @@ class BasePL(LightningModule):
         target = batch[1]
         preds = self(inputs)
         preds = preds.view(-1)
-        loss = self.loss_func(preds, target)
+        if self.task == "reg":
+            cell_line_ids = inputs[:, 2]
+            loss = self.loss_func(preds, target, cell_line_ids)
+        else:
+            loss = self.loss_func(preds, target)
+
         return loss, target, preds
 
     def training_step(self, batch, batch_idx):
@@ -167,9 +176,22 @@ class BasePL(LightningModule):
                                 "params": self.model.prediction_head.global_mlp.parameters(),
                                 "lr": lr_setup.lr_ph_global_mlp,
                             },
+                            {"params": self.loss_func.parameters(), "lr": self.lr},
                         ]
                     )
-            return Adam(self.model.parameters(), lr=self.lr)
+            return Adam(
+                [
+                    {"params": self.model.parameters()},
+                    {"params": self.loss_func.parameters()},
+                ],
+                lr=self.lr,
+            )
 
         else:
-            return Adam(self.model.parameters(), lr=self.lr)
+            return Adam(
+                [
+                    {"params": self.model.parameters()},
+                    {"params": self.loss_func.parameters()},
+                ],
+                lr=self.lr,
+            )
