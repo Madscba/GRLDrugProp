@@ -18,6 +18,7 @@ import shutil
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import matplotlib.pyplot as plt
 import pandas as pd
+from torchdrug.data import Graph
 
 random.seed(4)  # set seed for reproducibility of shuffle get_drug_few_shot_split
 
@@ -46,10 +47,9 @@ def generate_histogram_of_node_degrees(dataset, dataset_name):
     plt.show()
 
 
-def get_drug_few_shot_split(
-    dataset, config, n_drugs_per_fold=8, print_split_stats=True
-):
+def get_drug_few_shot_split(dataset, config, print_split_stats=True):
     """Split into 5 folds"""
+    n_drugs_per_fold = config.n_drugs_per_fold
     generate_histogram_of_node_degrees(dataset, dataset_name=config.dataset.name)
     all_drugs_ids = list(range(0, dataset.graph.num_node))
     random.shuffle(all_drugs_ids)
@@ -83,10 +83,10 @@ def get_drug_few_shot_split(
         print(f"amount of splits: {len(splits)}")
     return splits
 
-def get_cell_line_few_shot_split(
-    dataset, config, n_cell_lines_per_fold=25, print_split_stats=True
-):
+
+def get_cell_line_few_shot_split(dataset, config, print_split_stats=True):
     """Split into 5 folds"""
+    n_cell_lines_per_fold = config.n_cell_lines_per_fold
     num_cell_lines = dataset.graph.num_relation.cpu().numpy()
     all_cell_line_ids = list(range(0, num_cell_lines))
     splits = []
@@ -118,7 +118,6 @@ def get_cell_line_few_shot_split(
     return splits
 
 
-
 def get_drug_split(dataset, config, n_drugs_per_fold=3):
     splits = []
     df = dataset.data_df
@@ -139,8 +138,8 @@ def get_cv_splits(dataset, config):
     elif config.group_val == "drug_few_shot":
         splits = get_drug_few_shot_split(dataset, config)
         return splits
-    elif config.group_val =="cell_line_few_shot":
-        splits = get_cell_line_few_shot_split(dataset,config)
+    elif config.group_val == "cell_line_few_shot":
+        splits = get_cell_line_few_shot_split(dataset, config)
         return splits
     else:
         if config.group_val == "drug_combination":
@@ -154,11 +153,8 @@ def get_cv_splits(dataset, config):
         )
         return kfold.split(dataset, dataset.get_labels(dataset.indices), group)
 
-def pretrain_single_model(model_name, config, data_loaders, k):
-    check_point_path = Directories.CHECKPOINT_PATH / model_name
-    if os.path.isdir(check_point_path):
-        shutil.rmtree(check_point_path)
 
+def pretrain_single_model(model_name, config, data_loaders, k):
     checkpoint_callback = ModelCheckpoint(
         dirpath=get_checkpoint_path(config.model.pretrain_model, k),
         **config.checkpoint_callback,
@@ -200,7 +196,7 @@ def init_model(
     model: str = "deepdds",
     fold: int = 0,
     config: dict = None,
-    graph: Optional[KnowledgeGraphDataset] = None,
+    graph: Graph = None,
     logger_enabled: bool = True,
     pretrain: bool = False,
 ):
@@ -209,10 +205,10 @@ def init_model(
     if model == "gnn":
         if config.dataset.drug_representation in ["distmult", "deepdds"]:
             load_pretrained_drug_embeddings_into_graph(
-                graph=graph, 
-                model=config.dataset.drug_representation, 
-                dataset_str=config.dataset.name, 
-                fold=fold 
+                graph=graph,
+                model=config.dataset.drug_representation,
+                dataset_str=config.dataset.name,
+                fold=fold,
             )
         model = model_dict[model.lower()](
             graph=graph, dataset=config.dataset.name, **config.model
@@ -225,6 +221,7 @@ def init_model(
 
     pl_module = BasePL(
         model,
+        graph.num_relation,
         lr=config.lr,
         task=config.task,
         logger_enabled=logger_enabled,
@@ -306,21 +303,21 @@ def split_dataset(
 
 def split_train_val_test(dataset, train_idx, test_idx, config):
     train_set, test_set = split_dataset(
-            dataset, split_method="custom", split_idx=(train_idx, test_idx)    
+        dataset, split_method="custom", split_idx=(train_idx, test_idx)
     )
 
-    if config.group_val == "drug_few_shot": 
+    if config.group_val in ("drug_few_shot", "cell_line_few_shot", "drug_combination"):
         test_idx, val_idx = train_val_split(
             test_set.indices,
             test_size=0.4,
             random_state=config.seed,
             stratify=dataset.get_labels(test_set.indices),
         )
-        
+
         test_set, val_set = split_dataset(
             dataset, split_method="custom", split_idx=(list(test_idx), list(val_idx))
         )
-    
+
     else:
         train_idx, val_idx = train_val_split(
             train_set.indices,
@@ -332,33 +329,36 @@ def split_train_val_test(dataset, train_idx, test_idx, config):
         train_set, val_set = split_dataset(
             dataset, split_method="custom", split_idx=(list(train_idx), list(val_idx))
         )
-
+    train_set.indices = list(train_set.indices)
     return train_set, val_set, test_set
 
 
 def save_pretrained_drug_embeddings(model, fold):
     model_name = model.model._get_name()
-    if model_name.lower() == 'deepdds':
+    if model_name.lower() == "deepdds":
         drug_ids = torch.arange(len(model.model.entity_vocab), device=model.device)
         molecules = model.model._get_drug_molecules(drug_ids)
         features = model.model.drug_conv(
-                molecules, molecules.data_dict["atom_feature"].float()
-            )["node_feature"]
+            molecules, molecules.data_dict["atom_feature"].float()
+        )["node_feature"]
         features = model.model.drug_readout(molecules, features).tolist()
     else:
         drug_ids = torch.arange(model.model.num_entity, device=model.device)
         features = model.model.entity[drug_ids].tolist()
-    dataset_path = dataset_dict['oneil_almanac']
+    dataset_path = dataset_dict["oneil_almanac"]
     with open(dataset_path.parent / "entity_vocab.json") as f:
         drug_vocab = json.load(f)
     reverse_vocab = {i: drug for drug, i in drug_vocab.items()}
     drug_feature_dict = {reverse_vocab[i]: features[i] for i in drug_ids.tolist()}
-    file_name = f"drug_embedding_{model_name.lower()}_f{fold}_d{np.shape(features)[1]}.json"
+    file_name = (
+        f"drug_embedding_{model_name.lower()}_f{fold}_d{np.shape(features)[1]}.json"
+    )
     save_path = Directories.DATA_PATH / "features" / "pretrained_features"
     save_path.mkdir(parents=True, exist_ok=True)
     with open(save_path / file_name, "w") as json_file:
         json.dump(drug_feature_dict, json_file)
     return
+
 
 def load_pretrained_drug_embeddings_into_graph(graph, model, dataset_str, fold, dim=83):
     dataset_path = dataset_dict[dataset_str.lower()]
@@ -370,10 +370,11 @@ def load_pretrained_drug_embeddings_into_graph(graph, model, dataset_str, fold, 
         node_feature_dict = json.load(f)
     # Convert to a list in correct order determined by graph node ID
     node_features = [
-        node_feature_dict[name] for name in drug_vocab.keys() 
+        node_feature_dict[name]
+        for name in drug_vocab.keys()
         if name in node_feature_dict.keys()
     ]
-    # Convert to float arraylike 
+    # Convert to float arraylike
     node_features = np.array(node_features).astype(np.float32)
     graph.node_feature = torch.as_tensor(node_features, device=graph.device)
-    return 
+    return

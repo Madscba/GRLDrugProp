@@ -25,6 +25,7 @@ model_dict = {
 dataset_dict = {
     "oneil_legacy": Directories.DATA_PATH / "gold" / "oneil_legacy" / "oneil.csv",
     "oneil": Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv",
+    "oneil_het": Directories.DATA_PATH / "gold" / "oneil_het" / "oneil_het.csv",
     "deepdds_original": Directories.DATA_PATH
     / "gold"
     / "deepdds_original"
@@ -33,6 +34,10 @@ dataset_dict = {
     / "gold"
     / "oneil_almanac"
     / "oneil_almanac.csv",
+    "oneil_almanac_het": Directories.DATA_PATH
+    / "gold"
+    / "oneil_almanac_het"
+    / "oneil_almanac_het.csv",
 }
 
 
@@ -41,6 +46,7 @@ drug_representation_path_dict = {
     "morgan": d_feature_path / "drug_ECFP_fp_2D.csv",
     "morgan83_rad6": d_feature_path / "drug_ECFP_fp_2D_83.csv",
     "morgan83_rad3": d_feature_path / "drug_ECFP_fp_2D_83_rad3.csv",
+    "e3fp": d_feature_path / "drug_E3FP_fp_3D.csv",
     "maccs": d_feature_path / "drug_MACCS_fp_2D_.csv",
     "minhash": d_feature_path / "drug_MINHASH_fp_2D.csv",
     "minhash83": d_feature_path / "drug_MINHASH_fp_2D_83.csv",

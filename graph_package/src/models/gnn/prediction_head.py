@@ -24,7 +24,7 @@ class MLP(nn.Module):
         super(MLP, self).__init__()
         self.use_mono_response = use_mono_response
         self.dataset = dataset
-        self.encoding = self._load_ccle() if cell_line_features=="ccle" else self.load_cell_line_onehot()
+        self.encoding = self._load_ccle(cell_line_features) if cell_line_features in ("ccle","ccle_full") else self.load_cell_line_onehot()
         self.feature_dropout = nn.Dropout(feature_dropout)
         cell_line_input_dim = self.encoding.shape[1]
         
@@ -42,6 +42,7 @@ class MLP(nn.Module):
 
         if self.use_mono_response:
             self.mono_r_index, self.mono_r = self._load_mono_response(self.dataset)
+
             global_mlp_input_dim = 2 * dim + 64 + 3 * 2
         else:
             global_mlp_input_dim = 2 * dim + 64
@@ -49,12 +50,18 @@ class MLP(nn.Module):
         self.global_mlp = self.create_global_mlp(global_mlp_input_dim, hidden_dims, batch_norm, feature_dropout)
 
 
-    def _load_ccle(self):
+    def _load_ccle(self, cell_line_features):
+        if cell_line_features == "ccle":
+            f_name = "CCLE_954_gene_express_pca.json"
+        elif cell_line_features == "ccle_full":
+            f_name = "CCLE_954_gene_express.json"
+        else:
+            raise ValueError("Invalid cell feature arg (++model.ph_kwargs.cell_line_feature)")
         feature_path = (
             Directories.DATA_PATH
             / "features"
             / "cell_line_features"
-            / "CCLE_954_gene_express_pca.json"
+            / f_name
         )
         with open(feature_path) as f:
             all_edge_features = json.load(f)

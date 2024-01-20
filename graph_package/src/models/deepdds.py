@@ -35,6 +35,7 @@ class DeepDDS(nn.Module):
     ):
 
         super().__init__()
+        self.dataset_path = dataset_path
         self.entity_vocab = json.load(open(dataset_path.parent / "entity_vocab.json","r"))
         self.context_vocab = json.load(open(dataset_path.parent / "relation_vocab.json","r"))
         self.drug_features = self.load_drug_features()
@@ -102,14 +103,22 @@ class DeepDDS(nn.Module):
 
     def load_context_features(self) -> dict:
         """Get the context feature set."""
-        feature_path = (
-            Directories.DATA_PATH
-            / "features"
-            / "cell_line_features"
-            / "CCLE_954_gene_express_pca.json"
+        
+        if self.dataset_path.parent.name == 'deepdds_original':
+            feature_path = (
+            self.dataset_path.parent
+            / "cell_line_feature_dict.json"
         )
+        else:
+            feature_path = (
+                Directories.DATA_PATH
+                / "features"
+                / "cell_line_features"
+                / "CCLE_954_gene_express_pca.json"
+            )
         with open(feature_path) as f:
             all_edge_features = json.load(f)
+
 
         raw_data = {v: torch.FloatTensor(np.array(all_edge_features[k]).reshape(1, -1)).to(device) for k, v in self.context_vocab.items()}
         return raw_data

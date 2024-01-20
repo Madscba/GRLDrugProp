@@ -6,10 +6,6 @@ from graph_package.configs.definitions import (
     dataset_dict,
     drug_representation_path_dict,
 )
-from graph_package.src.etl.medallion.gold import (
-    create_drug_id_vocabs,
-    create_cell_line_id_vocabs,
-)
 from torch.utils.data import Dataset
 from torchdrug.data import Graph
 import numpy as np
@@ -35,7 +31,7 @@ class KnowledgeGraphDataset(Dataset):
         target: str = "zip_mean",
         task: str = "reg",
         use_node_features: bool = False,
-        modalities: str = "None",
+        modalities: str = False,
         drug_representation: str = "morgan",
         use_edge_features: bool = False,
     ):

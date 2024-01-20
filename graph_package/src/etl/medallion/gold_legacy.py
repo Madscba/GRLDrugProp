@@ -6,14 +6,18 @@ from graph_package.utils.helpers import init_logger
 import json
 from tqdm import tqdm
 import requests
-from .load import (
+from graph_package.src.etl.medallion.load import (
     load_oneil,
     load_drug_info_drugcomb,
-    load_cell_info_drugcomb
+    load_cell_info_drugcomb,
 )
-from .gold import create_drug_id_vocabs, create_cell_line_id_vocabs
+from graph_package.src.etl.medallion.gold import (
+    create_drug_id_vocabs,
+    create_cell_line_id_vocabs,
+)
 
 logger = init_logger()
+
 
 def download_drug_dict_deepdds_original():
     url = "https://raw.githubusercontent.com/Sinwang404/DeepDDs/master/data/drugs_0_10.csv"
@@ -77,13 +81,16 @@ def make_original_deepdds_dataset():
     df = pd.read_csv(
         "https://raw.githubusercontent.com/Sinwang404/DeepDDs/master/data/new_labels_0_10.csv"
     )
+    cell_line_features = pd.read_csv(
+        "https://raw.githubusercontent.com/Sinwang404/DeepDDs/master/data/new_cell_features_954.csv"
+    )
+
     drug_dict_deepdds = get_drug_dict_deepdds_original()
     cell_line_dict_deepdds = get_cell_line_dict_deepdds_original(df)
 
     df["drug_1_name"] = df["drug1"].map(drug_dict_deepdds)
     df["drug_2_name"] = df["drug2"].map(drug_dict_deepdds)
     df["context"] = df["cell"].map(cell_line_dict_deepdds)
-
     df, drug_vocab = create_drug_id_vocabs(df)
     df, cell_line_vocab = create_cell_line_id_vocabs(df)
     for vocab, name in zip(
@@ -91,6 +98,22 @@ def make_original_deepdds_dataset():
     ):
         with open(save_path / name, "w") as json_file:
             json.dump(vocab, json_file)
+
+    cell_line_features = cell_line_features.iloc[1:, :]
+    cell_line_features["gene_id"] = cell_line_features["gene_id"].map(cell_line_dict_deepdds)
+    cell_line_features = cell_line_features.set_index(
+        cell_line_features["gene_id"]
+    ).T.iloc[1:, :]
+    cell_line_feature_dict = cell_line_features.astype(float).to_dict(orient="list")
+
+    with open(
+        Directories.DATA_PATH
+        / "gold"
+        / "deepdds_original"
+        / "cell_line_feature_dict.json",
+        "w",
+    ) as json_file:
+        json.dump(cell_line_feature_dict, json_file)
 
     df = df[
         [
@@ -104,6 +127,7 @@ def make_original_deepdds_dataset():
         ]
     ]
     assert df.isna().sum().sum() == 0
+
     df.to_csv(
         Directories.DATA_PATH / "gold" / "deepdds_original" / "deepdds_original.csv",
         index=False,
@@ -134,3 +158,7 @@ def make_oneil_legacy_dataset():
             json.dump(vocab, json_file)
 
     df.to_csv(save_path / "oneil.csv", index=False)
+
+
+if __name__ == "__main__":
+    make_original_deepdds_dataset()
