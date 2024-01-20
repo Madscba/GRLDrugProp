@@ -82,11 +82,11 @@ def perform_manual_paired_two_sided_t_test(residuals_mse):
     p_val = 2 * (stats.t.cdf(-abs(t_stat), degrees_of_freedom))
     if abs(t_stat) > t_crit:
         print("reject null hypothesis: There is a difference in the means")
-        print(f"T-statistic {t_stat} and T-crit: {t_crit}\np-val: {pval}")
+        print(f"T-statistic {t_stat} and T-crit: {t_crit}\np-val: {p_val}")
         reject_null_hypothesis = True
     else:
         print("accept null hypothesis: There is no difference in the means")
-        print(f"T-statistic {t_stat} and T-crit: {t_crit}\np-val: {pval}")
+        print(f"T-statistic {t_stat} and T-crit: {t_crit}\np-val: {p_val}")
         reject_null_hypothesis = False
     return t_stat, p_val, reject_null_hypothesis
 
@@ -150,7 +150,8 @@ def run_pairwise_two_sided_ttests(
         ) = perform_manual_paired_two_sided_t_test(paired_residuals)
 
         # sanity check with scipy
-        # t_statistic_, p_value_, reject_null_hypothesis_ = paired_t_test(m1_mse, m2_mse)
+        #t_statistic_, p_value_, reject_null_hypothesis_ = paired_t_test(m1_mse, m2_mse)
+
         if perform_residual_analysis:
             res_is_normal, res_homoscedastic = residual_analysis(
                 paired_residuals,
