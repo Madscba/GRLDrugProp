@@ -676,9 +676,9 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
 
         self.output_dim = output_dim
         # Weight matrix for linear transformation
-        self.W = nn.Linear(self.input_dim,  self.n_hidden * n_heads * (self.num_relation+1))
+        self.W = nn.Linear(self.input_dim,  self.n_hidden * n_heads * (self.num_relation+1), bias=False)
         # Attention mechanism
-        self.attention = nn.Parameter(torch.empty(size=((self.num_relation+1), n_heads , output_dim * 2 // n_heads)))
+        self.attention = nn.Parameter(torch.empty(size=((self.num_relation+1), n_heads , self.n_hidden * 2)))
         nn.init.xavier_uniform_(self.attention.data)
         self.activation = nn.ELU() if self.concat_hidden else None
 
