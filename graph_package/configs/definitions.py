@@ -25,6 +25,7 @@ model_dict = {
 dataset_dict = {
     "oneil_legacy": Directories.DATA_PATH / "gold" / "oneil_legacy" / "oneil.csv",
     "oneil": Directories.DATA_PATH / "gold" / "oneil" / "oneil.csv",
+    "oneil_het": Directories.DATA_PATH / "gold" / "oneil_het" / "oneil_het.csv",
     "deepdds_original": Directories.DATA_PATH
     / "gold"
     / "deepdds_original"
