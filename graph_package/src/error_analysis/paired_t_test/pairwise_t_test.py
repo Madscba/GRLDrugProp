@@ -72,7 +72,6 @@ def perform_manual_paired_two_sided_t_test(residuals_mse):
     sigma_hat = np.sqrt(np.sum((mu_hat - residuals_mse) ** 2) / (degrees_of_freedom))
     sigma_err_mean = sigma_hat / np.sqrt(len(residuals_mse))
     t_stat = mu_hat / sigma_err_mean
-    pval = special.stdtr(degrees_of_freedom, -np.abs(t_stat)) * 2  # two sided
     alpha = 0.05
     # We are performing a two_sided test
     crit_level = alpha / 2
@@ -80,7 +79,7 @@ def perform_manual_paired_two_sided_t_test(residuals_mse):
     t_crit = stats.t.ppf(
         1 - crit_level, degrees_of_freedom
     )  # inverse cdf of t distribution
-    p_val = 2 * (1 - stats.t.cdf(abs(t_stat), degrees_of_freedom))
+    p_val = 2 * (stats.t.cdf(-abs(t_stat), degrees_of_freedom))
     if abs(t_stat) > t_crit:
         print("reject null hypothesis: There is a difference in the means")
         print(f"T-statistic {t_stat} and T-crit: {t_crit}\np-val: {pval}")
