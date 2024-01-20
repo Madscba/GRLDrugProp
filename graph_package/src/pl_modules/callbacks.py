@@ -25,16 +25,18 @@ class TestDiagnosticCallback(Callback):
             target,
             batch,
             batch_idx,
-        ) = pl_module.test_step_outputs.values()
+        ) = pl_module.test_outputs.values()
         print("conf_matrix:\n", df_cm)
 
-        save_performance_plots(
-            df_cm, metrics, preds, target, self.config, self.model_name, save_path=Path("")
-        )
-        save_model_pred(
-            batch_idx, batch, preds, target, self.config, self.model_name, save_path=Path("")
-        )
+
+        if self. config.save_model_pred:
+            save_performance_plots(
+                df_cm, metrics, preds, target, self.config, self.model_name, save_path=Path("")
+            )
+            save_model_pred(
+                batch_idx, batch, preds, target, self.config, self.model_name, save_path=Path("")
+            )
         # save pretrained drug embeddings
         if self.model_name in ["deepdds", "distmult"]:
             save_pretrained_drug_embeddings(model=pl_module,fold=self.fold)
-        pl_module.test_step_outputs.clear()
+        pl_module.test_outputs.clear()

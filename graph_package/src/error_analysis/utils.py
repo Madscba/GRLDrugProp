@@ -81,7 +81,7 @@ def get_performance_curve(
         save_path = get_err_analysis_path(save_path, config)
 
         plt.savefig(
-            save_path / f"{model_name}_{curve_type}_curve.png", bbox_inches="tight"
+            save_path / f"{model_name}_{curve_type}_curve_{config.run_hash}.png", bbox_inches="tight"
         )
     plt.show()
 
@@ -116,7 +116,7 @@ def convert_metrics_to_summary_table(
     if save_output:
         save_path = get_err_analysis_path(save_path, config)
         plt.savefig(
-            save_path / f"{model_name}_summary_metric_table.png", bbox_inches="tight"
+            save_path / f"{model_name}_summary_metric_table{config.run_hash}.png", bbox_inches="tight"
         )
 
 
@@ -197,8 +197,7 @@ def get_confusion_matrix_heatmap(
     ax.set_ylabel("actual values")
     if save_output:
         save_path = get_err_analysis_path(save_path, config)
-
-        fig.savefig(save_path / f"{model_name}_conf_matrix.png")
+        fig.savefig(save_path / f"{model_name}_conf_matrix_{config.run_hash}.png")
     return fig
 
 
@@ -228,9 +227,9 @@ def save_model_pred(batch_idx, batch, preds, target, config, model_name, save_pa
         print("making a space to save preds: ", save_path)
         save_path.mkdir(exist_ok=True, parents=True),
 
-    pred_path = save_path / f"{model_name}_model_pred_dict.pkl"
+    pred_path = save_path / f"{model_name}_model_pred_dict_{config.run_hash}.pkl"
     if pred_path.exists():
-        with open(save_path / f"{model_name}_model_pred_dict.pkl", "rb") as f:
+        with open(pred_path, "rb") as f:
             old_output_dict = pickle.load(f)
 
         # append old predictions with new
@@ -238,8 +237,8 @@ def save_model_pred(batch_idx, batch, preds, target, config, model_name, save_pa
             concatenated_input = old_output_dict[key] + output_dict[key]
             output_dict.update({key: concatenated_input})
 
-    with open(save_path / f"{model_name}_model_pred_dict.pkl", "wb") as f:
-        print("saving at: ", save_path / f"{model_name}_model_pred_dict.pkl")
+    with open(pred_path, "wb") as f:
+        print("saving at: ", pred_path)
         pickle.dump(output_dict, f)
 
 

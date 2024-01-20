@@ -1,11 +1,13 @@
 # @package _global_
 
 run_name: 'NO_NAME'
+run_hash: '' #automatically generated
 wandb: False
 lr: 0.001
 l2_reg: False
 batch_sizes: {"train": 128,"val": 1000, "test": 10000}
 group_val: False
+save_model_pred: False
 max_train_triplets: 120 #if group_val="drug_few_shot", this value determines amount of triplets to be included in train
 n_drugs_per_fold: 8
 n_cell_lines_per_fold: 10
