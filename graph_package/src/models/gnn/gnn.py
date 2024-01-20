@@ -104,6 +104,8 @@ class GNN(nn.Module, core.Configurable):
         layers = nn.ModuleList()
         dims = input_dim + hidden_dims
         for i in range(len(dims) - 1):
+            if layer=="gac" and i>0 and i==(len(hidden_dims)-1):
+                enc_kwargs.update({"concat":False})
             layers.append(
                 layer_dict[layer](
                     dims[i], dims[i + 1], self.graph.num_relation, **enc_kwargs
@@ -183,3 +185,6 @@ class GNN(nn.Module, core.Configurable):
 
         elif prediction_head == "mlp":
             self.ph_kwargs.update({"dataset": dataset})
+        
+
+
