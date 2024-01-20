@@ -510,97 +510,59 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
             self.n_hidden = output_dim
 
         self.output_dim = output_dim
-        self.W = nn.Linear(self.input_dim, self.n_hidden * n_heads)
-
-        # Define parameters for each relation type and each head
-        self.attentions = nn.ModuleList()
-        for _ in range(num_relation):
-            head_attentions = nn.ModuleList(
-                [nn.Linear(2 * self.n_hidden, 1) for _ in range(n_heads)]
-            )
-            self.attentions.append(head_attentions)
-
+        # Weight matrix for linear transformation
+        self.W = nn.Linear(self.input_dim,  self.n_hidden * n_heads * (self.num_relation+1), bias=False)
+        # Attention mechanism
+        self.attention = nn.Parameter(torch.empty(size=((self.num_relation+1), n_heads , self.n_hidden * 2)))
+        nn.init.xavier_uniform_(self.attention.data)
         self.activation = nn.ELU() if self.concat_hidden else None
-
-    def _add_relation_specific_self_loops(self, n_nodes, device):
-        # Creating self-loop edges for each node and each relation
-        self_loop_edges = (
-            torch.stack(
-                [
-                    torch.arange(n_nodes, device=device)
-                    for _ in range(self.num_relation)
-                ],
-                dim=1,
-            )
-            .view(-1, 1)
-            .repeat(1, 2)
-        )
-        relation_indices = torch.repeat_interleave(
-            torch.arange(self.num_relation, device=device), n_nodes
-        ).view(-1, 1)
-        self_loop_edge_list = torch.cat([self_loop_edges, relation_indices], dim=1)
-        return self_loop_edge_list
 
     def message_and_aggregate(self, graph, input):
         # Extract triplets from the graph and create self-loop edges
         n_nodes = input.shape[0]
-        self_loop_edge_list = self._add_relation_specific_self_loops(
-            n_nodes, graph.device
-        )
+        self_loop_edges = torch.stack([torch.arange(n_nodes, device=graph.device)], dim=1).view(-1, 1).repeat(1, 2)
+        self_loop_edge_list = torch.cat([self_loop_edges, torch.ones(n_nodes,1,dtype=torch.int,device=graph.device)*self.num_relation], dim=1)
         edge_list = torch.cat([graph.edge_list, self_loop_edge_list], dim=0)
+        
         node_in, node_out, relation = edge_list.t()
 
-        # Handling edge weights, assigning small positive weights to self-loops
-        num_self_loops = n_nodes * self.num_relation
-        self_loop_weights = torch.ones(num_self_loops, device=graph.device) * 0.1
+        # Handling edge weights, assigning small positive weights to self-edges
+        self_loop_weights = torch.ones(n_nodes, device=graph.device)
         edge_weight = torch.cat([graph.edge_weight, self_loop_weights])
 
-        # Linear transformation
-        Wh = self.W(input)
-        Wh = Wh.view(-1, self.n_heads, self.n_hidden)
+        # Linear transformation with reshaping for relations
+        Wh = self.W(input).view(-1, self.n_heads, self.n_hidden, self.num_relation+1)
 
-        # Initialize output
-        h_prime = torch.zeros(
-            (input.size(0), self.n_heads, self.n_hidden, self.num_relation),
-            device=graph.device,
-        )
+        # Calculate attention coefficients for all attention heads and relations
+        Wh_i = Wh[node_in, :, :, relation]  # Source node features
+        Wh_j = Wh[node_out, :, :, relation]  # Target node features
 
-        # Apply attention mechanism for each relation and each head
-        for rel in range(self.num_relation):
-            rel_mask = relation == rel
-            edges = torch.stack([node_in[rel_mask], node_out[rel_mask]])
-            weights = edge_weight[rel_mask].unsqueeze(1)
+        Wh_concat = torch.cat([Wh_i, Wh_j], dim=2) # Concatenate source and target features
 
-            for head in range(self.n_heads):
-                Wh_i = Wh[edges[0], head, :]  # Features of source nodes
-                Wh_j = Wh[edges[1], head, :]  # Features of target nodes
+        # Calculate attention coefficients e_ij for each node pair following eq. 3 [Velickovic] with leaky rely
+        e = torch.einsum("nhd, nhd -> nh", self.attention[relation], Wh_concat)
+        e = F.leaky_relu(e, negative_slope=self.negative_slope)
 
-                # Calculate attention coefficients e_ij for each node pair following eq. 3 [Velickovic] with leaky rely
-                Wh_concat = torch.cat([Wh_i, Wh_j], dim=-1)
-                e = self.attentions[rel][head](Wh_concat)
-                e = F.leaky_relu(e, negative_slope=self.negative_slope)
+        # Multiply synergy scores to the attention coefficients including self-loop
+        e *= edge_weight.unsqueeze(1)
 
-                # Multiply synergy scores to the attention coefficients including self-loop
-                e *= weights
+        # Normalize attention coefficients and apply dropout
+        attention = scatter_softmax(e, node_out, dim=0)
+        attention = F.dropout(attention, p=self.dropout, training=self.training)
 
-                # Now normalize following eq. 3 [Velickovic]
-                a = scatter_softmax(e, edges[1], dim=0)
-                a = F.dropout(a, p=self.dropout, training=self.training)
+        # Expand 'attention' to have the same number of dimensions as 'Wh_j'
+        a_ij = attention.unsqueeze(-1).expand_as(Wh_j)
 
-                # Compute final output features for every node for the attention head following eq. 4 [Velickovic]
-                h_prime[:, head, :, rel] = scatter_add(
-                    a * Wh_j, edges[1], dim=0, dim_size=input.size(0)
-                )
+        # Aggregate the attention-weighted node features for each source node and compute final output features
+        # following eq. 4 [Velickovic]
+        h_prime = scatter_add(a_ij * Wh_j, node_in, dim=0, dim_size=input.size(0))
 
-        # Mean across relations
-        h_prime = h_prime.mean(dim=-1)
-
-        # Whether to mean across the multiple attention heads or not
         if self.concat_hidden:
             # eq. 5 [Velickovic]
-            return h_prime.reshape(input.shape[0], self.n_heads * self.n_hidden)
+            update = h_prime.view(input.shape[0], self.n_heads * self.n_hidden)
         else:
-            return h_prime.mean(dim=1)
+            update = h_prime.mean(dim=1)
+        return update 
 
     def combine(self, input, update):
         output = update

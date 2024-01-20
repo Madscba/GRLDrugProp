@@ -6,10 +6,6 @@ from graph_package.configs.definitions import (
     dataset_dict,
     drug_representation_path_dict,
 )
-from graph_package.src.etl.medallion.gold import (
-    create_drug_id_vocabs,
-    create_cell_line_id_vocabs,
-)
 from torch.utils.data import Dataset
 from torchdrug.data import Graph
 import numpy as np
