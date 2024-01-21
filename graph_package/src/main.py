@@ -25,6 +25,7 @@ import sys
 import wandb
 import warnings
 import os
+from wandb.sdk.lib.runid import generate_id as wandb_generate_id
 
 warnings.filterwarnings("ignore", category=UserWarning, module="hydra")
 warnings.filterwarnings(
@@ -46,6 +47,7 @@ def main(config):
         config.dataset.drug_representation not in ["distmult", "deepdds"]
     ):
         config.dataset.update({"use_node_features": True})
+    config.update({"run_hash": wandb_generate_id(24)})
 
     dataset = KnowledgeGraphDataset(task=config.task, **config.dataset)
     update_model_kwargs(config, model_name, dataset)

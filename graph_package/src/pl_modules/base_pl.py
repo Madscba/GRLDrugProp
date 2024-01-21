@@ -124,16 +124,36 @@ class BasePL(LightningModule):
 
         metrics.pop("CM", None)
 
-        self.test_step_outputs = {
+        step_o = {
             "df_cm": df_cm.cpu(),
             "metrics": {key: val.cpu() for key, val in metrics.items()},
             "preds": preds.cpu(),
             "target": (target.cpu() >= 10).to(torch.int64),
             "batch": [t.cpu() for t in batch],
-            "batch_idx": batch_idx,
+            "batch_idx": [batch_idx],
         }
 
+        keys_to_concat = ["preds", "target"]
+
+        if batch_idx == 0:
+            self.test_outputs = step_o
+        else:
+            self.test_outputs["df_cm"] = self.test_outputs["df_cm"] + step_o["df_cm"]
+            self.test_outputs["batch"] = [torch.vstack([step_o["batch"][0], step_o["batch"][0]]),
+                                          torch.hstack([step_o["batch"][1], step_o["batch"][1]])]
+            self.test_outputs["batch_idx"] += [step_o["batch_idx"]]
+
+            for key in keys_to_concat:
+                self.test_outputs[key] = torch.cat([self.test_outputs[key], step_o[key]], dim=0)
+
+            for key, val in metrics.items():
+                if key in ("test_auprc", "test_auroc", "test_F1", "test_mse"):
+                    #incremental estimate of the mean of the metric
+                    # mu_k = mu_{k-1} + (x_k - mu_{k-1})/k
+                    self.test_outputs["metrics"][key] += + (self.test_outputs["metrics"][key] - step_o["metrics"][key]) / (batch_idx + 1)
+
         return
+
 
     def configure_optimizers(self):
         if "ph_kwargs" in self.model_config:

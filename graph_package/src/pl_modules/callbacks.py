@@ -32,24 +32,26 @@ class TestDiagnosticCallback(Callback):
             target,
             batch,
             batch_idx,
-        ) = pl_module.test_step_outputs.values()
-        
-        std = torch.sqrt(softplus(pl_module.loss_func.var.cpu().detach()))
-        
-        std_per_cell_line = std[batch[0][:,2]]
+        ) = pl_module.test_outputs.values()
+        print("conf_matrix:\n", df_cm)
 
-        save_performance_plots(
-            df_cm, metrics, preds, target, self.config, self.model_name, save_path=Path("")
-        )
-        save_model_pred(
-            batch_idx, batch, preds, target, std_per_cell_line, self.config, self.model_name, save_path=Path("")
-        )
+
+        if self. config.save_model_pred:
+            std = torch.sqrt(softplus(pl_module.loss_func.var.cpu().detach()))
+
+            std_per_cell_line = std[batch[0][:,2]]
+
+            save_performance_plots(
+                df_cm, metrics, preds, target, self.config, self.model_name, save_path=Path("")
+            )
+            save_model_pred(
+                batch_idx, batch, preds, target, std_per_cell_line, self.config, self.model_name, save_path=Path("")
+            )
 
         # save pretrained drug embeddings
         if self.model_name in ["deepdds", "distmult"]:
             save_pretrained_drug_embeddings(model=pl_module,fold=self.fold)
         pl_module.test_step_outputs.clear()
-
 class LossFnCallback(Callback):
     def __init__(self, epochs_wo_var) -> None:
         self.epochs_wo_var = epochs_wo_var
@@ -68,3 +70,4 @@ class LossFnCallback(Callback):
             pl_module.log('std_std', std_std, on_epoch=True)
             pl_module.log('max_std',max_std, on_epoch=True)
             pl_module.log('min_std',min_std,on_epoch=True)
+
