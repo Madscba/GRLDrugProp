@@ -128,7 +128,7 @@ def generate_corr_heatmap(
     plt.clf()
 
 
-def enrich_df_w_metric_nexp_meantarget_per_group(df, group_by_columns, metric_name):
+def enrich_df_w_metric(df, group_by_columns, metric_name):
     """
     Get metric, n_exp and mean_target for each group that exists for the entity currently under investigation
     Args:
@@ -508,6 +508,8 @@ def get_drug_level_df(df_list, task):
             "cancer_cell_name",
             "targets",
             "drug_pair_idx",
+            "clinical_phase",
+            "clinical_phase_right",
         ]
         + additional_cols,
     ]
@@ -568,7 +570,7 @@ def save_model_pred(batch_idx, batch, preds, target, std_per_cell_line, config, 
         print("saving at: ", pred_path)
         pickle.dump(output_dict, f)
 
-def enrich_model_predictions(model_names, pred_dfs, task):
+def enrich_model_pred(model_names, pred_dfs, task):
     """
     Enrich prediction dataframe with vocabulary and meta information on both drug and cancer cell line level.
     Parameters:

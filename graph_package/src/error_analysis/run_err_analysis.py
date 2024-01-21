@@ -3,8 +3,8 @@ from graph_package.configs.directories import Directories
 from graph_package.src.error_analysis.err_utils.err_utils import (
     generate_error_plots_per_entity,
     get_drug_level_df,
-    enrich_model_predictions,
-    enrich_df_w_metric_nexp_meantarget_per_group,
+    enrich_model_pred,
+    enrich_df_w_metric,
     generate_difference_df,
     ENTITY_ERR_DICT,
 )
@@ -14,29 +14,40 @@ from graph_package.src.error_analysis.err_utils.err_utils_load import (
 import pandas as pd
 
 
-def load_and_prepare_predictions_for_comp(model_names, entity, comparison, err_configs):
+def load_and_prepare_pred(model_names, entity, comparison, err_configs):
+    """
+    Load model predictions and prepare them for comparison
+
+    Args:
+        model_names:
+        entity:
+        comparison (str): individual, concatenate or difference
+        err_configs:
+
+    Returns:
+
+    """
     # load predictions (triplets, predictions, targets) from trained model(s),
     pred_dfs = get_saved_pred(err_configs)
-
+    task = err_configs[0]['task']
     # enrich predictions with vocabularies and meta data
-    pred_dfs = enrich_model_predictions(model_names, pred_dfs, task)
+    pred_dfs = enrich_model_pred(model_names, pred_dfs, task)
 
     metric_name = "AUC_ROC" if task == "clf" else "MSE"
     group_by_column = ENTITY_ERR_DICT[entity]["group_by"]
     x_label_col_name = ENTITY_ERR_DICT[entity]["x_label_column_name"]
 
-    # todo add a check for entity = "drug":
     if entity == "drug":
         if len(pred_dfs) > 1:
-            df_drug_without_dupl = [
+            pred_dfs = [
                 get_drug_level_df([pred_dfs[i]], task) for i in range(len(pred_dfs))
             ]
         else:
-            df_drug_without_dupl = [get_drug_level_df(pred_dfs, task)]
+            pred_dfs = [get_drug_level_df(pred_dfs, task)]
 
     # prepare df(s) for relevant comparison
     if comparison == "individual":
-        grouped_dfs = enrich_df_w_metric_nexp_meantarget_per_group(
+        grouped_dfs = enrich_df_w_metric(
             pred_dfs[0], group_by_column, metric_name
         )
         x_labels = (
@@ -49,7 +60,7 @@ def load_and_prepare_predictions_for_comp(model_names, entity, comparison, err_c
             len(model_names) > 1
         ), "Concatenation of predictions requires more than one model"
         pred_dfs = pd.concat(pred_dfs)
-        grouped_dfs = enrich_df_w_metric_nexp_meantarget_per_group(
+        grouped_dfs = enrich_df_w_metric(
             pred_dfs, group_by_column, metric_name
         )
         # check that x_labels work as they should in this case
@@ -63,7 +74,7 @@ def load_and_prepare_predictions_for_comp(model_names, entity, comparison, err_c
             len(model_names) > 1
         ), "Difference comparison requires more than one model"
         grouped_dfs = [
-            enrich_df_w_metric_nexp_meantarget_per_group(
+            enrich_df_w_metric(
                 pred_df, group_by_column, metric_name
             )
             for pred_df in pred_dfs
@@ -89,7 +100,7 @@ def main_error_diagnostics(err_configs, comparison, model_names, entities):
     if comparison == "individual":
         for i in range(len(model_names)):
             for entity in entities:
-                df = load_and_prepare_predictions_for_comp(
+                df = load_and_prepare_pred(
                     [model_names[i]],
                     entity,
                     comparison,
@@ -105,7 +116,7 @@ def main_error_diagnostics(err_configs, comparison, model_names, entities):
 
     else:
         for entity in entities:
-            dfs = load_and_prepare_predictions_for_comp(
+            dfs = load_and_prepare_pred(
                 model_names, entity, comparison, err_configs
             )
             generate_error_plots_per_entity(
@@ -114,16 +125,6 @@ def main_error_diagnostics(err_configs, comparison, model_names, entities):
 
 
 if __name__ == "__main__":
-    task = "reg"
-    target = "zip_mean"
-    day_of_prediction = "10_12_2023"
-    path_to_prediction_folder = (
-        Directories.OUTPUT_PATH
-        / "model_predictions"
-        / day_of_prediction
-        / "_".join([task, target])
-    )
-
     model_1_config = {
         "task": "reg",
         "target": "zip_mean",

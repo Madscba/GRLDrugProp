@@ -181,10 +181,7 @@ def run_pairwise_two_sided_ttests(
 if __name__ == "__main__":
     # put prediction files in the folder, where each prediction file is named after the model:
     # ex : rescal_model_pred_dict.pkl
-    # path_to_prediction_folder = (
-    #     Directories.OUTPUT_PATH / "model_predictions" / "10_12_2023" / "reg_zip_mean"
-    # )
-    #
+
     model_1_config = {
         "task": "reg",
         "target": "zip_mean",
