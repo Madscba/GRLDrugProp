@@ -222,6 +222,7 @@ class GraphAttentionConv(MessagePassingBase):
         edge_input_dim=None,
         num_head=1,
         negative_slope=0.2,
+        dropout=0.1,
         concat=True,
         feature_dropout: int = 0.0,
         batch_norm=False,
@@ -234,7 +235,8 @@ class GraphAttentionConv(MessagePassingBase):
         self.concat = concat
         # call relu bu with a slightly negative slop for negative values
         self.leaky_relu = functools.partial(F.leaky_relu, negative_slope=negative_slope)
-
+        self.dropout = dropout
+        
         if concat:
             hidden_dim = output_dim * 2 // num_head
         else: 
@@ -284,6 +286,7 @@ class GraphAttentionConv(MessagePassingBase):
         # similarity between the query for each cell line and key vectors for each sample and head.
         weight = torch.einsum("hd, nhd -> nh", self.query, key)
         weight = self.leaky_relu(weight)
+        
 
         # the maximum attention for each node, denominator in [Hamilton] eq 5.20, but uses max instead of sum
         # used to force the largest value to be 1 after taking exp
@@ -299,8 +302,8 @@ class GraphAttentionConv(MessagePassingBase):
         normalizer = scatter_mean(attention, node_out, dim=0, dim_size=graph.num_node)[
             node_out
         ]
-
         attention = attention / (normalizer + self.eps)
+        attention = F.dropout(attention, self.dropout, training=self.training)
         # see eq. 5.19 [Hamilton], this is 'h'
         value = hidden[node_in].view(-1, self.num_head, self.query.shape[-1] // 2)
         # Copies a_{v,u} for each dimension of output
