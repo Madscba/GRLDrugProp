@@ -15,16 +15,8 @@ import jsonlines
 logger = init_logger()
 
 def load_silver_csv(study):
-    if True:
-        data_path = Directories.DATA_PATH / "silver" / study/ f"{study}.csv"
-        return pd.read_csv(data_path)
-    else:
-        data_path_almanac = Directories.DATA_PATH / "silver" / "oneil_almanac"/ "oneil_almanac.csv"
-        df_almanac = pd.read_csv(data_path_almanac)
-        study = f"rest_of_{study}"
-        data_path = Directories.DATA_PATH / "silver" / study/ f"{study}.csv"
-        df_rest = pd.read_csv(data_path)
-        return pd.concat([df_almanac, df_rest])
+    data_path = Directories.DATA_PATH / "silver" / study/ f"{study}.csv"
+    return pd.read_csv(data_path)
 
 def load_oneil():
     data_path = Directories.DATA_PATH / "silver" / "oneil" / "oneil.csv"
