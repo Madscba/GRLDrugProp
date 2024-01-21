@@ -1,5 +1,5 @@
 from graph_package.configs.directories import Directories
-from graph_package.src.error_analysis.utils import get_saved_pred
+from graph_package.src.error_analysis.err_utils.err_utils_load import get_saved_pred
 from itertools import combinations
 import numpy as np
 import pandas as pd
@@ -107,12 +107,12 @@ def check_if_samples_are_paired(df_m1, df_m2):
 
 def run_pairwise_two_sided_ttests(
     model_names,
-    path_to_prediction_folder,
+    err_configs,
     alpha: float = 0.05,
     perform_residual_analysis: bool = False,
     plot_residuals: bool = False,
 ):
-    pred_dfs = get_saved_pred(model_names, path_to_prediction_folder)
+    pred_dfs = get_saved_pred(err_configs)
 
     # prepare pairwise combinations
     model_indices = np.arange(len(model_names))
@@ -181,9 +181,32 @@ def run_pairwise_two_sided_ttests(
 if __name__ == "__main__":
     # put prediction files in the folder, where each prediction file is named after the model:
     # ex : rescal_model_pred_dict.pkl
-    path_to_prediction_folder = (
-        Directories.OUTPUT_PATH / "model_predictions" / "10_12_2023" / "reg_zip_mean"
-    )
+    # path_to_prediction_folder = (
+    #     Directories.OUTPUT_PATH / "model_predictions" / "10_12_2023" / "reg_zip_mean"
+    # )
+    #
+    model_1_config = {
+        "task": "reg",
+        "target": "zip_mean",
+        "day_of_prediction": "21_01_2024",
+        "prediction_file_name": "gnn_model_pred_dict_1j75xr94dxyat0e9lixmwb8e.pkl",
+        "bar_plot_config": {"add_bar_info": True},
+    }
+
+    model_2_config = {
+        "task": "reg",
+        "target": "zip_mean",
+        "day_of_prediction": "21_01_2024",
+        "prediction_file_name": "gnn_model_pred_dict_bo9n6s0v6g7oa3tvy0s1nmvy.pkl",
+        "bar_plot_config": {"add_bar_info": True},
+    }
+
+    err_configs = {
+        0: model_1_config,
+        1: model_2_config,
+    }
+
+
     model_names = ["rescal", "deepdds"]
     alpha = 0.05
     perform_residual_analysis = True
@@ -191,7 +214,7 @@ if __name__ == "__main__":
 
     df_results = run_pairwise_two_sided_ttests(
         model_names,
-        path_to_prediction_folder,
+        err_configs,
         alpha,
         perform_residual_analysis,
         plot_residuals,

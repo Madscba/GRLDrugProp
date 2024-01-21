@@ -1,263 +1,158 @@
-import pandas as pd
 from graph_package.configs.directories import Directories
-from graph_package.src.main import (
-    load_data,
-    get_dataloaders,
-)
-from graph_package.src.error_analysis.utils import (
-    find_best_model_ckpt,
-    barplot_aucroc_grouped_by_entity,
-    get_saved_pred,
+
+from graph_package.src.error_analysis.err_utils.err_utils import (
+    generate_error_plots_per_entity,
+    get_drug_level_df,
     enrich_model_predictions,
-    get_evaluation_metric_name,
+    enrich_df_w_metric_nexp_meantarget_per_group,
+    generate_difference_df,
+    ENTITY_ERR_DICT,
 )
-import hydra
-import numpy as np
-from graph_package.configs.definitions import model_dict
-from pytorch_lightning import Trainer
-import torch
-
-
-@hydra.main(
-    config_path=str(Directories.CONFIG_PATH / "hydra_configs"),
-    config_name="config.yaml",
+from graph_package.src.error_analysis.err_utils.err_utils_load import (
+    get_saved_pred,
 )
-def main(config):
-    """
-    Load checkpoint and run err. diagnostics for rescal model. remove comment line 34 to run deepdds (and outcomment 35,36)
-
-    Be aware that the test dataset is generated differently than in main.
-
-    Args:
-        config:
-
-    Returns:
-
-    """
-    # model_name = get_model_name(config, sys_args=sys.argv)
-    model_name = "rescal"
-    config.update({"model": {"dim": 100, "ent_tot": "", "rel_tot": ""}})
-
-    dataset = load_data(model=model_name, dataset=config.dataset)
-
-    if model_name == "rescal":
-        update_dict = {
-            "ent_tot": int(dataset.num_entity.numpy()),
-            "rel_tot": int(dataset.num_relation.numpy()),
-        }
-        config.model.update(update_dict)
-
-    check_point_path_folder = Directories.CHECKPOINT_PATH / model_name
-    best_ckpt = find_best_model_ckpt(check_point_path_folder)
-
-    model = model_dict[model_name].load_from_checkpoint(best_ckpt, **config.model)
-
-    generator1 = torch.Generator().manual_seed(42)
-    split_lengths = [
-        int(np.ceil(len(dataset) * frac))
-        if idx == 0
-        else int(np.floor(len(dataset) * frac))
-        for idx, frac in enumerate([0.8, 0.2])
-    ]
-    train_set, test_set = torch.utils.data.random_split(
-        dataset, split_lengths, generator=generator1
-    )
-
-    data_loaders = get_dataloaders(
-        [train_set, test_set], batch_sizes=config.batch_sizes
-    )
-    loggers = []
-    trainer = Trainer(logger=loggers, **config.trainer)
-
-    trainer.test(
-        model,
-        dataloaders=data_loaders["test"],
-        ckpt_path=best_ckpt,
-    )
-    print(trainer.callback_metrics)
-
-    error_diagnostics_plots()
+import pandas as pd
 
 
-def error_diagnostics_plots(model_names, path_to_prediction_folder, task):
-    """
-    Load predictions and provide diagnostics bar plots on entity level:
-
-    Single drugs, drug pairs, triplets, disease, tissue, cancer cell line, drug target
-    Parameters:
-        model_names List[str]: Models for which to generate err diagnostic plots.
-
-    Returns:
-        None
-    """
-    # load predictions from trained model(s)
-    pred_dfs = get_saved_pred(model_names, path_to_prediction_folder)
-    run_name = path_to_prediction_folder.name
+def load_and_prepare_predictions_for_comp(model_names, entity, comparison, err_configs):
+    # load predictions (triplets, predictions, targets) from trained model(s),
+    pred_dfs = get_saved_pred(err_configs)
 
     # enrich predictions with vocabularies and meta data
-    combined_df, pred_dfs = enrich_model_predictions(model_names, pred_dfs, task)
-    df_lists = [pred_dfs, combined_df]
-    title_suffix = ["single_model", "both"]
-    combined_legend = ["&".join(model_names)]
-    legend_list = [model_names, combined_legend]
+    pred_dfs = enrich_model_predictions(model_names, pred_dfs, task)
 
-    metric_name, triplet_metric = get_evaluation_metric_name(task)
-    ##Investigate triplet (drug,drug, cell line), "triplet_name"
-    # triplet_titles = [f"triplet_{title}" for title in title_suffix]
-    # for idx, df_list in enumerate(df_lists):
-    #     barplot_aucroc_grouped_by_entity(
-    #         df_list,
-    #         legend_list[idx],
-    #         ["triplet_idx"],
-    #         triplet_titles[idx],
-    #         "triplet_name",
-    #         add_bar_info=False,
-    #         run_name=run_name,
-    #         metric = triplet_metric
-    #         task = task
-    #     )
+    metric_name = "AUC_ROC" if task == "clf" else "MSE"
+    group_by_column = ENTITY_ERR_DICT[entity]["group_by"]
+    x_label_col_name = ENTITY_ERR_DICT[entity]["x_label_column_name"]
 
-    ##Investigate drug pairs, "drug_pair_name"
-    drug_pair_titles = [f"drug_pair_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["drug_pair_idx"],
-            drug_pair_titles[idx],
-            "drug_pair_name",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
-
-    ##Investigate cancer cell line, "cancer_cell_name"
-    cancer_cell_line_titles = [f"cancer_cell_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["context_features_id"],
-            cancer_cell_line_titles[idx],
-            "cancer_cell_name",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
-
-    ##Investigate drug target, "drug_targets_name"
-    drug_targets_titles = [f"drug_targets_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["drug_targets_idx"],
-            drug_targets_titles[idx],
-            "drug_targets_name",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
-
-    # Investigate disease id, "disease_id"
-    disease_titles = [f"disease_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["disease_idx"],
-            disease_titles[idx],
-            "disease_id",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
-
-    # Investigate tissue, "name"
-    tissue_titles = [f"tissue_{title}" for title in title_suffix]
-    for idx, df_list in enumerate(df_lists):
-        barplot_aucroc_grouped_by_entity(
-            df_list,
-            legend_list[idx],
-            ["tissue_id"],
-            tissue_titles[idx],
-            "tissue_name",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
-        )
-
-    ##Investigate single drug
-    drug_titles = [f"drug_{title}" for title in title_suffix]
-    save_path = Directories.OUTPUT_PATH / "err_diagnostics"
-    for idx, df_list in enumerate(df_lists):
-        if len(df_list) > 1:
+    # todo add a check for entity = "drug":
+    if entity == "drug":
+        if len(pred_dfs) > 1:
             df_drug_without_dupl = [
-                get_drug_level_df([df_list[i]], task) for i in range(len(df_list))
+                get_drug_level_df([pred_dfs[i]], task) for i in range(len(pred_dfs))
             ]
         else:
-            df_drug_without_dupl = [get_drug_level_df(df_list, task)]
-        barplot_aucroc_grouped_by_entity(
-            df_drug_without_dupl,
-            legend_list[idx],
-            ["drug_molecules_left_id"],
-            drug_titles[idx],
-            "drug_name_left",
-            run_name=run_name,
-            metric_name=metric_name,
-            task=task,
+            df_drug_without_dupl = [get_drug_level_df(pred_dfs, task)]
+
+    # prepare df(s) for relevant comparison
+    if comparison == "individual":
+        grouped_dfs = enrich_df_w_metric_nexp_meantarget_per_group(
+            pred_dfs[0], group_by_column, metric_name
         )
+        x_labels = (
+            pred_dfs[0].groupby(group_by_column)[x_label_col_name].max().reset_index()
+        )
+        grouped_dfs = grouped_dfs.merge(x_labels, on=group_by_column)
 
+    elif comparison == "concatenate":
+        assert (
+            len(model_names) > 1
+        ), "Concatenation of predictions requires more than one model"
+        pred_dfs = pd.concat(pred_dfs)
+        grouped_dfs = enrich_df_w_metric_nexp_meantarget_per_group(
+            pred_dfs, group_by_column, metric_name
+        )
+        # check that x_labels work as they should in this case
+        x_labels = (
+            pred_dfs.groupby(group_by_column)[x_label_col_name].max().reset_index()
+        )
+        grouped_dfs = grouped_dfs.merge(x_labels, on=group_by_column)
 
-def get_drug_level_df(df_list, task):
-    if task == "clf":
-        additional_cols = ["pred_prob", "correct_pred"]
-    else:
-        additional_cols = ["MSE"]
-    df = df_list[0]
-    df_sub = df.loc[
-        :,
-        [
-            "drug_molecules_left_id",
-            "drug_molecules_right_id",
-            "context_features_id",
-            "predictions",
-            "model_name",
-            "drug_name_left",
-            "drug_name_right",
-            "cancer_cell_name",
-            "targets",
-            "drug_pair_idx",
+    elif comparison == "difference":
+        assert (
+            len(model_names) > 1
+        ), "Difference comparison requires more than one model"
+        grouped_dfs = [
+            enrich_df_w_metric_nexp_meantarget_per_group(
+                pred_df, group_by_column, metric_name
+            )
+            for pred_df in pred_dfs
         ]
-        + additional_cols,
-    ]
-    df_sub = pd.concat(
-        (
-            df_sub,
-            df_sub.rename(
-                columns={
-                    "drug_molecules_left_id": "drug_molecules_right_id",
-                    "drug_molecules_right_id": "drug_molecules_left_id",
-                    "drug_name_left": "drug_name_right",
-                    "drug_name_right": "drug_name_left",
-                }
-            ),
+        x_labels = [
+            pred_df.groupby(group_by_column)[x_label_col_name].max().reset_index()
+            for pred_df in pred_dfs
+        ]
+        grouped_dfs = [
+            grouped_df.merge(x_label, on=group_by_column)
+            for grouped_df, x_label in zip(grouped_dfs, x_labels)
+        ]
+        grouped_dfs = generate_difference_df(
+            group_by_column, grouped_dfs, metric_name, model_names, x_label_col_name
         )
-    )
+    else:
+        raise ValueError(f"Comparison {comparison} not supported")
 
-    return df_sub
+    return grouped_dfs
+
+
+def main_error_diagnostics(err_configs, comparison, model_names, entities):
+    if comparison == "individual":
+        for i in range(len(model_names)):
+            for entity in entities:
+                df = load_and_prepare_predictions_for_comp(
+                    [model_names[i]],
+                    entity,
+                    comparison,
+                    {0: err_configs[i]},
+                )
+                generate_error_plots_per_entity(
+                    df,
+                    {0: err_configs[i]},
+                    entity,
+                    comparison,
+                    model_names[i],
+                )
+
+    else:
+        for entity in entities:
+            dfs = load_and_prepare_predictions_for_comp(
+                model_names, entity, comparison, err_configs
+            )
+            generate_error_plots_per_entity(
+                dfs, {0: err_configs[0]}, entity, comparison, "&".join(model_names)
+            )
 
 
 if __name__ == "__main__":
-    # load_dotenv(".env")
-    # main()
-
     task = "reg"
     target = "zip_mean"
     day_of_prediction = "10_12_2023"
-    task_target = "_".join([task, target])
     path_to_prediction_folder = (
-        Directories.OUTPUT_PATH / "model_predictions" / day_of_prediction / task_target
+        Directories.OUTPUT_PATH
+        / "model_predictions"
+        / day_of_prediction
+        / "_".join([task, target])
     )
-    models = ["rescal", "deepdds"]
-    error_diagnostics_plots(models, path_to_prediction_folder, task)
+
+    model_1_config = {
+        "task": "reg",
+        "target": "zip_mean",
+        "day_of_prediction": "21_01_2024",
+        "prediction_file_name": "gnn_model_pred_dict_1j75xr94dxyat0e9lixmwb8e.pkl",
+        "bar_plot_config": {"add_bar_info": True},
+    }
+    model_2_config = {
+        "task": "reg",
+        "target": "zip_mean",
+        "day_of_prediction": "21_01_2024",
+        "prediction_file_name": "gnn_model_pred_dict_bo9n6s0v6g7oa3tvy0s1nmvy.pkl",
+        "bar_plot_config": {"add_bar_info": True},
+    }
+
+    # Note that if multiple model_configs are given and the comparison is not individual,
+    # the first models plotting config will be used.
+
+    err_configs = {
+        0: model_1_config,
+        1: model_2_config,
+    }
+    # todo validate: that models names can be 1 or more. check that every comparison works. And that each entity works
+    comparison = "difference"  # "individual", "concatenate" or "difference"
+    model_names = ["rescal", "deepdds"]
+    entities = ["drug"] # drug_pair, drug "disease", "tissue", "cancer_cell", "drug_target"]
+
+    assert len(model_names) == len(
+        err_configs
+    ), "Number of models and configs must be equal"
+
+    main_error_diagnostics(err_configs, comparison, model_names, entities)
