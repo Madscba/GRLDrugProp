@@ -4,17 +4,23 @@ defaults:
   - model: deepdds # override model by writing model=rescal or model=hybridmodel as command line argument to main.py
 
 run_name: 'NO_NAME'
+run_hash: '' #automatically generated
 wandb: False
 lr: 0.001
 l2_reg: False
 batch_sizes: {"train": 128,"val": 1000, "test": 10000}
+epochs_wo_var: 100000
+
 group_val: False
+save_model_pred: False
 max_train_triplets: 120 #if group_val="drug_few_shot", this value determines amount of triplets to be included in train
 n_drugs_per_fold: 5
 n_cell_lines_per_fold: 5
 save_embedding: False
 
+
 n_splits: 5
+max_folds: 100000
 seed: 43
 remove_old_checkpoints: True
 task: 'reg' #clf (does not work for css)

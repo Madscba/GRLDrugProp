@@ -8,14 +8,21 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from pathlib import Path
+# directories
+from graph_package.configs.directories import Directories
+
+base_path = Directories.REPO_PATH / "plots/explainability/distmult"
+save_path = Path(base_path /'embedding_pca')
+save_path.mkdir(parents=True, exist_ok=True)
 
 # train a distmultmodel 
-#state_dict = torch.load('checkpoints/distmult-16/fold_0/epoch=110-val_mse=9.7478.ckpt')['state_dict']
-state_dict = torch.load('checkpoints/distmult-256/fold_0/epoch=22-val_mse=8.0689.ckpt')['state_dict']
+state_dict = torch.load(Directories.REPO_PATH / 'checkpoints/distmult-16/fold_0/epoch=110-val_mse=9.7478.ckpt')['state_dict']
+#state_dict = torch.load('checkpoints/distmult-256/fold_0/epoch=22-val_mse=8.0689.ckpt')['state_dict']
 color_metric = 'std'
 embedding_type='entity' # entity or relation
-plot_title = 'distmult-256-drug-std.png'
-
+plot_title = f'distmult-16-{embedding_type}-{color_metric}.png'
+save_path = save_path / plot_title
 embeddings = state_dict[f"model.{embedding_type}"].detach().numpy()
 
 # Perform PCA analysis
@@ -24,12 +31,12 @@ pca = pca.fit(embeddings)
 print(np.sum(pca.explained_variance_ratio_))
 principal_components = pca.fit_transform(embeddings)
 
-data_csv = pd.read_csv('data/gold/oneil/oneil.csv')
+data_csv = pd.read_csv(Directories.REPO_PATH / 'data/gold/oneil_het/oneil_het.csv')
 df_inv = data_csv.copy()
 df_inv["drug_1_name"], df_inv["drug_2_name"] = data_csv["drug_2_name"], data_csv["drug_1_name"]
 df_inv["drug_1_id"], df_inv["drug_2_id"] = data_csv["drug_2_id"], data_csv["drug_1_id"]
 data_df = pd.concat([data_csv, df_inv], ignore_index=True)
-metric = data_df.groupby(['context_id']).agg({'synergy_zip_mean': color_metric}).reset_index()
+metric = data_df.groupby(['context_id' if embedding_type=='relation' else 'drug_1_id']).agg({'synergy_zip_mean': color_metric}).reset_index()
 
 # Create a plot grid
 fig, axs = plt.subplots(2, 2, figsize=(10, 10))
@@ -50,4 +57,5 @@ for i in range(2):
 plt.tight_layout()
 fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 1), cmap='viridis'),
              ax=axs, orientation='vertical', label=color_metric)
-plt.savefig(plot_title)
+plt.savefig(save_path)
+# %%
