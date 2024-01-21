@@ -51,7 +51,7 @@ class TestDiagnosticCallback(Callback):
         # save pretrained drug embeddings
         if self.model_name in ["deepdds", "distmult"]:
             save_pretrained_drug_embeddings(model=pl_module,fold=self.fold)
-        pl_module.test_step_outputs.clear()
+        pl_module.test_outputs.clear()
 class LossFnCallback(Callback):
     def __init__(self, epochs_wo_var) -> None:
         self.epochs_wo_var = epochs_wo_var
