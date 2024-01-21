@@ -1,8 +1,8 @@
 from pytorch_lightning import LightningModule, Trainer
-from graph_package.src.error_analysis.utils import (
-    save_performance_plots,
+from graph_package.src.error_analysis.err_utils.err_utils import  (
     save_model_pred,
 )
+from graph_package.src.error_analysis.err_utils.err_callback_utils import save_performance_plots
 from graph_package.src.main_utils import (
     save_pretrained_drug_embeddings
 )
