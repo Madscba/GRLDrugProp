@@ -199,32 +199,21 @@ def get_drug_cell_line_ids(df: pd.DataFrame):
 
 
 def get_max_zip_response(df: pd.DataFrame, study: str = "oneil"):
-    if study=="drugcomb2":
-        block_dict_almanac = load_jsonl(
-        Directories.DATA_PATH / "silver" / "oneil_almanac" / "block_dict.json"
-        )
-        block_dict_rest = load_jsonl(
-        Directories.DATA_PATH / "silver" / "rest_of_drugcomb" / "block_dict.json"
-        )
-        block_df_almanac = pd.DataFrame(block_dict_almanac)
-        block_df_rest = pd.DataFrame(block_dict_rest)
-        block_df = pd.concat([block_df_almanac, block_df_rest])
-    else:
-        block_dict = load_jsonl(
-            Directories.DATA_PATH / "silver" / study / "block_dict.json"
-        )
-        block_df = pd.DataFrame(block_dict)
+    block_dict = load_jsonl(
+        Directories.DATA_PATH / "silver" / study / "block_dict.json"
+    )
+    block_df = pd.DataFrame(block_dict)
     block_df = (
         block_df.groupby(["block_id", "conc_c", "conc_r"])
-        .agg({"synergy_zip": "mean"})
+        .agg({"synergy_zip": "mean", "synergy_loewe": "mean"})
         .reset_index()
     )
     block_df = (
         block_df.groupby(["block_id"])
-        .agg({"synergy_zip": ["max", "mean"]})
+        .agg({"synergy_zip": ["max", "mean"], "synergy_loewe": "mean"})
         .reset_index()
     )
-    block_df.columns = ["block_id", "synergy_zip_max", "synergy_zip_mean"]
+    block_df.columns = ["block_id", "synergy_zip_max", "synergy_zip_mean", "synergy_loewe"]
     df = df.merge(block_df, on="block_id", how="left", validate="1:1")
     df = df.groupby(["drug_1_name", "drug_2_name", "context"]).mean().reset_index()
     df["mean_label"] = df["synergy_zip_mean"].apply(lambda x: 1 if x >= 5 else 0)
@@ -403,4 +392,4 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac","drugcomb"]):
 
 
 if __name__ == "__main__":
-    make_oneil_almanac_dataset(studies=["drugcomb"])
+    make_oneil_almanac_dataset(studies=["oneil_almanac","drugcomb"])
