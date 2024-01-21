@@ -9,9 +9,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scipy import linalg
+from pathlib import Path
+from graph_package.configs.directories import Directories
 
-state_dict = torch.load('checkpoints/distmult-256/fold_0/epoch=22-val_mse=8.0689.ckpt')['state_dict']
-state_dict = torch.load('checkpoints/distmult-16/fold_0/epoch=110-val_mse=9.7478.ckpt')['state_dict']
+base_path =Directories.REPO_PATH / "plots/explainability/distmult"
+save_path = Path(base_path /'pairwise_product_pca'/'pca_16.png')
+save_path.parent.mkdir(parents=True, exist_ok=True)
+
+#state_dict = torch.load('checkpoints/distmult-256/fold_0/epoch=22-val_mse=8.0689.ckpt')['state_dict']
+state_dict = torch.load(Directories.REPO_PATH / 'checkpoints/distmult-16/fold_0/epoch=110-val_mse=9.7478.ckpt')['state_dict']
 
 cell_line_embeddings = state_dict["model.relation"].detach().numpy()
 drug_embeddings = state_dict["model.entity"].detach().numpy()
@@ -32,10 +38,11 @@ for i in range(len(cell_line_embeddings)):
     pca_components[i] = pca.components_
 
 
+# Make sure components have same sign 
 for i in range(n_components):
     U,s,_ = linalg.svd(pca_components[:,i,:])
     explained_variance = (s ** 2) / np.sum(s ** 2)
-    print('explained variance of first components')
+    print(f'explained variance of pca on {i}.th components')
     print(explained_variance)
     pca_components[:,i,:] = pca_components[:,i,:]*np.sign(U[:,0]).reshape(-1,1)
 
@@ -58,6 +65,5 @@ for i, cell_line_idx in enumerate(random_cell_lines):
     axs[row, col].set_ylabel("Principal Component 2")
 
 plt.tight_layout()
-plt.savefig('pca_16.png')
-
-
+plt.savefig(save_path)
+# %%
