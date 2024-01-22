@@ -5,11 +5,7 @@ import asyncio
 import json
 import os
 from graph_package.src.etl.medallion.bronze import download_response_info_drugcomb
-from graph_package.src.etl.medallion.load import load_block_ids
-
-def load_drugcomb():
-    data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
-    return pd.read_csv(data_path)
+from graph_package.src.etl.medallion.load import load_block_ids, load_drugcomb
 
 
 def generate_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
@@ -32,6 +28,31 @@ def generate_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
         ]
         df_study_cleaned.to_csv(study_path / f"{study}.csv", index=False)
 
+def generate_rest_of_drugcomb_dataset():
+    """
+    Generate the DrugComb dataset which does not include the ONEIL and ALMANAC studies.
+    """
+    df = load_drugcomb()
+    # Remove mono-studies
+    df = df.dropna(subset=["drug_col"])
+    # Remove non-cancer studies
+    non_cancer_studies = ["MOTT", "NCATS_SARS-COV-2DPI", "BOBROWSKI", "DYALL"]
+    cancer_studies = set(df.study_name.unique()).difference(non_cancer_studies)
+    df = df[df["study_name"].isin(cancer_studies)]
+    df = df.dropna(
+        subset=["drug_row", "drug_col", "synergy_zip"]
+    )
+    # Remove ONEIL & ALMANAC and generate block-dict for remaining 
+    df = df[df["study_name"].isin(cancer_studies-set(["ONEIL", "ALMANAC"]))]
+    study = "drugcomb"
+    study_path = Directories.DATA_PATH / "silver" / study
+    study_path.mkdir(exist_ok=True, parents=True)
+    unique_block_ids = df["block_id"].unique().tolist()
+    download_response_info(unique_block_ids, study, overwrite=True)
+    df_study_cleaned = df.loc[
+        :, ~df.columns.str.startswith("Unnamed")
+    ]
+    df_study_cleaned.to_csv(study_path / f"{study}.csv", index=False)
 
 def download_response_info(list_entities, study_names="oneil", overwrite=False):
     """Download response information from DrugComb API. This is in silver

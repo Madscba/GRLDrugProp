@@ -49,7 +49,7 @@ class TestDiagnosticCallback(Callback):
             )
 
         # save pretrained drug embeddings
-        if self.model_name in ["deepdds", "distmult"]:
+        if self.config.save_embedding:
             save_pretrained_drug_embeddings(model=pl_module,fold=self.fold)
         pl_module.test_outputs.clear()
 class LossFnCallback(Callback):

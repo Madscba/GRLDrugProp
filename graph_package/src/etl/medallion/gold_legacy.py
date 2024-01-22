@@ -7,7 +7,7 @@ import json
 from tqdm import tqdm
 import requests
 from graph_package.src.etl.medallion.load import (
-    load_oneil,
+    load_silver_csv,
     load_drug_info_drugcomb,
     load_cell_info_drugcomb,
 )
@@ -138,7 +138,7 @@ def make_oneil_legacy_dataset():
     logger.info("Making Oneil legacy dataset.")
     save_path = Directories.DATA_PATH / "gold" / "oneil_legacy"
     save_path.mkdir(parents=True, exist_ok=True)
-    df = load_oneil()
+    df = load_silver_csv("oneil")
     rename_dict = {
         "drug_row": "drug_1_name",
         "drug_col": "drug_2_name",
