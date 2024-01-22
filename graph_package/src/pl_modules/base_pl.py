@@ -139,8 +139,8 @@ class BasePL(LightningModule):
             self.test_outputs = step_o
         else:
             self.test_outputs["df_cm"] = self.test_outputs["df_cm"] + step_o["df_cm"]
-            self.test_outputs["batch"] = [torch.vstack([step_o["batch"][0], step_o["batch"][0]]),
-                                          torch.hstack([step_o["batch"][1], step_o["batch"][1]])]
+            self.test_outputs["batch"] = [torch.vstack([ self.test_outputs["batch"][0], step_o["batch"][0]]),
+                                          torch.hstack([ self.test_outputs["batch"][1], step_o["batch"][1]])]
             self.test_outputs["batch_idx"] += [step_o["batch_idx"]]
 
             for key in keys_to_concat:

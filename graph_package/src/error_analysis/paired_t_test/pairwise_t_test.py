@@ -185,16 +185,16 @@ if __name__ == "__main__":
     model_1_config = {
         "task": "reg",
         "target": "zip_mean",
-        "day_of_prediction": "21_01_2024",
-        "prediction_file_name": "gnn_model_pred_dict_1j75xr94dxyat0e9lixmwb8e.pkl",
+        "day_of_prediction": "22_01_2024",
+        "prediction_file_name": "gnn_model_pred_dict_3wdo3a4f7xibff4w3d8dz0qo.pkl",
         "bar_plot_config": {"add_bar_info": True},
     }
 
     model_2_config = {
         "task": "reg",
         "target": "zip_mean",
-        "day_of_prediction": "21_01_2024",
-        "prediction_file_name": "gnn_model_pred_dict_bo9n6s0v6g7oa3tvy0s1nmvy.pkl",
+        "day_of_prediction": "22_01_2024",
+        "prediction_file_name": "gnn_model_pred_dict_3wdo3a4f7xibff4w3d8dz0qo.pkl",
         "bar_plot_config": {"add_bar_info": True},
     }
 
