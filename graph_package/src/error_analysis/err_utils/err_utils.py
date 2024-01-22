@@ -556,7 +556,7 @@ def save_model_pred(batch_idx, batch, preds, target, std_per_cell_line, config, 
         print("making a space to save preds: ", save_path)
         save_path.mkdir(exist_ok=True, parents=True),
 
-    pred_path = save_path / f"{model_name}_model_pred_dict_{config.run_hash}.pkl"
+    pred_path = save_path / f"{config.run_name}_pred_{config.run_hash}.pkl"
     if pred_path.exists():
         with open(pred_path, "rb") as f:
             old_output_dict = pickle.load(f)
