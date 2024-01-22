@@ -267,9 +267,10 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
         # Filter drugs and cell lines not found in _het dataset
         df_mono_study = df_mono_study[df_mono_study["drug"].isin(unique_drugs)]
         df_mono_study = df_mono_study[df_mono_study["cell_line"].isin(df.cell_line_name.unique())]
+        df_mono_study.reset_index(drop=True, inplace=True)
         save_path = Directories.DATA_PATH / "gold" / study_name
         save_path.mkdir(exist_ok=True, parents=True)
-        df_mono_study.to_csv(save_path / m_file_name, index=True)
+        df_mono_study.to_csv(save_path / m_file_name,index=False)
         return
     file_path = data_path / m_file_name
     if (not (file_path).exists()) | overwrite:
@@ -339,10 +340,8 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
         save_path.mkdir(exist_ok=True, parents=True)
         if study == "drugcomb":
             # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
-            almanac = "oneiL_almanac_het" if het else "oneiL_almanac"
-            df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / almanac / "mono_response.csv")
+            df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / "oneiL_almanac" / "mono_response.csv")
             df_mono = pd.concat([df_mono, df_mono_oneil_almanac], ignore_index=True)
-            df_mono.drop_duplicates(inplace=True)
         df_mono.to_csv(save_path / m_file_name, index=True)
 
 
@@ -397,4 +396,4 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac","drugcomb"]):
 
 
 if __name__ == "__main__":
-    make_oneil_almanac_dataset(studies=["oneil_almanac","drugcomb"])
+    make_oneil_almanac_dataset()
