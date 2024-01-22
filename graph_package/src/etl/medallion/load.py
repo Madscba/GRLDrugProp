@@ -14,17 +14,13 @@ import jsonlines
 
 logger = init_logger()
 
+def load_drugcomb():
+    data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
+    return pd.read_csv(data_path)
+
+
 def load_silver_csv(study):
     data_path = Directories.DATA_PATH / "silver" / study/ f"{study}.csv"
-    return pd.read_csv(data_path)
-
-def load_oneil():
-    data_path = Directories.DATA_PATH / "silver" / "oneil" / "oneil.csv"
-    return pd.read_csv(data_path)
-
-
-def load_oneil_almanac():
-    data_path = Directories.DATA_PATH / "silver" / "oneil_almanac" / "oneil_almanac.csv"
     return pd.read_csv(data_path)
 
 

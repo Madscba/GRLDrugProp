@@ -12,8 +12,6 @@ import json
 from itertools import product
 from tqdm import tqdm
 from graph_package.src.etl.medallion.load import (
-    load_oneil,
-    load_oneil_almanac,
     load_silver_csv,
     load_block_as_df,
     load_mono_response,
@@ -250,10 +248,24 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
     data_path = Directories.DATA_PATH / "gold" / study_name
     data_path.mkdir(exist_ok=True, parents=True)
     m_file_name = "mono_response.csv"
+    # Create a bool to check if dataset is filtered on het
     het = True if study_name in ["oneil_het", "oneil_almanac_het", "drugcomb_het"] else False
-    if ((not (data_path / m_file_name).exists()) | overwrite ) and (not het):
-        if (data_path / m_file_name).exists():
-            os.remove(data_path / m_file_name)
+    if het:
+        # Get subset of mono-responses since het is a subset of the corresponding dataset
+        study = study_name[:-4] if het else study_name
+        df_mono_study = pd.read_csv(Directories.DATA_PATH / "gold" / study / "mono_response.csv")
+        unique_drugs = set(df["drug_row"]).union(set(df["drug_col"]))
+        # Filter drugs and cell lines not found in _het dataset
+        df_mono_study = df_mono_study[df_mono_study["drug"].isin(unique_drugs)]
+        df_mono_study = df_mono_study[df_mono_study["cell_line"].isin(df.cell_line_name.unique())]
+        save_path = Directories.DATA_PATH / "gold" / study_name
+        save_path.mkdir(exist_ok=True, parents=True)
+        df_mono_study.to_csv(save_path / m_file_name, index=True)
+        return
+    file_path = data_path / m_file_name
+    if (not (file_path).exists()) | overwrite:
+        if (file_path).exists():
+            os.remove(file_path)
         study = study_name[:-4] if het else study_name
         df_block = load_block_as_df(study)
         df_block = df_block.merge(
@@ -323,18 +335,6 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
             df_mono = pd.concat([df_mono, df_mono_oneil_almanac], ignore_index=True)
             df_mono.drop_duplicates(inplace=True)
         df_mono.to_csv(save_path / m_file_name, index=True)
-        
-    # We dont need to generate the monoresponses since the _het datasets are subsets
-    elif het:
-        study = study_name[:-4] if het else study_name
-        df_mono_study = pd.read_csv(Directories.DATA_PATH / "gold" / study / "mono_response.csv")
-        unique_drugs = set(df["drug_row"]).union(set(df["drug_col"]))
-        # Filter drugs and cell lines not found in _het dataset
-        df_mono_study = df_mono_study[df_mono_study["drug"].isin(unique_drugs)]
-        df_mono_study = df_mono_study[df_mono_study["cell_line"].isin(df.cell_line_name.unique())]
-        save_path = Directories.DATA_PATH / "gold" / study_name
-        save_path.mkdir(exist_ok=True, parents=True)
-        df_mono_study.to_csv(save_path / m_file_name, index=True)
 
 
 
