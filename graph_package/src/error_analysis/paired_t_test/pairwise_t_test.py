@@ -194,7 +194,7 @@ if __name__ == "__main__":
         "task": "reg",
         "target": "zip_mean",
         "day_of_prediction": "22_01_2024",
-        "prediction_file_name": "NO_NAME_pred_co3ky6olh8sxpsy24h3uxc1u.pkl",
+        "prediction_file_name": "NO_NAME_pred_yat97kycpwhm8724e1gs8l2a.pkl",
         "bar_plot_config": {"add_bar_info": True},
     }
 
