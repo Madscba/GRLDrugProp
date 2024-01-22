@@ -243,6 +243,15 @@ def concat_oneil_almanac(df: pd.DataFrame, het: bool = False):
     df_combined = pd.concat([df,oneil_almanac_df],ignore_index=True)
     return df_combined
 
+def get_combined_drugs_and_cell_lines(df: pd.DataFrame):
+    unique_drugs_rest = set(df["drug_row"]).union(set(df["drug_col"]))
+    oneil_almanac_path = Directories.DATA_PATH / "gold" / "oneil_almanac_het" / "oneil_almanac_het.csv"
+    oneil_almanac_df = pd.read_csv(oneil_almanac_path)
+    unique_drugs_almanac = set(oneil_almanac_df["drug_1_name"]).union(set(oneil_almanac_df["drug_2_name"]))
+    unique_drugs = unique_drugs_rest.union(unique_drugs_almanac)
+    unique_cell_lines = set(df.cell_line_name).union(set(oneil_almanac_df.context))
+    return unique_drugs, unique_cell_lines
+
 
 def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac", overwrite: bool = False):
     """From the relevant block dict from data/silver/<study_name>/block_dict.json fetch mono responses
@@ -259,19 +268,31 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
     m_file_name = "mono_response.csv"
     # Create a bool to check if dataset is filtered on het
     het = True if study_name in ["oneil_het", "oneil_almanac_het", "drugcomb_het"] else False
+    if study_name=="drugcomb":
+        # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
+        df_mono = pd.read_csv(Directories.DATA_PATH / "gold" / "drugcomb_old" / "mono_response.csv")
+        df_mono = df_mono.groupby(["drug","cell_line"]).mean().reset_index()
+        save_path = Directories.DATA_PATH / "gold" / study_name
+        save_path.mkdir(exist_ok=True, parents=True)
+        df_mono.to_csv(save_path / m_file_name, index=False)
     if het:
         # Get subset of mono-responses since het is a subset of the corresponding dataset
         study = study_name[:-4] if het else study_name
         df_mono_study = pd.read_csv(Directories.DATA_PATH / "gold" / study / "mono_response.csv")
-        unique_drugs = set(df["drug_row"]).union(set(df["drug_col"]))
+        if study == "drugcomb":
+            unique_drugs, unique_cell_lines = get_combined_drugs_and_cell_lines(df)
+        else:
+            unique_drugs = set(df["drug_row"]).union(set(df["drug_col"]))
+            unique_cell_lines = set(df.cell_line_name)
         # Filter drugs and cell lines not found in _het dataset
         df_mono_study = df_mono_study[df_mono_study["drug"].isin(unique_drugs)]
-        df_mono_study = df_mono_study[df_mono_study["cell_line"].isin(df.cell_line_name.unique())]
-        df_mono_study.reset_index(drop=True, inplace=True)
+        df_mono_study = df_mono_study[df_mono_study["cell_line"].isin(unique_cell_lines)]
+        df_mono_study.reset_index(drop=True,inplace=True)
         save_path = Directories.DATA_PATH / "gold" / study_name
         save_path.mkdir(exist_ok=True, parents=True)
         df_mono_study.to_csv(save_path / m_file_name,index=False)
         return
+    
     file_path = data_path / m_file_name
     if (not (file_path).exists()) | overwrite:
         if (file_path).exists():
@@ -295,7 +316,8 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
         multi_index = pd.MultiIndex.from_tuples(
             product(unique_drugs, unique_cell_lines), names=("drug", "cell_line")
         )
-        df_mono = pd.DataFrame(0, index=multi_index, columns=["min", ",median", "max"])
+        dummy_max = -9999
+        df_mono = pd.DataFrame(-9999, index=multi_index, columns=["min", ",median", "max"])
         
         for drug in tqdm(unique_drugs, desc="creating mono response dict"):
             drug_included = ((df_block["drug_row"]==drug) | (df_block[
@@ -337,12 +359,25 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
             df_mono.loc[idx] = stat_array
         save_path = Directories.DATA_PATH / "gold" / study_name
         save_path.mkdir(exist_ok=True, parents=True)
+        # All drug-cell line pairs are created, but we only need to save the ones with mono response data
+        df_mono = df_mono[df_mono.loc[:,"max"]!=dummy_max]
+        df_mono = df_mono.groupby(["drug","cell_line"]).mean().reset_index()
         if study_name == "drugcomb":
             # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
-            df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / "oneiL_almanac" / "mono_response.csv")
+            df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / "oneil_almanac" / "mono_response.csv")
             df_mono = pd.concat([df_mono, df_mono_oneil_almanac], ignore_index=True)
-        df_mono.to_csv(save_path / m_file_name, index=True)
+            df_mono = df_mono.groupby(["drug","cell_line"]).mean().reset_index()
+            df_mono.to_csv(save_path / m_file_name, index=False)
+        else:
+            df_mono.to_csv(save_path / m_file_name, index=True)
 
+
+def filter_drugs_from_smiles(df: pd.DataFrame):
+    unique_drugs = set(df["drug_row"]).union(set(df["drug_col"]))
+    drug_info = get_drug_info(df, unique_drugs, add_SMILES=True)
+    drugs = [drug for drug in unique_drugs if drug_info[drug]["SMILES"] not in ("NULL", 'Antibody (MEDI3622)')]
+    df_filtered = df[df["drug_row"].isin(drugs) & df["drug_col"].isin(drugs)]
+    return df_filtered
 
 
 def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac","drugcomb"]):
@@ -363,6 +398,7 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac","drugcomb"]):
             if het:
                 df = filter_from_hetionet(df)
             generate_mono_responses(df=df, study_name=study_name)
+            df = filter_drugs_from_smiles(df)
             rename_dict = {
                 "block_id": "block_id",
                 "drug_row": "drug_1_name",
@@ -395,4 +431,4 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac","drugcomb"]):
 
 
 if __name__ == "__main__":
-    make_oneil_almanac_dataset()
+    make_oneil_almanac_dataset(studies=["drugcomb"])
