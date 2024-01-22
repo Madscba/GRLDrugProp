@@ -276,8 +276,7 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
     if (not (file_path).exists()) | overwrite:
         if (file_path).exists():
             os.remove(file_path)
-        study = study_name[:-4] if het else study_name
-        df_block = load_block_as_df(study)
+        df_block = load_block_as_df(study_name)
         df_block = df_block.merge(
             df.loc[:, ["drug_row", "drug_col", "cell_line_name", "block_id"]],
             how="left",
@@ -338,7 +337,7 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
             df_mono.loc[idx] = stat_array
         save_path = Directories.DATA_PATH / "gold" / study_name
         save_path.mkdir(exist_ok=True, parents=True)
-        if study == "drugcomb":
+        if study_name == "drugcomb":
             # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
             df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / "oneiL_almanac" / "mono_response.csv")
             df_mono = pd.concat([df_mono, df_mono_oneil_almanac], ignore_index=True)
