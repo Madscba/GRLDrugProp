@@ -4,7 +4,7 @@ model:
   ph_kwargs:
       hidden_dims: [256, 128, 64]
       dataset: ''
-      use_mono_response: False
+      use_mono_response: True
       cell_line_features: ccle
       custom_lr_setup:
         value: False
