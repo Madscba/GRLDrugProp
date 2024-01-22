@@ -235,6 +235,15 @@ def filter_cell_lines(data_df):
     return data_df
 
 
+def concat_oneil_almanac(df: pd.DataFrame, het: bool = False):
+    oneil_almanac = "oneil_almanac_het" if het else "oneil_almanac"
+    oneil_almanac_path = Directories.DATA_PATH / "gold" / oneil_almanac / f"{oneil_almanac}.csv"
+    oneil_almanac_df = pd.read_csv(oneil_almanac_path)
+    oneil_almanac_df = oneil_almanac_df.loc[:, df.columns.to_list()]
+    df_combined = pd.concat([df,oneil_almanac_df],ignore_index=True)
+    return df_combined
+
+
 def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac", overwrite: bool = False):
     """From the relevant block dict from data/silver/<study_name>/block_dict.json fetch mono responses
     and per drug and cell line and aggregate inhibition per concentration.
@@ -375,11 +384,7 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac","drugcomb"]):
 
             # Concat ONEIL-ALMANAC to remaining of DrugComb
             if study=="drugcomb":
-                oneil_almanac = "oneil_almanac_het" if het else "oneil_almanac"
-                oneil_almanac_path = Directories.DATA_PATH / "gold" / oneil_almanac / f"{oneil_almanac}.csv"
-                oneil_almanac_df = pd.read_csv(oneil_almanac_path)
-                oneil_almanac_df = oneil_almanac_df.loc[:, df.columns.to_list()]
-                df = pd.concat([df,oneil_almanac_df],ignore_index=True)
+                df = concat_oneil_almanac(df, het)
 
             df, drug_vocab = create_drug_id_vocabs(df)
             df, cell_line_vocab = create_cell_line_id_vocabs(df)
