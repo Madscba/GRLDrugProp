@@ -186,7 +186,7 @@ if __name__ == "__main__":
         "task": "reg",
         "target": "zip_mean",
         "day_of_prediction": "22_01_2024",
-        "prediction_file_name": "gnn_model_pred_dict_3wdo3a4f7xibff4w3d8dz0qo.pkl",
+        "prediction_file_name": "NO_NAME_pred_co3ky6olh8sxpsy24h3uxc1u.pkl",
         "bar_plot_config": {"add_bar_info": True},
     }
 
@@ -194,7 +194,7 @@ if __name__ == "__main__":
         "task": "reg",
         "target": "zip_mean",
         "day_of_prediction": "22_01_2024",
-        "prediction_file_name": "gnn_model_pred_dict_3wdo3a4f7xibff4w3d8dz0qo.pkl",
+        "prediction_file_name": "NO_NAME_pred_co3ky6olh8sxpsy24h3uxc1u.pkl",
         "bar_plot_config": {"add_bar_info": True},
     }
 
