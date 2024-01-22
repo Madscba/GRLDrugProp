@@ -472,10 +472,9 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
         input_dim (int): input dimension
         output_dim (int): output dimension
         num_relation (int): dimension of edge features
-        dataset (str): name of dataset
         n_heads (int, optional): number of attention heads
         negative_slope (float, optional): negative slope of leaky relu activation
-        dropout (float, optional): Whether to apply dropout
+        feature_dropout (float, optional): Whether to apply dropout
         batch_norm (bool, optional): apply batch normalization on nodes or not
         activation (str or function, optional): activation function
     """
@@ -485,18 +484,16 @@ class RelationalGraphAttentionLayer(MessagePassingBase):
         input_dim,
         output_dim,
         num_relation,
-        dataset,
         n_heads: int = 1,
         negative_slope: int = 0.2,
-        dropout: int = 0.6,
+        feature_dropout: int = 0.1,
         concat_hidden=True,
         batch_norm=False,
     ):
         super(RelationalGraphAttentionLayer, self).__init__()
         self.input_dim = input_dim
         self.num_relation = num_relation
-        self.dataset = dataset
-        self.dropout = dropout
+        self.dropout = feature_dropout
         self.concat_hidden = concat_hidden
         self.negative_slope = negative_slope
         self.n_heads = n_heads
