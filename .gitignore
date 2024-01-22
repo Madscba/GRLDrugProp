@@ -29,7 +29,6 @@ scrapbook.py
 graph_package/src/outputs/*
 venv
 openbabel-openbabel-3-1-1
-pca_plots
-pca.png
 /graph_package/scratch/old/
 /graph_package/scratch/old/
+/pca_plots

@@ -1,5 +1,6 @@
-
 hidden_dims: [256]
 concat_hidden: False
 enc_kwargs:
+  feature_dropout: 0.1
 ph_kwargs:
+  feature_dropout: 0.1
