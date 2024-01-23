@@ -10,7 +10,7 @@ group_val: False
 save_model_pred: True
 max_folds: 2
 max_train_triplets: 120 #if group_val="drug_few_shot", this value determines amount of triplets to be included in train
-n_drugs_per_fold: 300
+n_drugs_per_fold: 40
 n_cell_lines_per_fold: 20
 
 n_splits: 5
@@ -35,7 +35,7 @@ checkpoint_callback:
 
 trainer:  
   check_val_every_n_epoch: 1
-  max_epochs: 200
+  max_epochs: 150
   enable_checkpointing: True
   enable_progress_bar: True
   fast_dev_run: False
