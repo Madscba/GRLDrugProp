@@ -268,13 +268,6 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
     m_file_name = "mono_response.csv"
     # Create a bool to check if dataset is filtered on het
     het = True if study_name in ["oneil_het", "oneil_almanac_het", "drugcomb_het"] else False
-    if study_name=="drugcomb":
-        # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
-        df_mono = pd.read_csv(Directories.DATA_PATH / "gold" / "drugcomb_old" / "mono_response.csv")
-        df_mono = df_mono.groupby(["drug","cell_line"]).mean().reset_index()
-        save_path = Directories.DATA_PATH / "gold" / study_name
-        save_path.mkdir(exist_ok=True, parents=True)
-        df_mono.to_csv(save_path / m_file_name, index=False)
     if het:
         # Get subset of mono-responses since het is a subset of the corresponding dataset
         study = study_name[:-4] if het else study_name
@@ -316,8 +309,8 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
         multi_index = pd.MultiIndex.from_tuples(
             product(unique_drugs, unique_cell_lines), names=("drug", "cell_line")
         )
-        dummy_max = -9999
-        df_mono = pd.DataFrame(-9999, index=multi_index, columns=["min", ",median", "max"])
+        dummy_max = 0.0
+        df_mono = pd.DataFrame(dummy_max, index=multi_index, columns=["min", ",median", "max"])
         
         for drug in tqdm(unique_drugs, desc="creating mono response dict"):
             drug_included = ((df_block["drug_row"]==drug) | (df_block[
@@ -360,8 +353,6 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
         save_path = Directories.DATA_PATH / "gold" / study_name
         save_path.mkdir(exist_ok=True, parents=True)
         # All drug-cell line pairs are created, but we only need to save the ones with mono response data
-        df_mono = df_mono[df_mono.loc[:,"max"]!=dummy_max]
-        df_mono = df_mono.groupby(["drug","cell_line"]).mean().reset_index()
         if study_name == "drugcomb":
             # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
             df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / "oneil_almanac" / "mono_response.csv")
