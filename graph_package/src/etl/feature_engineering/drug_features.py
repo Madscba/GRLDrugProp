@@ -147,8 +147,8 @@ def generate_and_save_morgan_fp(dim, drug_names, mols, save_path):
             Fingerprint.calculate_morgan_fp(mol, radius=6, nbits=morgan_dim)
         )  # Settings from SOTA paper we are implementing
     pd.DataFrame(drug_2d_morgan_fingerprint, index=drug_names).to_csv(
-        save_path / morgan_fpath
-    )
+        save_path / morgan_fpath)
+
 
 
 def calculate_molecular_descriptors(mol, print_descriptors=False):
@@ -174,21 +174,24 @@ def calculate_molecular_descriptors(mol, print_descriptors=False):
 
 
 def get_drug_SMILES_repr():
-    datasets_name = "oneil_almanac"
+    datasets_names = ["oneil_almanac", "drugcomb"]
     save_path = Directories.DATA_PATH / "features" / "drug_features"
     save_path.mkdir(parents=True, exist_ok=True)
     # Get info dict with drug name, DrugBank ID and inchikey for each drug in dataset
-    data_path = (
-        Directories.DATA_PATH / "silver" / datasets_name / f"{datasets_name}.csv"
-    )
-    drugs = pd.read_csv(data_path)
+
+    data_paths = [Directories.DATA_PATH / "silver" / datasets_names[i] / f"{datasets_names[i]}.csv" for i in range(len(datasets_names))]
+
+    drugs = pd.concat([pd.read_csv(data_paths[i]) for i in range(len(data_paths))])
     unique_drug_names = set(drugs["drug_row"]).union(set(drugs["drug_col"]))
     drug_info = get_drug_info(drugs, unique_drug_names, add_SMILES=True)
     df_drug_info = pd.DataFrame(drug_info).T.reset_index()
     df_drug_info = df_drug_info.rename(columns={"index": "drug_name"})
     drug_SMILES = [d.split(";")[0] for d in df_drug_info["SMILES"]]
-    drug_drug_names = list(df_drug_info["drug_name"])
-    return drug_SMILES, drug_drug_names
+    drug_names = list(df_drug_info["drug_name"])
+    #remove drugs without SMILES and drug names
+    drug_names = [drug_names[i] for i in range(len(drug_names)) if drug_SMILES[i] not in ("NULL", 'Antibody (MEDI3622)')]
+    drug_SMILES = [drug_SMILES[i] for i in range(len(drug_SMILES)) if drug_SMILES[i] not in ("NULL", 'Antibody (MEDI3622)')]
+    return drug_SMILES, drug_names
 
 
 def get_molecules_from_SMILES(drug_SMILES):
@@ -206,4 +209,4 @@ def get_molecules_from_SMILES(drug_SMILES):
 
 
 if __name__ == "__main__":
-    make_drug_fingerprint_features(dim=83)
+    make_drug_fingerprint_features()

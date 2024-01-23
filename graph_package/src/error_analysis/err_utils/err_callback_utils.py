@@ -126,7 +126,7 @@ def get_performance_curve(
         save_path = get_err_analysis_path(save_path, config)
 
         plt.savefig(
-            save_path / f"{model_name}_{curve_type}_curve_{config.run_hash}.png", bbox_inches="tight"
+            save_path / f"{config.run_name}_{curve_type}_curve_{config.run_hash}.png", bbox_inches="tight"
         )
     plt.show()
 
@@ -161,7 +161,7 @@ def convert_metrics_to_summary_table(
     if save_output:
         save_path = get_err_analysis_path(save_path, config)
         plt.savefig(
-            save_path / f"{model_name}_summary_metric_table{config.run_hash}.png", bbox_inches="tight"
+            save_path / f"{config.run_name}_summary_metric_table{config.run_hash}.png", bbox_inches="tight"
         )
 
 
@@ -187,5 +187,5 @@ def get_confusion_matrix_heatmap(
     ax.set_ylabel("actual values")
     if save_output:
         save_path = get_err_analysis_path(save_path, config)
-        fig.savefig(save_path / f"{model_name}_conf_matrix_{config.run_hash}.png")
+        fig.savefig(save_path / f"{config.run_name}_conf_matrix_{config.run_hash}.png")
     return fig

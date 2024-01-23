@@ -10,8 +10,8 @@ group_val: False
 save_model_pred: True
 max_folds: 2
 max_train_triplets: 120 #if group_val="drug_few_shot", this value determines amount of triplets to be included in train
-n_drugs_per_fold: 8
-n_cell_lines_per_fold: 10
+n_drugs_per_fold: 300
+n_cell_lines_per_fold: 20
 
 n_splits: 5
 seed: 43
@@ -23,7 +23,7 @@ dataset:
   target: 'zip_mean' # zip_max, css, loewe (legacy)
   use_node_features: False
   use_edge_features: False  
-  drug_representation: morgan # morgan, onehot
+  drug_representation: e3fp # morgan, onehot
   modalities: False # All, Gene, Side Effect, Disease, Pharmacologic Class
   edge_weights: False # continous, discrete, False
 

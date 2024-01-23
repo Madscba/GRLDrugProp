@@ -21,7 +21,7 @@ def format_and_return_as_dataframes(pred_dict):
             pd.DataFrame(ent)
             for ent in [
                 pred_dict["batch"][0],
-                pred_dict["predictions"],
+                pred_dict["predictions"][0],
                 pred_dict["batch"][1],
             ]
         ]

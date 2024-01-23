@@ -19,6 +19,7 @@ from graph_package.src.error_analysis.err_utils.err_utils_load import (
     get_drug_info,
 )
 import numpy as np
+import torch
 
 MODEL_COLORS = {
     'deepdds': '#EDB732',
@@ -556,15 +557,21 @@ def save_model_pred(batch_idx, batch, preds, target, std_per_cell_line, config, 
         print("making a space to save preds: ", save_path)
         save_path.mkdir(exist_ok=True, parents=True),
 
-    pred_path = save_path / f"{model_name}_model_pred_dict_{config.run_hash}.pkl"
+    pred_path = save_path / f"{config.run_name}_pred_{config.run_hash}.pkl"
     if pred_path.exists():
         with open(pred_path, "rb") as f:
             old_output_dict = pickle.load(f)
 
         # append old predictions with new
         for key, val in old_output_dict.items():
-            concatenated_input = old_output_dict[key] + output_dict[key]
-            output_dict.update({key: concatenated_input})
+            if key == 'batch':
+                output_dict[key] = [torch.vstack([ old_output_dict[key][0], output_dict[key][0]]),
+                                        torch.hstack([ old_output_dict[key][1], output_dict[key][1]])]
+            elif key in ('predictions','targets','var_per_cell_line'):
+                output_dict[key] = [torch.hstack([old_output_dict[key][0], output_dict[key][0]])]
+            else:
+                concatenated_input = [old_output_dict[key][0] + output_dict[key][0]]
+                output_dict.update({key: concatenated_input})
 
     with open(pred_path, "wb") as f:
         print("saving at: ", pred_path)
