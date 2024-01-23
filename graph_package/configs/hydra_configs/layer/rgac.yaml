@@ -1,5 +1,5 @@
 # @package _global_
-lr: 0.0001
+lr: 0.001
 model:
   layer: 'rgac'
   enc_kwargs: 
