@@ -4,4 +4,5 @@ model:
   layer: 'rgat'
   enc_kwargs: 
     n_heads: 1
+    feature_dropout: 0.1
     concat_hidden: True

@@ -360,7 +360,7 @@ class GraphAttentionLayer(MessagePassingBase):
         dataset,
         n_heads: int = 4,
         negative_slope: int = 0.2,
-        dropout: int = 0.6,
+        feature_dropout: int = 0.1,
         concat_hidden=True,
         batch_norm=False,
     ):
@@ -368,7 +368,7 @@ class GraphAttentionLayer(MessagePassingBase):
         self.input_dim = input_dim
         self.num_relation = num_relation
         self.dataset = dataset
-        self.dropout = dropout
+        self.dropout = feature_dropout
         self.concat_hidden = concat_hidden
         self.negative_slope = negative_slope
         self.n_heads = n_heads
