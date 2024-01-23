@@ -147,15 +147,28 @@ def fit_pca_node_feature(adjacency_matrix, components, node_type, relation):
 def make_node_features(datasets=["ONEIL", "ALMANAC"], components=16, min_degree=4, node_types="all"):
     """Function for generating PCA feature vectors based on Hetionet"""
     # Defining paths
-    datasets_name = "oneil_almanac" if datasets == ["ONEIL", "ALMANAC"] else "oneil"
+    if datasets == ["drugcomb"]:
+        datasets_name = "drugcomb"
+        components*=2
+        min_degree*=2
+    else:
+        datasets_name = "oneil_almanac" if datasets == ["ONEIL", "ALMANAC"] else "oneil"
     save_path = Directories.DATA_PATH / "features" / "node_features"
     save_path.mkdir(parents=True, exist_ok=True)
 
     # Get info dict with drug name, DrugBank ID and inchikey for each drug in dataset
     data_path = (
-        Directories.DATA_PATH / "silver" / datasets_name / f"{datasets_name}.csv"
-    )
-    drugs = pd.read_csv(data_path)
+            Directories.DATA_PATH / "silver" / datasets_name / f"{datasets_name}.csv"
+        )
+    if datasets_name=="drugcomb":
+        data_path_almanac = (
+            Directories.DATA_PATH / "silver" / "oneil_almanac" / "oneil_almanac.csv"
+        )
+        drugs_rest = pd.read_csv(data_path)
+        drugs_almanac = pd.read_csv(data_path_almanac)
+        drugs = pd.concat([drugs_rest,drugs_almanac],ignore_index=True)
+    else:
+        drugs = pd.read_csv(data_path)
     unique_drug_names = sorted(
         list(set(drugs["drug_row"].tolist() + drugs["drug_col"].tolist()))
     )
@@ -206,4 +219,4 @@ def make_node_features(datasets=["ONEIL", "ALMANAC"], components=16, min_degree=
 
 
 if __name__ == "__main__":
-    make_node_features()
+    make_node_features(datasets=["drugcomb"])
