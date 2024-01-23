@@ -5,7 +5,7 @@ run_hash: '' #automatically generated
 wandb: False
 lr: 0.001
 l2_reg: False
-batch_sizes: {"train": 128, "val": 1000, "test": 10000}
+batch_sizes: {"train": 1024, "val": 1000, "test": 10000}
 group_val: False
 save_model_pred: True
 max_folds: 2

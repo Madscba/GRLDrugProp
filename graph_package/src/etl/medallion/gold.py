@@ -336,11 +336,12 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
                 )
             )
             df_mono.loc[idx] = stat_array
+        
         save_path = Directories.DATA_PATH / "gold" / study_name
         save_path.mkdir(exist_ok=True, parents=True)
         if study == "drugcomb":
             # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
-            almanac = "oneiL_almanac_het" if het else "oneiL_almanac"
+            almanac = "oneil_almanac_het" if het else "oneil_almanac"
             df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / almanac / "mono_response.csv")
             df_mono = pd.concat([df_mono, df_mono_oneil_almanac], ignore_index=True)
             df_mono.drop_duplicates(inplace=True)
