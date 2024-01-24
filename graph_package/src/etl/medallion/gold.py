@@ -17,6 +17,7 @@ from graph_package.src.etl.medallion.load import (
     load_mono_response,
     load_jsonl
 )
+import matplotlib.pyplot as plt 
 
 logger = init_logger()
 
@@ -350,12 +351,14 @@ def generate_mono_responses(df: pd.DataFrame, study_name: str = "oneil_almanac",
                 )
             )
             df_mono.loc[idx] = stat_array
+        
         save_path = Directories.DATA_PATH / "gold" / study_name
         save_path.mkdir(exist_ok=True, parents=True)
         # All drug-cell line pairs are created, but we only need to save the ones with mono response data
         if study_name == "drugcomb":
             # Concat ONEIL-ALMANAC to rest of DrugComb to create full DrugComb mono-responses
             df_mono_oneil_almanac = pd.read_csv(Directories.DATA_PATH / "gold" / "oneil_almanac" / "mono_response.csv")
+
             df_mono = pd.concat([df_mono, df_mono_oneil_almanac], ignore_index=True)
             df_mono = df_mono.groupby(["drug","cell_line"]).mean().reset_index()
             df_mono.to_csv(save_path / m_file_name, index=False)
@@ -420,6 +423,59 @@ def make_oneil_almanac_dataset(studies=["oneil","oneil_almanac","drugcomb"]):
                     json.dump(vocab, json_file)
             df.to_csv(save_path / f"{study_name}.csv", index=False)
 
+def make_filtered_drugcomb_dataset():
+    """ 
+    Second gold layer. 
+    Filters drugcomb dataset on triplets for which drugs and cell lines that are present
+    in less than 50 triplets are removed.
+    """
+
+    save_path = Directories.DATA_PATH / "gold"
+    study = "drugcomb"
+    df = pd.read_csv(save_path / study / f"{study}.csv")
+    df_mono = pd.read_csv(save_path / study / "mono_response.csv")
+    # take only cell_lines with more than 50 triplets
+    df_context_id=df.value_counts(subset=['context_id'])
+    context_ids = df_context_id[df_context_id > 50].index.get_level_values(0)
+    df_inv = df.copy()
+    df_inv["drug_1_id"], df_inv["drug_2_id"] = (
+        df["drug_2_id"],
+        df["drug_1_id"],
+    )
+    df_undirected = pd.concat([df, df_inv], ignore_index=True)
+    df_undirected = df_undirected.value_counts(["drug_1_id"]).sort_values(ascending=False)
+    drug_index = df_undirected[df_undirected>50].index.get_level_values(0)
+    # filter away drugs with less than 50 triplets
+    drug_filter = df["drug_1_id"].isin(drug_index) & df["drug_2_id"].isin(drug_index)
+    drug_context_filter = drug_filter & df["context_id"].isin(context_ids) 
+    df_filter = df[drug_context_filter]
+    # filter away outliers 
+    df_filter = df_filter[df_filter["synergy_zip_max"] < 50]
+
+    drug_filter = df_mono["drug"].isin(set(df_filter["drug_1_name"]).union(set(df_filter["drug_2_name"])))
+    drug_cell_line_filter = drug_filter & df_mono["cell_line"].isin(df_filter["context"].unique())
+    df_mono_filtered = df_mono[drug_cell_line_filter] 
+    drug_names = df_mono_filtered["drug"].unique()
+    cell_lines = df_mono_filtered["cell_line"].unique()  
+    # make vocabs   
+    entity_vocab = {name: i for i, name in enumerate(drug_names)}
+    cell_line_vocab = {name: i for i, name in enumerate(cell_lines)}
+    df_filter.loc[:,"drug_1_id"] = df_filter["drug_1_name"].map(entity_vocab)
+    df_filter.loc[:,"drug_2_id"] = df_filter["drug_2_name"].map(entity_vocab)
+    df_filter.loc[:,"context_id"] = df_filter["context"].map(cell_line_vocab)
+    
+    new_study_name = study + "_filtered"
+    save_path_new = save_path / (new_study_name)
+    with open(save_path_new / 'entity_vocab.json', "w") as json_file:
+                    json.dump(entity_vocab, json_file)
+    with open(save_path_new / 'relation_vocab.json', "w") as json_file:
+                json.dump(cell_line_vocab, json_file)
+    
+    save_path_new.mkdir(parents=True, exist_ok=True)    
+    df_filter.to_csv(save_path_new / f"{new_study_name}.csv", index=False)
+    df_mono.to_csv(save_path_new / "mono_response.csv", index=False)
 
 if __name__ == "__main__":
     make_oneil_almanac_dataset(studies=["drugcomb"])
+    make_filtered_drugcomb_dataset()
+
