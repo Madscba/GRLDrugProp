@@ -1,18 +1,17 @@
-from graph_package.configs.directories import Directories
-
 from graph_package.src.error_analysis.err_utils.err_utils import (
     generate_error_plots_per_entity,
     get_drug_level_df,
     enrich_model_pred,
     enrich_df_w_metric,
     generate_difference_df,
-    ENTITY_ERR_DICT,
+    ENTITY_ERR_DICT, residual_scatter_plot, residual_box_plot_MAE_MSE
 )
 from graph_package.src.error_analysis.err_utils.err_utils_load import (
     get_saved_pred,
 )
 import pandas as pd
 
+from graph_package.src.error_analysis.err_utils.err_config import res_err_configs, entity_err_configs
 
 def load_and_prepare_pred(model_names, entity, comparison, err_configs):
     """
@@ -96,7 +95,7 @@ def load_and_prepare_pred(model_names, entity, comparison, err_configs):
     return grouped_dfs
 
 
-def main_error_diagnostics(err_configs, comparison, model_names, entities):
+def error_diagnostics_per_entity(err_configs, comparison, model_names, entities):
     if comparison == "individual":
         for i in range(len(model_names)):
             for entity in entities:
@@ -125,35 +124,20 @@ def main_error_diagnostics(err_configs, comparison, model_names, entities):
 
 
 if __name__ == "__main__":
-    model_1_config = {
-        "task": "reg",
-        "target": "zip_mean",
-        "day_of_prediction": "22_01_2024",
-        "prediction_file_name": "NO_NAME_pred_co3ky6olh8sxpsy24h3uxc1u.pkl",
-        "bar_plot_config": {"add_bar_info": True},
-    }
-    model_2_config = {
-        "task": "reg",
-        "target": "zip_mean",
-        "day_of_prediction": "22_01_2024",
-        "prediction_file_name": "NO_NAME_pred_yat97kycpwhm8724e1gs8l2a.pkl",
-        "bar_plot_config": {"add_bar_info": True},
-    }
-
     # Note that if multiple model_configs are given and the comparison is not individual,
     # the first models plotting config will be used.
 
-    err_configs = {
-        0: model_1_config,
-        1: model_2_config,
-    }
     # todo validate: that models names can be 1 or more. check that every comparison works. And that each entity works
-    comparison = "difference"  # "individual", "concatenate" or "difference"
-    model_names = ["rescal", "deepdds"]
-    entities = ["drug"] # drug_pair, drug "disease", "tissue", "cancer_cell", "drug_target"]
+    comparison = "individual"  # "individual", "concatenate" or "difference"
+    model_names = ["Distmult", "RGAT"]
+    entities = ["cancer_cell"] # drug_pair, drug "disease", "tissue", "cancer_cell", "drug_target"]
 
     assert len(model_names) == len(
-        err_configs
+        entity_err_configs
     ), "Number of models and configs must be equal"
 
-    main_error_diagnostics(err_configs, comparison, model_names, entities)
+    residual_scatter_plot(res_err_configs)
+    residual_box_plot_MAE_MSE(res_err_configs, filter_outliers=True)
+    # residual_box_plot_MAPE_MSE(res_err_configs)
+
+    error_diagnostics_per_entity(entity_err_configs, comparison, model_names, entities)

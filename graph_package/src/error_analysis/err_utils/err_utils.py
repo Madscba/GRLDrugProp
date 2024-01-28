@@ -16,10 +16,13 @@ from graph_package.src.error_analysis.err_utils.err_utils_load import (
     get_ent_vocab,
     get_rel_vocab,
     get_cell_line_info,
-    get_drug_info,
+    get_drug_info, get_saved_pred,
 )
 import numpy as np
 import torch
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+from scipy.stats import pearsonr
 
 MODEL_COLORS = {
     'deepdds': '#EDB732',
@@ -27,7 +30,7 @@ MODEL_COLORS = {
     'hybrid': '#A46750',
     'gc': '#DA4C4C',
     'rgc': '#C565C7',
-    'rgac': '#5387DD'
+    'rgat': '#5387DD'
 }
 
 
@@ -262,27 +265,29 @@ def generate_bar_plot(
     title = plot_conf.get("title","")
     x_label = plot_conf.get("x_label",x_label_col_name)
     y_label = plot_conf.get("y_label",None)
-    y_lim = plot_conf.get("y_lim",None)
+    # y_lim = plot_conf.get("y_lim",None)
+    y_lim = [0, 80]
     x_lim = plot_conf.get("x_lim",None)
 
     model_name = model_name.lower()
     plt_color = MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue"
     print(f"Plotting {model_name} with color {plt_color}, scope {scope} and comparison {comparison}")
+    plt.figure(figsize=(8, 4))
 
-    #Set plt config args
+    # Set plt config args
     if x_label:
-        plt.xlabel(x_label)
+        plt.xlabel(" ")
+
     if y_label:
         plt.ylabel(y_label)
     if x_lim:
         plt.xlim(x_lim)
     if y_lim:
-        y_lim.ylim(y_lim)
+        plt.ylim(y_lim)
     plt.title(f"{title}")
 
-    plt.figure(figsize=(8, 5))
     df.reset_index(inplace=True)
-    sns.barplot(x=df.index, y=df[metric_name], color=plt_color, palette="Set3")
+    sns.barplot(x=df.index, y=df[metric_name], color=plt_color)
     # df[metric_name].plot(kind="bar", ax=plt.gca(), color=plt_color)
 
     plt.gca().set_ylabel(metric_name)
@@ -304,10 +309,10 @@ def generate_bar_plot(
                 plt.text(i, value, bar_text, ha="center", va="bottom")
         elif scope == "top_and_bottom5":
             for i, value in enumerate(df[metric_name]):
-                bar_text = f":{value:.1f}"
+                bar_text = f"{value:.1f}"
                 plt.text(i, value, bar_text, ha="center", va="bottom")
 
-    plt.legend([model_name])
+    plt.legend([model_name],loc="upper left")
     plt.tight_layout()
     plt.savefig(save_path / f"{entity}_{scope}_{model_name}_{comparison}_barchart.png")
     plt.clf()
@@ -611,3 +616,94 @@ def enrich_model_pred(model_names, pred_dfs, task):
         generate_group_indices_and_names(df)
         new_pred_dfs.append(df)
     return new_pred_dfs
+
+
+def residual_scatter_plot(err_configs):
+    pred_dfs = get_saved_pred(err_configs)
+    #create a subplot for each of the df in pred_dfs and plot the prediction column aginst the targets
+    #and fit a linear regression with a R2 and spearson correlation coefficients
+    model_names = [err_configs[i]["model_name"].lower() for i in range(len(err_configs))]
+    plt_colors = [MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue" for model_name in model_names]
+    # Set up the subplots
+    num_plots = len(pred_dfs)
+    fig, axes = plt.subplots(nrows=1, ncols=num_plots, figsize=(12, 6))
+    # Iterate through each DataFrame in pred_dfs
+    for i, df in enumerate(pred_dfs):
+        # Plot the data
+        ax = axes[i]
+
+
+        sns.scatterplot(x='predictions', y='targets', data=df, ax=ax, alpha=0.3,color=plt_colors[i], label=model_names[i])
+        #ax.set_title(f'Predicted vs Target synergies {i + 1}')
+
+        # Fit linear regression
+        y = df[['targets']].values.squeeze()
+        X = df['predictions'].values.reshape(-1,1)
+        model = LinearRegression()
+        model.fit(X, y)
+        model_pred = model.predict(X)
+        # Plot the regression line
+        x_range = pd.DataFrame({'Predictions': [df['predictions'].min(), df['predictions'].max()]})
+        ax.plot(x_range, model.predict(x_range), color='red')
+        # Calculate R^2 and Pearson correlation coefficients
+        r2 = r2_score(y, model_pred)
+        corr, _ = pearsonr(y, df['predictions'])
+
+        # Display R^2 and correlation coefficients on the plot
+        intercept = model.intercept_
+        slope = model.coef_[0]
+        ax.text(0.5, 0.9,f'$R^2 = {r2:.2f}$\nPearson corr = {corr:.2f}\ny = {intercept:.2f} + {slope:.2f}x',
+                transform=ax.transAxes, ha='center')
+    plt.tight_layout()
+    plt.show()
+    a = 2
+
+def residual_box_plot_MAE_MSE(err_configs, filter_outliers=False):
+    pred_dfs = get_saved_pred(err_configs)
+
+    model_names = [err_configs[i]["model_name"].lower() for i in range(len(err_configs))]
+    plt_colors = [MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue" for model_name in model_names]
+    # Set up the subplots
+    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 10))
+    # Plot residuals as boxplots
+    mse_values = []
+    mae_values  = []
+    for i, df in enumerate(pred_dfs):
+        X = df[['targets']].values.squeeze()
+        y = df['predictions'].values
+        mse_values.append((X - y) ** 2)
+        mae_values.append(abs((X - y)))
+
+    plt_colors_dict = {model_names[i].lower(): col for i, col in enumerate(plt_colors)}
+    df_mse = pd.DataFrame(dict(zip(model_names, mse_values)))  # Updated this line
+    if filter_outliers:
+        df_mse_filter = pd.DataFrame(
+            {model: filter_quantile(pd.Series(values)) for model, values in zip(model_names, mse_values)}).dropna()
+    sns.boxplot(data=df_mse, ax=axes[0], palette=plt_colors_dict)  # Updated this line
+    axes[0].set_title('Squared Error Boxplots')
+    for i, model in enumerate(model_names):
+        axes[0].text(i, np.mean(df_mse[model]), f'MSE: {np.mean(df_mse[model]):.1f}', ha='center', va='bottom',
+                     color='black')    # axes[0].legend(labels=model_names, loc='upper right', bbox_to_anchor=(1.2, 1))
+
+    df_mae = pd.DataFrame(dict(zip(model_names, mae_values)))  # Updated this line
+    if filter_outliers:
+        df_mae = pd.DataFrame(
+            {model: filter_quantile(pd.Series(values)) for model, values in zip(model_names, mae_values)}).dropna()
+    sns.boxplot(data=df_mae, ax=axes[1], palette=plt_colors_dict)  # Updated this line
+    axes[1].set_title('Absolute Error Boxplots')
+    for i, model in enumerate(model_names):
+        axes[1].text(i, np.mean(df_mae[model]), f'MAE: {np.mean(df_mae[model]):.1f}', ha='center', va='bottom',
+                     color='black')
+
+
+    # axes[-1].legend(labels=model_names, loc='upper right', bbox_to_anchor=(1.2, 1))
+    # Adjust layout
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(Directories.OUTPUT_PATH / "err_diagnostics" / f"MSE_MAE_MAPE_filter_{filter_outliers}.png")
+    a = 2
+
+def filter_quantile(series):
+    lower_bound = series.quantile(0.05)
+    upper_bound = series.quantile(0.95)
+    return series[(series >= lower_bound) & (series <= upper_bound)]

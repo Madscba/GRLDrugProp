@@ -200,8 +200,8 @@ def make_node_features(datasets=["ONEIL", "ALMANAC"], components=16, min_degree=
     for feature_vector, relation in zip(feature_vectors, relations):
         for i, drug in enumerate(filtered_drug_dict.keys()):
             drug_features[drug][relation] = feature_vector[i]
-    with open(save_path / f"{datasets_name}_drug_features.json", "w") as json_file:
-        json.dump(drug_features, json_file)
+    #with open(save_path / f"{datasets_name}_drug_features.json", "w") as json_file:
+    #    json.dump(drug_features, json_file)
     logger.info(f"Saved {len(drug_features)} PCA feature vectors to {save_path}")
 
 
