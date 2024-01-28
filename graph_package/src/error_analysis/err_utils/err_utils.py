@@ -664,7 +664,7 @@ def residual_box_plot_MAE_MSE(err_configs, filter_outliers=False):
     model_names = [err_configs[i]["model_name"].lower() for i in range(len(err_configs))]
     plt_colors = [MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue" for model_name in model_names]
     # Set up the subplots
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 10))
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(14, 10))
     # Plot residuals as boxplots
     mse_values = []
     mae_values  = []
@@ -676,26 +676,30 @@ def residual_box_plot_MAE_MSE(err_configs, filter_outliers=False):
 
     plt_colors_dict = {model_names[i].lower(): col for i, col in enumerate(plt_colors)}
     df_mse = pd.DataFrame(dict(zip(model_names, mse_values)))  # Updated this line
-    if filter_outliers:
-        df_mse_filter = pd.DataFrame(
-            {model: filter_quantile(pd.Series(values)) for model, values in zip(model_names, mse_values)}).dropna()
-    sns.boxplot(data=df_mse, ax=axes[0], palette=plt_colors_dict)  # Updated this line
-    axes[0].set_title('Squared Error Boxplots')
+    sns.boxplot(data=df_mse, ax=axes[0,0], palette=plt_colors_dict)  # Updated this line
+    axes[0,0].set_title('Squared Error Boxplots')
+    df_mse_filter = pd.DataFrame(
+        {model: filter_quantile(pd.Series(values)) for model, values in zip(model_names, mse_values)}).dropna()
+    sns.boxplot(data=df_mse_filter, ax=axes[1, 0], palette=plt_colors_dict)  # Updated this line
+    axes[1, 0].set_title('Squared Error Boxplots (Filtered)')
     for i, model in enumerate(model_names):
-        axes[0].text(i, np.mean(df_mse[model]), f'MSE: {np.mean(df_mse[model]):.1f}', ha='center', va='bottom',
-                     color='black')    # axes[0].legend(labels=model_names, loc='upper right', bbox_to_anchor=(1.2, 1))
+        axes[0, 0].text(i, np.mean(df_mse[model]), f'MSE: {np.mean(df_mse[model]):.1f}', ha='center', va='bottom',
+                        color='black')
+        axes[1, 0].text(i, np.mean(df_mse_filter[model]), f'MSE: {np.mean(df_mse_filter[model]):.1f}', ha='center', va='bottom',
+                        color='black')
 
     df_mae = pd.DataFrame(dict(zip(model_names, mae_values)))  # Updated this line
-    if filter_outliers:
-        df_mae = pd.DataFrame(
-            {model: filter_quantile(pd.Series(values)) for model, values in zip(model_names, mae_values)}).dropna()
-    sns.boxplot(data=df_mae, ax=axes[1], palette=plt_colors_dict)  # Updated this line
-    axes[1].set_title('Absolute Error Boxplots')
+    sns.boxplot(data=df_mae, ax=axes[0,1], palette=plt_colors_dict)  # Updated this line
+    axes[0,1].set_title('Absolute Error Boxplots')
+    df_mae_filtered = pd.DataFrame(
+        {model: filter_quantile(pd.Series(values)) for model, values in zip(model_names, mae_values)}).dropna()
+    sns.boxplot(data=df_mae_filtered, ax=axes[1,1], palette=plt_colors_dict)  # Updated this line
+    axes[1,1].set_title('Absolute Error Boxplots (Filtered)')
     for i, model in enumerate(model_names):
-        axes[1].text(i, np.mean(df_mae[model]), f'MAE: {np.mean(df_mae[model]):.1f}', ha='center', va='bottom',
+        axes[0,1].text(i, np.mean(df_mae[model]), f'MAE: {np.mean(df_mae[model]):.1f}', ha='center', va='bottom',
                      color='black')
-
-
+        axes[1,1].text(i, np.mean(df_mae_filtered[model]), f'MAE: {np.mean(df_mae_filtered[model]):.1f}', ha='center', va='bottom',
+                     color='black')
     # axes[-1].legend(labels=model_names, loc='upper right', bbox_to_anchor=(1.2, 1))
     # Adjust layout
     plt.tight_layout()
