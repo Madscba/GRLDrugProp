@@ -108,6 +108,8 @@ class MLP(nn.Module):
 
         mono_response = mono_response.dropna().drop(columns=["drug", "cell_line"])
         mono_response.set_index(["drug_id", "context_id"], inplace=True)
+        if "Unnamed: 0" in mono_response.columns:
+            mono_response.drop("Unnamed: 0",axis=1,inplace=True)
         return mono_response
 
     def _get_mono_response(self, drug_ids, context_ids):

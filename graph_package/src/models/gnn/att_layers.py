@@ -44,7 +44,7 @@ class RelationalGraphAttentionConv(MessagePassingBase):
         input_dim,
         output_dim,
         num_relations,
-        feature_dropout=False,
+        feature_dropout=0.0,
         w_per_relation=False,
         num_head=1,
         negative_slope=0.2,
@@ -249,7 +249,7 @@ class GraphAttentionConv(MessagePassingBase):
                 "Expect output_dim to be a multiplier of num_head, but found `%d` and `%d`"
                 % (output_dim, num_head)
             )
-
+        self.feature_dropout = nn.Dropout(feature_dropout)
         self.linear = nn.Linear(input_dim, hidden_dim*num_head // 2)
         # the idea is that different heads are each allocated to a slice of the hidden vector
         self.query = nn.Parameter(torch.zeros(num_head, hidden_dim))
@@ -329,6 +329,8 @@ class GraphAttentionConv(MessagePassingBase):
         output = update
         if self.activation:
             output = self.activation(output)
+        if self.feature_dropout:
+            output = self.feature_dropout(output)
         return output
 
 
