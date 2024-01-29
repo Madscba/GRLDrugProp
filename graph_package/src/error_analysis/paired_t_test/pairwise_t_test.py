@@ -6,6 +6,7 @@ import pandas as pd
 import scipy.stats as stats
 import scipy.special as special
 import matplotlib.pyplot as plt
+from graph_package.src.error_analysis.err_utils.err_config import entity_err_configs
 
 
 def paired_t_test(data1, data2):
@@ -65,14 +66,13 @@ def residual_analysis(
     return res_is_normal, res_homoscedastic
 
 
-def perform_manual_paired_two_sided_t_test(residuals_mse):
+def perform_manual_paired_two_sided_t_test(residuals_mse,alpha):
     # perform paired t test
     mu_hat = np.mean(residuals_mse)
     degrees_of_freedom = len(residuals_mse) - 1
     sigma_hat = np.sqrt(np.sum((mu_hat - residuals_mse) ** 2) / (degrees_of_freedom))
     sigma_err_mean = sigma_hat / np.sqrt(len(residuals_mse))
     t_stat = mu_hat / sigma_err_mean
-    alpha = 0.05
     # We are performing a two_sided test
     crit_level = alpha / 2
     # todo get t value lookup table
@@ -92,17 +92,31 @@ def perform_manual_paired_two_sided_t_test(residuals_mse):
 
 
 def check_if_samples_are_paired(df_m1, df_m2):
-    assert len(df_m1) == len(
-        df_m2
-    ), "Samples are not paired, they have different lengths"
     triplet_col = [
         "drug_molecules_left_id",
         "drug_molecules_right_id",
         "context_features_id",
     ]
-    assert (
-        (df_m1[triplet_col] == df_m2[triplet_col]).all().all()
-    ), "Samples are not paired, they have different triplets"
+    df_m1 = df_m1.drop_duplicates(subset=triplet_col, keep='first')
+    df_m2 = df_m2.drop_duplicates(subset=triplet_col, keep='first')
+
+    if not len(df_m1) == len(df_m2):
+        print( "Samples are not paired, they have different lengths")
+        df_m1.set_index(triplet_col, inplace=True)
+        df_m2.set_index(triplet_col, inplace=True)
+        triplet_set = list(set(df_m1.index).intersection(df_m2.index))
+        df_m1 = df_m1.loc[triplet_set].reset_index()
+        df_m2 = df_m2.loc[triplet_set].reset_index()
+
+    if not ((df_m1[triplet_col] == df_m2[triplet_col]).all().all()):
+        print("Triplet ordering differ. Trying to align")
+        df_m1.set_index(triplet_col, inplace=True)
+        df_m2.set_index(triplet_col, inplace=True)
+        df_m2 = df_m2.reindex(df_m1.index)
+        df_m1, df_m2 = check_if_samples_are_paired(df_m1, df_m2)
+
+    return df_m1, df_m2
+
 
 
 def run_pairwise_two_sided_ttests(
@@ -132,22 +146,25 @@ def run_pairwise_two_sided_ttests(
             "p_value",
             "alpha_bonferroni",
             "reject_null_hypothesis",
+            "mse_model1",
+            "mse_model2",
+            "mse_model1-mse_model2",
         ]
         + residual_cols
     )
-    for combination in combinations_list:
+    for idx, combination in enumerate(combinations_list):
         m1_idx, m2_idx = combination
         df_m1, df_m2 = pred_dfs[m1_idx], pred_dfs[m2_idx]
+        df_m1, df_m2 = check_if_samples_are_paired(df_m1, df_m2)
         m1_mse = (df_m1["targets"].values - df_m1["predictions"].values) ** 2
         m2_mse = (df_m2["targets"].values - df_m2["predictions"].values) ** 2
-        check_if_samples_are_paired(df_m1, df_m2)
         paired_residuals = m1_mse - m2_mse
 
         (
             t_statistic,
             p_value,
             reject_null_hypothesis,
-        ) = perform_manual_paired_two_sided_t_test(paired_residuals)
+        ) = perform_manual_paired_two_sided_t_test(paired_residuals,alpha)
 
         # sanity check with scipy
         #t_statistic_, p_value_, reject_null_hypothesis_ = paired_t_test(m1_mse, m2_mse)
@@ -166,15 +183,18 @@ def run_pairwise_two_sided_ttests(
             [res_is_normal, res_homoscedastic] if perform_residual_analysis else []
         )
 
-        results_df.loc[-1] = [
-            model_names[m1_idx],
-            model_names[m2_idx],
-            t_statistic,
-            p_value,
-            alpha,
-            reject_null_hypothesis,
-        ] + res_values
-
+        df_values = [
+                model_names[m1_idx],
+                model_names[m2_idx],
+                t_statistic,
+                p_value,
+                alpha,
+                reject_null_hypothesis,
+                np.mean(m1_mse),
+                np.mean(m2_mse),
+                np.mean(m1_mse)-np.mean(m2_mse)
+            ] + res_values
+        results_df.loc[idx] = df_values
     return results_df
 
 
@@ -182,36 +202,14 @@ if __name__ == "__main__":
     # put prediction files in the folder, where each prediction file is named after the model:
     # ex : rescal_model_pred_dict.pkl
 
-    model_1_config = {
-        "task": "reg",
-        "target": "zip_mean",
-        "day_of_prediction": "26_01_2024",
-        "prediction_file_name": "p3_distmult_pred_tuk4g2fb5sevg66pittq1w7e.pkl",
-        "bar_plot_config": {"add_bar_info": True},
-    }
-
-    model_2_config = {
-        "task": "reg",
-        "target": "zip_mean",
-        "day_of_prediction": "26_01_2024",
-        "prediction_file_name": "p3_rgat_e3fp_4_pred_bpm179tn7wtqt9ov7svwj3lm.pkl",
-        "bar_plot_config": {"add_bar_info": True},
-    }
-
-    err_configs = {
-        0: model_1_config,
-        1: model_2_config,
-    }
-
-
-    model_names = ["rescal", "deepdds"]
+    model_names = ["DistMult", "DeepDDS", "GC", "RGAT","RGAT-one-hot"] #, "DistMult2"]
     alpha = 0.05
     perform_residual_analysis = True
     plot_residuals = False
 
     df_results = run_pairwise_two_sided_ttests(
         model_names,
-        err_configs,
+        entity_err_configs,
         alpha,
         perform_residual_analysis,
         plot_residuals,
