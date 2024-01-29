@@ -85,7 +85,7 @@ def get_rel_vocab():
     Returns:
         df_rel_vocab (pd.DataFrame):
     """
-    gold_root_path = Directories.DATA_PATH / "gold" / "oneil"
+    gold_root_path = Directories.DATA_PATH / "gold" / "drugcomb_filtered"
     df_rel_vocab = pd.DataFrame(
         load_json(gold_root_path / "relation_vocab.json").items(),
         columns=["rel_name", "rel_id"],
@@ -101,7 +101,7 @@ def get_ent_vocab():
     Returns:
         df_ent_vocab (pd.DataFrame):
     """
-    gold_root_path = Directories.DATA_PATH / "gold" / "oneil"
+    gold_root_path = Directories.DATA_PATH / "gold" / "drugcomb_filtered"
     df_ent_vocab = pd.DataFrame(
         load_json(gold_root_path / "entity_vocab.json").items(),
         columns=["drug_name", "drug_id"],
