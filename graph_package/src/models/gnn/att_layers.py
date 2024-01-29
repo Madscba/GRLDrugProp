@@ -15,6 +15,7 @@ from graph_package.configs.directories import Directories
 from torchdrug.layers import functional
 from graph_package.src.models.gnn.base_layer import MessagePassingBase
 import json
+layers.GraphAttentionConv
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -236,6 +237,7 @@ class GraphAttentionConv(MessagePassingBase):
         # call relu bu with a slightly negative slop for negative values
         self.leaky_relu = functools.partial(F.leaky_relu, negative_slope=negative_slope)
         self.dropout = dropout
+        self.feature_dropout = nn.Dropout(feature_dropout)
         
         if concat:
             hidden_dim = output_dim * 2 // num_head
@@ -250,9 +252,9 @@ class GraphAttentionConv(MessagePassingBase):
                 % (output_dim, num_head)
             )
 
-        self.linear = nn.Linear(input_dim, hidden_dim*num_head // 2)
+        self.linear = nn.Linear(input_dim, output_dim)
         # the idea is that different heads are each allocated to a slice of the hidden vector
-        self.query = nn.Parameter(torch.zeros(num_head, hidden_dim))
+        self.query = nn.Parameter(torch.zeros(num_head, output_dim * 2 // num_head))
         nn.init.kaiming_uniform_(self.query, negative_slope, mode="fan_in")
 
     def message(self, graph, input):
@@ -303,7 +305,6 @@ class GraphAttentionConv(MessagePassingBase):
             node_out
         ]
         attention = attention / (normalizer + self.eps)
-        attention = F.dropout(attention, self.dropout, training=self.training)
         # see eq. 5.19 [Hamilton], this is 'h'
         value = hidden[node_in].view(-1, self.num_head, self.query.shape[-1] // 2)
         # Copies a_{v,u} for each dimension of output
@@ -329,6 +330,8 @@ class GraphAttentionConv(MessagePassingBase):
         output = update
         if self.activation:
             output = self.activation(output)
+        if self.feature_dropout:
+            output = self.feature_dropout(output)
         return output
 
 

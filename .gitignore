@@ -34,3 +34,4 @@ openbabel-openbabel-3-1-1
 plots/oneil/*
 plots/oneil_almanac/*
 /pca_plots
+/model_predictions_hpc
