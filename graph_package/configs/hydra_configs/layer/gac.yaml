@@ -3,7 +3,7 @@ lr: 0.001
 model:
   layer: 'gac'
   enc_kwargs: 
-    cell_line_features: ccle
+    cell_line_features: False
     dataset: ''
     feature_dropout: 0.0
     num_head: 1
