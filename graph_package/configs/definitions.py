@@ -25,6 +25,12 @@ dataset_dict = {
     / "gold"
     / "oneil_almanac_het"
     / "oneil_almanac_het.csv",
+    "drugcomb": Directories.DATA_PATH / "gold" / "drugcomb" / "drugcomb.csv",
+    "drugcomb_het": Directories.DATA_PATH
+    / "gold"
+    / "drugcomb_het"
+    / "drugcomb_het.csv",
+    "drugcomb_filtered": Directories.DATA_PATH / "gold" / "drugcomb_filtered" / "drugcomb_filtered.csv",
 }
 
 

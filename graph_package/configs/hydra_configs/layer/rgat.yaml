@@ -1,7 +1,8 @@
 # @package _global_
+lr: 0.001
 model:
   layer: 'rgat'
   enc_kwargs: 
-    dataset: ''
     n_heads: 1
-    dropout: 0.6
+    feature_dropout: 0.1
+    concat_hidden: True

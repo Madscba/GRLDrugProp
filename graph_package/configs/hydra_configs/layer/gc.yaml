@@ -1,8 +1,9 @@
 # @package _global_
+lr: 0.001
 model:
   layer: 'gc'
   enc_kwargs: 
     dataset: ''
     batch_norm: False
     feature_dropout: 0.0
-    cell_line_features: ccle #False, onehot
+    cell_line_features: False #ccle, onehot

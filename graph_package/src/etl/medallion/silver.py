@@ -5,11 +5,7 @@ import asyncio
 import json
 import os
 from graph_package.src.etl.medallion.bronze import download_response_info_drugcomb
-from graph_package.src.etl.medallion.load import load_block_ids
-
-def load_drugcomb():
-    data_path = Directories.DATA_PATH / "bronze" / "drugcomb" / "summary_v_1_5.csv"
-    return pd.read_csv(data_path)
+from graph_package.src.etl.medallion.load import load_block_ids, load_drugcomb
 
 
 def generate_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
@@ -34,25 +30,25 @@ def generate_oneil_almanac_dataset(studies=["oneil", "oneil_almanac"]):
 
 def generate_rest_of_drugcomb_dataset():
     """
-    Generate the ONEIL and ONEIL-ALMANAC dataset from the DrugComb dataset.
+    Generate the DrugComb dataset which does not include the ONEIL and ALMANAC studies.
     """
     df = load_drugcomb()
     # Remove mono-studies
     df = df.dropna(subset=["drug_col"])
     # Remove non-cancer studies
     non_cancer_studies = ["MOTT", "NCATS_SARS-COV-2DPI", "BOBROWSKI", "DYALL"]
-    cancer_studies = list(set(df.study_name.unique()).difference(non_cancer_studies))
+    cancer_studies = set(df.study_name.unique()).difference(non_cancer_studies)
     df = df[df["study_name"].isin(cancer_studies)]
     df = df.dropna(
         subset=["drug_row", "drug_col", "synergy_zip"]
     )
     # Remove ONEIL & ALMANAC and generate block-dict for remaining 
-    df = df[df["study_name"].isin(list(set(cancer_studies)-set(["ONEIL", "ALMANAC"])))]
-    study = "rest_of_drugcomb"
+    df = df[df["study_name"].isin(cancer_studies-set(["ONEIL", "ALMANAC"]))]
+    study = "drugcomb"
     study_path = Directories.DATA_PATH / "silver" / study
     study_path.mkdir(exist_ok=True, parents=True)
     unique_block_ids = df["block_id"].unique().tolist()
-    download_response_info(unique_block_ids, study, overwrite=False)
+    download_response_info(unique_block_ids, study, overwrite=True)
     df_study_cleaned = df.loc[
         :, ~df.columns.str.startswith("Unnamed")
     ]

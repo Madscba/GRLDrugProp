@@ -2,10 +2,9 @@ import json
 import torch
 import pandas as pd
 from graph_package.configs.directories import Directories
-from graph_package.configs.definitions import dataset_dict
-from graph_package.src.etl.medallion.gold import (
-    create_drug_id_vocabs,
-    create_cell_line_id_vocabs,
+from graph_package.configs.definitions import (
+    dataset_dict,
+    drug_representation_path_dict,
 )
 from torch.utils.data import Dataset
 from torchdrug.data import Graph
@@ -248,7 +247,7 @@ class KnowledgeGraphDataset(Dataset):
                 for relation, value in feature.items():
                     if relation in relations_to_include:
                         concatenated_pca_features.extend(value)
-                node_feature_dict[node] = concatenated_pca_features
+                node_feature_dict[node].extend(concatenated_pca_features)
 
         # Convert to a list in correct order determined by graph node ID
         node_features = [

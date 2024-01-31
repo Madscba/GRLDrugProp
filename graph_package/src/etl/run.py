@@ -1,5 +1,8 @@
 from graph_package.src.etl.medallion.bronze import get_drugcomb
-from graph_package.src.etl.medallion.silver import generate_oneil_almanac_dataset
+from graph_package.src.etl.medallion.silver import (
+    generate_oneil_almanac_dataset,
+    generate_rest_of_drugcomb_dataset
+)
 import argparse
 from graph_package.src.etl.medallion.gold import make_oneil_almanac_dataset
 from graph_package.src.etl.feature_engineering.node_features import make_node_features
@@ -19,6 +22,7 @@ def main():
         get_drugcomb()
     if (args.update == "silver") | (args.update == "full"):
         generate_oneil_almanac_dataset()
+        generate_rest_of_drugcomb_dataset()
     if (args.update == "feature") | (args.update == "full"):
         make_cell_line_features()
         make_node_features()

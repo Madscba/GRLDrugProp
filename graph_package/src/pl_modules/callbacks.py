@@ -1,7 +1,8 @@
-from graph_package.src.error_analysis.utils import (
-    save_performance_plots,
+from pytorch_lightning import LightningModule, Trainer
+from graph_package.src.error_analysis.err_utils.err_utils import  (
     save_model_pred,
 )
+from graph_package.src.error_analysis.err_utils.err_callback_utils import save_performance_plots
 from graph_package.src.main_utils import (
     init_model,
     save_pretrained_drug_embeddings
@@ -11,9 +12,12 @@ from graph_package.src.explainability.utils import explain_attention
 from pytorch_lightning.callbacks import Callback
 from omegaconf import DictConfig
 from pathlib import Path
-from graph_package.src.etl.dataloaders import KnowledgeGraphDataset
+from pytorch_lightning.trainer import Trainer
+from torch.nn.functional import softplus
 import torch
-import pandas as pd
+from pytorch_lightning.core import LightningModule
+import torch
+from torch.nn import functional as F
 
 class TestDiagnosticCallback(Callback):
     def __init__(self, model_name, config: DictConfig, graph: KnowledgeGraphDataset, fold: int, triplets: pd.DataFrame) -> None:
@@ -23,7 +27,7 @@ class TestDiagnosticCallback(Callback):
         self.fold = fold
         self.triplets = triplets
 
-    def on_test_end(self, trainer, pl_module):
+    def on_test_end(self, trainer: Trainer, pl_module: LightningModule):
         # save and perform err_diag
         (
             df_cm,
@@ -32,28 +36,43 @@ class TestDiagnosticCallback(Callback):
             target,
             batch,
             batch_idx,
-        ) = pl_module.test_step_outputs.values()
+        ) = pl_module.test_outputs.values()
         print("conf_matrix:\n", df_cm)
 
-        #save_performance_plots(
-        #    df_cm, metrics, preds, target, self.config, self.model_name, save_path=Path("")
-        #)
-        #save_model_pred(
-        #    batch_idx, batch, preds, target, self.config, self.model_name, save_path=Path("")
-        #)
-        if (self.model_name=="gnn") & (self.config.model.layer in ['rgat', 'rgac', 'gat', 'gac']):
-            model = init_model(
-                model=self.model_name,
-                config=self.config,
-                graph=self.graph,
-            ).model
-            state_dict = remove_prefix_from_keys(
-                torch.load(trainer.checkpoint_callback.best_model_path)["state_dict"], "model."
+
+        if self. config.save_model_pred:
+            std = torch.sqrt(softplus(pl_module.loss_func.var.cpu().detach()))
+
+            std_per_cell_line = std[batch[0][:,2]]
+
+            save_performance_plots(
+                df_cm, metrics, preds, target, self.config, self.model_name, save_path=Path("")
             )
-            model.load_state_dict(state_dict)
-            model.eval()
-            explain_attention(df=self.triplets, graph=self.graph, model=model)
+            save_model_pred(
+                batch_idx, batch, preds, target, std_per_cell_line, self.config, self.model_name, save_path=Path("")
+            )
+
         # save pretrained drug embeddings
-        if self.model_name in ["deepdds", "distmult"]:
+        if self.config.save_embedding:
             save_pretrained_drug_embeddings(model=pl_module,fold=self.fold)
-        pl_module.test_step_outputs.clear()
+        pl_module.test_outputs.clear()
+        
+class LossFnCallback(Callback):
+    def __init__(self, epochs_wo_var) -> None:
+        self.epochs_wo_var = epochs_wo_var
+        super().__init__()  
+
+    def on_train_epoch_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        if pl_module.current_epoch == self.epochs_wo_var:
+            pl_module.loss_func.set_var_grad()
+        if pl_module.current_epoch >= self.epochs_wo_var:
+            std = torch.sqrt(F.softplus(pl_module.loss_func.var.detach()))
+            mean_std = torch.mean(std)
+            std_std = torch.std(std)
+            max_std = torch.max(std)
+            min_std = torch.min(std)
+            pl_module.log('loss_mean_std',mean_std, on_epoch=True)
+            pl_module.log('std_std', std_std, on_epoch=True)
+            pl_module.log('max_std',max_std, on_epoch=True)
+            pl_module.log('min_std',min_std,on_epoch=True)
+

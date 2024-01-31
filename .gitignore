@@ -25,8 +25,12 @@ graph_package/outputs
 /graph_package/src/main_playground.py
 .venv
 *.out
-plots/*
 scrapbook.py
 graph_package/src/outputs/*
 venv
 openbabel-openbabel-3-1-1
+/graph_package/scratch/old/
+/graph_package/scratch/old/
+plots/oneil/*
+plots/oneil_almanac/*
+/pca_plots

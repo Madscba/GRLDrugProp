@@ -116,15 +116,19 @@ class RelationalGraphConv(MessagePassingBase):
 
 
 class DummyLayer(MessagePassingBase):
-    def __init__(self, input_dim, output_dim, num_relation, dataset, batch_norm=False):
+    def __init__(self, input_dim, output_dim, num_relation, dataset, feature_dropout=0, batch_norm=False):
         "For testing MLP predictionhead without any GNN aggregation"
         super(DummyLayer, self).__init__()
+        self.feature_dropout = nn.Dropout(feature_dropout)
 
     def message_and_aggregate(self, graph, input):
         return input
 
     def combine(self, input, update):
-        return input
+        output = input
+        if self.feature_dropout:
+            output = self.feature_dropout(output)
+        return output
 
 
 class GraphConv(MessagePassingBase):
