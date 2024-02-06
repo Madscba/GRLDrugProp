@@ -450,7 +450,7 @@ def make_filtered_drugcomb_dataset():
     drug_context_filter = drug_filter & df["context_id"].isin(context_ids) 
     df_filter = df[drug_context_filter]
     # filter away outliers 
-    df_filter = df_filter[df_filter["synergy_zip_max"] < 50]
+    df_filter = df_filter[df_filter["synergy_zip_mean"] < 50]
 
     drug_filter = df_mono["drug"].isin(set(df_filter["drug_1_name"]).union(set(df_filter["drug_2_name"])))
     drug_cell_line_filter = drug_filter & df_mono["cell_line"].isin(df_filter["context"].unique())
