@@ -95,7 +95,7 @@ def generate_error_plots_per_entity(
 
     avg_exp_and_mean_target = [
         np.round(np.mean(sorted_df[exp_data].values), 2)
-        for exp_data in ["n_exp", "mean_target"]
+        for exp_data in ["n_exp", "mean_target", "mean_var_cell"]
     ]
     df_corr = get_err_correlations(sorted_df, metric_name, avg_exp_and_mean_target,model_name, comparison)
     generate_corr_heatmap(
@@ -145,7 +145,7 @@ def enrich_df_w_metric(df, group_by_columns, metric_name):
         metric_scores: performance measure for each group
         n_exp: number of experiments for each group
     """
-    metric_scores, n_exp, mean_target, mean_pred, clin_phase = {}, {}, {}, {}, {}
+    metric_scores, n_exp, mean_target, mean_pred, clin_phase, mean_var_cell = {}, {}, {}, {}, {}, {}
 
     unique_groups = df.loc[:, group_by_columns].squeeze().unique()
     for group in unique_groups:
@@ -155,13 +155,14 @@ def enrich_df_w_metric(df, group_by_columns, metric_name):
         mean_target[group] = (group_df["targets"]).mean()
         mean_pred[group] = (group_df["predictions"]).mean()
         clin_phase[group] = (pd.concat([group_df["clinical_phase"], group_df["clinical_phase_right"]])).mean()
+        mean_var_cell[group] = (group_df["var_per_cell_line"]).mean()
 
     grouped_df = pd.concat(
-        [pd.DataFrame(dict_.items()) for dict_ in [metric_scores, n_exp, mean_target, mean_pred, clin_phase]],
+        [pd.DataFrame(dict_.items()) for dict_ in [metric_scores, n_exp, mean_target, mean_pred, clin_phase, mean_var_cell]],
         axis=1,
     )
 
-    grouped_df = grouped_df.iloc[:, [0, 1, 3, 5, 7, 9]]
+    grouped_df = grouped_df.iloc[:, [0, 1, 3, 5, 7, 9,11]]
     grouped_df.columns = [
         group_by_columns[0],
         metric_name,
@@ -169,6 +170,7 @@ def enrich_df_w_metric(df, group_by_columns, metric_name):
         "mean_target",
         "mean_pred",
         "mean_clin_phase",
+        "mean_var_cell"
     ]
 
     return grouped_df
@@ -272,7 +274,7 @@ def generate_bar_plot(
     model_name = model_name.lower()
     plt_color = MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue"
     print(f"Plotting {model_name} with color {plt_color}, scope {scope} and comparison {comparison}")
-    plt.figure(figsize=(8, 4))
+    plt.figure(figsize=(6, 4))
 
     # Set plt config args
     if x_label:
@@ -296,8 +298,18 @@ def generate_bar_plot(
         plt.gca().set_xticklabels(df[x_label_col_name])
         plt.xticks(rotation=90)
     elif scope == "full":
+        n_entities = df.shape[0]
+        plt.axhline(y=df[metric_name].quantile(0.25), color='black', linestyle='--',alpha=0.4)
+        plt.axhline(y=df[metric_name].quantile(0.5), color='black', linestyle='-',alpha=0.4)
+        plt.axhline(y=df[metric_name].quantile(0.75), color='black', linestyle='--',alpha=0.4)
+        #print quartiles
+        print(f"Q1: {df[metric_name].quantile(0.25):.2f}")
+        print(f"Q2: {df[metric_name].quantile(0.50):.2f}")
+        print(f"Q3: {df[metric_name].quantile(0.75):.2f}")
+        #add quartiles values as legend to the plot
+
         plt.xticks([])
-        plt.xlabel(x_label)
+        plt.xlabel("Drugs")
 
 
     if add_bar_info and scope != "full":
@@ -305,7 +317,7 @@ def generate_bar_plot(
             for i, value in enumerate(df[metric_name]):
                 index = df.index[i]
                 mt = np.round(df.loc[index, ["mean_target"]].values[0], 2)
-                bar_text = f"n:\n{df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}"
+                bar_text = f"n:\n{df.loc[index, ['n_exp']].values[0]}\nmt:\n{mt:.2f}\nmv:\n{df.loc[index, ['mean_var_cell']].values[0]:.2f}"
                 plt.text(i, value, bar_text, ha="center", va="bottom")
         elif scope == "top_and_bottom5":
             for i, value in enumerate(df[metric_name]):
@@ -362,6 +374,7 @@ def get_err_correlations(df, metric_name, avg_exp_and_mean_target, model_name, c
         df_new[f"n_exp"] = df["n_exp_"+models[0]]
         df_new[f"mean_target"] = df["mean_target_"+models[0]]
         df_new[f"mean_clin_phase"] = df["mean_clin_phase_"+models[0]]
+        df_new[f"mean_var_cell"] = df["mean_var_cell_"+models[0]]
 
         for model in models:
             df_new[f"{metric_name}_{model}"] = df[metric_name+"_"+model]
@@ -375,9 +388,10 @@ def get_err_correlations(df, metric_name, avg_exp_and_mean_target, model_name, c
         mean_target = df["mean_target"]
         mean_pred = df["mean_pred"]
         mean_clin_ph = df["mean_clin_phase"]
+        mean_var_cell = df["mean_var_cell"]
         abs_mt_deviation_from_avg_mt = abs(df["mean_target"] - avg_exp_and_mean_target[1])
-        df_new = pd.DataFrame([metric_val.values, n_exp.values, mean_target.values, abs_mt_deviation_from_avg_mt.values, mean_pred.values, mean_clin_ph.values]).T
-        df_new.columns = [f"{metric_name}","n_exp","mean_target","abs_dev_mean_target", "mean_prediction","mean_clin_phase"]
+        df_new = pd.DataFrame([metric_val.values, n_exp.values, mean_target.values, abs_mt_deviation_from_avg_mt.values, mean_pred.values, mean_clin_ph.values, mean_var_cell.values]).T
+        df_new.columns = [f"{metric_name}","n_exp","mean_target","abs_dev_mean_target", "mean_prediction","mean_clin_phase", "mean_var_cell"]
         df_corr = df_new.corr()
     return round(df_corr, 2)
 
@@ -516,6 +530,7 @@ def get_drug_level_df(df_list, task):
             "drug_pair_idx",
             "clinical_phase",
             "clinical_phase_right",
+            "var_per_cell_line",
         ]
         + additional_cols,
     ]
@@ -622,8 +637,9 @@ def residual_scatter_plot(err_configs):
     pred_dfs = get_saved_pred(err_configs)
     #create a subplot for each of the df in pred_dfs and plot the prediction column aginst the targets
     #and fit a linear regression with a R2 and spearson correlation coefficients
-    model_names = [err_configs[i]["model_name"].lower() for i in range(len(err_configs))]
-    plt_colors = [MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue" for model_name in model_names]
+    model_names = [err_configs[i]["model_name"] for i in range(len(err_configs))]
+    model_names_lower = [model_name.lower() for model_name in model_names]
+    plt_colors = [MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue" for model_name in model_names_lower]
     # Set up the subplots
     num_plots = len(pred_dfs)
     fig, axes = plt.subplots(nrows=1, ncols=num_plots, figsize=(12, 6))
@@ -645,6 +661,7 @@ def residual_scatter_plot(err_configs):
         # Plot the regression line
         x_range = pd.DataFrame({'Predictions': [df['predictions'].min(), df['predictions'].max()]})
         ax.plot(x_range, model.predict(x_range), color='red')
+        ax.set_xlim(left=-20, right=55)
         # Calculate R^2 and Pearson correlation coefficients
         r2 = r2_score(y, model_pred)
         corr, _ = pearsonr(y, df['predictions'])
@@ -654,6 +671,8 @@ def residual_scatter_plot(err_configs):
         slope = model.coef_[0]
         ax.text(0.5, 0.9,f'$R^2 = {r2:.2f}$\nPearson corr = {corr:.2f}\ny = {intercept:.2f} + {slope:.2f}x',
                 transform=ax.transAxes, ha='center')
+        ax.set_xlabel('Predictions')
+        ax.set_ylabel('Targets')
     plt.tight_layout()
     plt.show()
     a = 2
@@ -661,8 +680,9 @@ def residual_scatter_plot(err_configs):
 def residual_box_plot_MAE_MSE(err_configs, filter_outliers=False):
     pred_dfs = get_saved_pred(err_configs)
 
-    model_names = [err_configs[i]["model_name"].lower() for i in range(len(err_configs))]
-    plt_colors = [MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue" for model_name in model_names]
+    model_names = [err_configs[i]["model_name"] for i in range(len(err_configs))]
+    model_names_lower = [model_name.lower() for model_name in model_names]
+    plt_colors = [MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue" for model_name in model_names_lower]
     # Set up the subplots
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 5))
     # Plot residuals as boxplots
@@ -674,7 +694,7 @@ def residual_box_plot_MAE_MSE(err_configs, filter_outliers=False):
         mse_values.append((X - y) ** 2)
         mae_values.append(abs((X - y)))
     #
-    plt_colors_dict = {model_names[i].lower(): col for i, col in enumerate(plt_colors)}
+    plt_colors_dict = {model_names[i]: col for i, col in enumerate(plt_colors)}
     # df_mse = pd.DataFrame(dict(zip(model_names, mse_values)))  # Updated this line
     # sns.boxplot(data=df_mse, ax=axes[0,0], palette=plt_colors_dict)  # Updated this line
     # axes[0,0].set_title('Squared Error Boxplots')
@@ -690,15 +710,15 @@ def residual_box_plot_MAE_MSE(err_configs, filter_outliers=False):
 
     df_mae = pd.DataFrame(dict(zip(model_names, mae_values)))  # Updated this line
     sns.boxplot(data=df_mae, ax=axes[0], palette=plt_colors_dict)  # Updated this line
-    axes[0].set_title('Absolute Error Boxplots')
+    # axes[0].set_title('Absolute Error Boxplots')
     df_mae_filtered = pd.DataFrame(
         {model: filter_quantile(pd.Series(values)) for model, values in zip(model_names, mae_values)}).dropna()
     sns.boxplot(data=df_mae_filtered, ax=axes[1], palette=plt_colors_dict)  # Updated this line
-    axes[1].set_title('Absolute Error Boxplots (Filtered)')
+    # axes[1].set_title('Absolute Error Boxplots (Filtered)')
     for i, model in enumerate(model_names):
-        axes[0].text(i, np.mean(df_mae[model]), f'MAE: {np.mean(df_mae[model]):.1f}', ha='center', va='bottom',
+        axes[0].text(i+0.3, 1.5*np.mean(df_mae[model]), f'MAE: {np.mean(df_mae[model]):.1f}', ha='center', va='bottom',
                      color='black')
-        axes[1].text(i, np.mean(df_mae_filtered[model]), f'MAE: {np.mean(df_mae_filtered[model]):.1f}', ha='center', va='bottom',
+        axes[1].text(i+0.3, 1.5*np.mean(df_mae_filtered[model]), f'MAE: {np.mean(df_mae_filtered[model]):.1f}', ha='center', va='bottom',
                      color='black')
     # axes[-1].legend(labels=model_names, loc='upper right', bbox_to_anchor=(1.2, 1))
     # Adjust layout

@@ -23,6 +23,7 @@ def format_and_return_as_dataframes(pred_dict):
                 pred_dict["batch"][0],
                 pred_dict["predictions"][0],
                 pred_dict["batch"][1],
+                pred_dict["var_per_cell_line"][0]**2, #std is saved, so we transform it to variance here.
             ]
         ]
     df = pd.concat(dataframes, axis=1)
@@ -32,5 +33,6 @@ def format_and_return_as_dataframes(pred_dict):
         "context_features_id",
         "predictions",
         "targets",
+        "var_per_cell_line",
     ]
     return df

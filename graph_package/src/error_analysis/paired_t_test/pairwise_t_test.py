@@ -6,7 +6,11 @@ import pandas as pd
 import scipy.stats as stats
 import scipy.special as special
 import matplotlib.pyplot as plt
-from graph_package.src.error_analysis.err_utils.err_config import entity_err_configs
+from graph_package.src.error_analysis.err_utils.err_config import (entity_err_configs,
+                                                                   fewhot_modal_10_err_configs, fewhot_modal_100_err_configs, fewhot_modal_250_err_configs,
+                                                                   p3_few_shot_drug_10_err_configs, p3_few_shot_drug_100_err_configs, p3_few_shot_drug_250_err_configs,
+                                                                   p3_few_shot_cell_100_err_configs, p3_few_shot_cell_250_err_configs,
+                                                                   p3_general_intra_model_var_err_configs)
 
 
 def paired_t_test(data1, data2):
@@ -125,12 +129,17 @@ def run_pairwise_two_sided_ttests(
     alpha: float = 0.05,
     perform_residual_analysis: bool = False,
     plot_residuals: bool = False,
+    subset_of_combinations: list = None,
 ):
     pred_dfs = get_saved_pred(err_configs)
 
     # prepare pairwise combinations
     model_indices = np.arange(len(model_names))
-    combinations_list = list(combinations(model_indices, 2))
+
+    if subset_of_combinations:
+        combinations_list = subset_of_combinations
+    else:
+        combinations_list = list(combinations(model_indices, 2))
     # Bonferroni correction, reject null hypothesis if p-value < alpha / m
     alpha /= len(combinations_list)
 
@@ -159,7 +168,7 @@ def run_pairwise_two_sided_ttests(
         m1_mse = (df_m1["targets"].values - df_m1["predictions"].values) ** 2
         m2_mse = (df_m2["targets"].values - df_m2["predictions"].values) ** 2
         paired_residuals = m1_mse - m2_mse
-
+        print(model_names[m1_idx],model_names[m2_idx])
         (
             t_statistic,
             p_value,
@@ -202,15 +211,112 @@ if __name__ == "__main__":
     # put prediction files in the folder, where each prediction file is named after the model:
     # ex : rescal_model_pred_dict.pkl
 
-    model_names = ["DistMult", "DeepDDS", "GC", "RGAT","RGAT-one-hot"] #, "DistMult2"]
+    model_names = ["DistMult", "DeepDDS", "GC", "RGAT", "RGAT-one-hot"] #, "DistMult2"]
     alpha = 0.05
     perform_residual_analysis = True
     plot_residuals = False
 
-    df_results = run_pairwise_two_sided_ttests(
+    #General split phase 3
+    # df_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     entity_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+
+    #Modality (3d-het, 3d, one-hot & one-hot-het) phase 2, few-shot split
+    model_names = [ "RGAT-one-hot", "RGAT-one-hot-Het", "RGAT-E3FP-Het", "RGAT-E3FP"]
+    df10_results = run_pairwise_two_sided_ttests(
         model_names,
-        entity_err_configs,
+        fewhot_modal_10_err_configs,
         alpha,
         perform_residual_analysis,
         plot_residuals,
+        subset_of_combinations=[(0,1),(0,2), (2,3)]
     )
+    df100_results = run_pairwise_two_sided_ttests(
+        model_names,
+        fewhot_modal_100_err_configs,
+        alpha,
+        perform_residual_analysis,
+        plot_residuals,
+        subset_of_combinations=[(0,1),(0,2), (2,3)]
+    )
+
+    df250_results = run_pairwise_two_sided_ttests(
+        model_names,
+        fewhot_modal_250_err_configs,
+        alpha,
+        perform_residual_analysis,
+        plot_residuals,
+        subset_of_combinations=[(0,1),(0,2), (2,3)]
+    )
+
+    #P3 few-shot drug split
+    # model_names = ["RGAT-E3FP", "DeepDDS"]
+    # df10_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_few_shot_drug_10_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # model_names = ["RGAT-E3FP", "DistMult"]
+    # df100_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_few_shot_drug_100_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # model_names = ["RGAT-E3FP", "DeepDDS"]
+    # df250_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_few_shot_drug_250_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+
+
+    #P3 few-shot cancer split
+    #TODO: WHEN distmult has been trained -> setup config and run pairwise test for the best two models.
+    # model_names = ["RGAT-E3FP", "DeepDDS"]
+    # df10_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_few_shot_drug_10_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+
+    # model_names = ["RGAT-E3FP", "DistMult"]
+    # df100_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_few_shot_cell_100_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # model_names = ["RGAT-E3FP", "DistMult"]
+    # df250_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_few_shot_cell_250_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+
+    #P3 general intra model variance
+    # model_names = ["RGAT-E3FP-1", "RGAT-E3FP-2"]
+    # df250_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_general_intra_model_var_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )

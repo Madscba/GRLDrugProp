@@ -11,7 +11,7 @@ from graph_package.src.error_analysis.err_utils.err_utils_load import (
 )
 import pandas as pd
 
-from graph_package.src.error_analysis.err_utils.err_config import res_err_configs, entity_err_configs
+from graph_package.src.error_analysis.err_utils.err_config import res_err_configs, entity_err_configs,p3_general_intra_model_var_err_configs
 
 def load_and_prepare_pred(model_names, entity, comparison, err_configs):
     """
@@ -137,7 +137,14 @@ if __name__ == "__main__":
     ), "Number of models and configs must be equal"
 
     # residual_scatter_plot(res_err_configs)
-    # residual_box_plot_MAE_MSE(res_err_configs, filter_outliers=True)
+    residual_box_plot_MAE_MSE(res_err_configs, filter_outliers=True)
     # residual_box_plot_MAPE_MSE(res_err_configs)
 
-    error_diagnostics_per_entity(res_err_configs, comparison, model_names, entities)
+    # error_diagnostics_per_entity(res_err_configs, comparison, model_names, entities)
+
+
+    #Intra model variability
+    # residual_scatter_plot(p3_general_intra_model_var_err_configs)
+    # residual_box_plot_MAE_MSE(p3_general_intra_model_var_err_configs, filter_outliers=True)
+    # error_diagnostics_per_entity(p3_general_intra_model_var_err_configs, comparison, ['RGAT-1'], entities)
+    a = 2
