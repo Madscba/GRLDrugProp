@@ -130,17 +130,17 @@ if __name__ == "__main__":
     # todo validate: that models names can be 1 or more. check that every comparison works. And that each entity works
     comparison = "individual"  # "individual", "concatenate" or "difference"
     model_names = ["Distmult", "RGAT"]
-    entities = ["cancer_cell"] # drug_pair, drug "disease", "tissue", "cancer_cell", "drug_target"]
+    entities = ["drug"] # drug_pair, drug "disease", "tissue", "cancer_cell", "drug_target"]
 
     assert len(model_names) == len(
         res_err_configs
     ), "Number of models and configs must be equal"
 
     # residual_scatter_plot(res_err_configs)
-    residual_box_plot_MAE_MSE(res_err_configs, filter_outliers=True)
+    # residual_box_plot_MAE_MSE(res_err_configs, filter_outliers=True)
     # residual_box_plot_MAPE_MSE(res_err_configs)
 
-    # error_diagnostics_per_entity(res_err_configs, comparison, model_names, entities)
+    error_diagnostics_per_entity(res_err_configs, comparison, model_names, entities)
 
 
     #Intra model variability

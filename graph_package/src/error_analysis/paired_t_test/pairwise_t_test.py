@@ -10,7 +10,14 @@ from graph_package.src.error_analysis.err_utils.err_config import (entity_err_co
                                                                    fewhot_modal_10_err_configs, fewhot_modal_100_err_configs, fewhot_modal_250_err_configs,
                                                                    p3_few_shot_drug_10_err_configs, p3_few_shot_drug_100_err_configs, p3_few_shot_drug_250_err_configs,
                                                                    p3_few_shot_cell_100_err_configs, p3_few_shot_cell_250_err_configs,
-                                                                   p3_general_intra_model_var_err_configs)
+                                                                   p3_general_intra_model_var_err_configs,
+                                                                   p3_rgat_drug_10, p3_rgat_drug_100, p3_rgat_drug_250,
+                                                                   p3_rgat_cell_10, p3_rgat_cell_100, p3_rgat_cell_250,
+                                                                   p3_e3fp_shuffle, p2_modal_onehot,
+                                                                   p2_few_shot_10_het_no_one_hot,
+                                                                   p2_few_shot_100_het_no_one_hot,
+                                                                   p2_few_shot_250_het_no_one_hot
+                                                                   )
 
 
 def paired_t_test(data1, data2):
@@ -53,6 +60,7 @@ def residual_analysis(
         plt.title(f"Q-Q Plot {model_name1} vs {model_name2}")
         plt.tight_layout()
         plt.show()
+        a = 2
 
     print(f"\nAssumption Tests for {model_name1} & {model_name2}:")
     if shapiro_p_value > 0.05:
@@ -112,11 +120,13 @@ def check_if_samples_are_paired(df_m1, df_m2):
         df_m1 = df_m1.loc[triplet_set].reset_index()
         df_m2 = df_m2.loc[triplet_set].reset_index()
 
-    if not ((df_m1[triplet_col] == df_m2[triplet_col]).all().all()):
+    if not (df_m1[triplet_col].equals(df_m2[triplet_col])):
         print("Triplet ordering differ. Trying to align")
         df_m1.set_index(triplet_col, inplace=True)
         df_m2.set_index(triplet_col, inplace=True)
         df_m2 = df_m2.reindex(df_m1.index)
+        df_m1 = df_m1.reset_index()
+        df_m2 = df_m2.reset_index()
         df_m1, df_m2 = check_if_samples_are_paired(df_m1, df_m2)
 
     return df_m1, df_m2
@@ -214,44 +224,44 @@ if __name__ == "__main__":
     model_names = ["DistMult", "DeepDDS", "GC", "RGAT", "RGAT-one-hot"] #, "DistMult2"]
     alpha = 0.05
     perform_residual_analysis = True
-    plot_residuals = False
+    plot_residuals = True
 
     #General split phase 3
-    # df_results = run_pairwise_two_sided_ttests(
+    df_results = run_pairwise_two_sided_ttests(
+        model_names,
+        entity_err_configs,
+        alpha,
+        perform_residual_analysis,
+        plot_residuals,
+    )
+
+    #Modality (3d-het, 3d, one-hot & one-hot-het) phase 2, few-shot split
+    # model_names = [ "RGAT-one-hot", "RGAT-one-hot-Het", "RGAT-E3FP-Het", "RGAT-E3FP"]
+    # df10_results = run_pairwise_two_sided_ttests(
     #     model_names,
-    #     entity_err_configs,
+    #     fewhot_modal_10_err_configs,
     #     alpha,
     #     perform_residual_analysis,
     #     plot_residuals,
+    #     subset_of_combinations=[(0,1),(0,2), (2,3)]
     # )
-
-    #Modality (3d-het, 3d, one-hot & one-hot-het) phase 2, few-shot split
-    model_names = [ "RGAT-one-hot", "RGAT-one-hot-Het", "RGAT-E3FP-Het", "RGAT-E3FP"]
-    df10_results = run_pairwise_two_sided_ttests(
-        model_names,
-        fewhot_modal_10_err_configs,
-        alpha,
-        perform_residual_analysis,
-        plot_residuals,
-        subset_of_combinations=[(0,1),(0,2), (2,3)]
-    )
-    df100_results = run_pairwise_two_sided_ttests(
-        model_names,
-        fewhot_modal_100_err_configs,
-        alpha,
-        perform_residual_analysis,
-        plot_residuals,
-        subset_of_combinations=[(0,1),(0,2), (2,3)]
-    )
-
-    df250_results = run_pairwise_two_sided_ttests(
-        model_names,
-        fewhot_modal_250_err_configs,
-        alpha,
-        perform_residual_analysis,
-        plot_residuals,
-        subset_of_combinations=[(0,1),(0,2), (2,3)]
-    )
+    # df100_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     fewhot_modal_100_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    #     subset_of_combinations=[(0,1),(0,2), (2,3)]
+    # )
+    #
+    # df250_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     fewhot_modal_250_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    #     subset_of_combinations=[(0,1),(0,2), (2,3)]
+    # )
 
     #P3 few-shot drug split
     # model_names = ["RGAT-E3FP", "DeepDDS"]
@@ -283,7 +293,6 @@ if __name__ == "__main__":
 
 
     #P3 few-shot cancer split
-    #TODO: WHEN distmult has been trained -> setup config and run pairwise test for the best two models.
     # model_names = ["RGAT-E3FP", "DeepDDS"]
     # df10_results = run_pairwise_two_sided_ttests(
     #     model_names,
@@ -316,6 +325,105 @@ if __name__ == "__main__":
     # df250_results = run_pairwise_two_sided_ttests(
     #     model_names,
     #     p3_general_intra_model_var_err_configs,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+
+
+    #P3 rgat one-hot vs 3D for drug few-shot
+    # model_names = ["RGAT-one-hot", "RGAT-E3FP"]
+    # df10_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_rgat_drug_10,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # df100_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_rgat_drug_100,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # df250_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_rgat_drug_250,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #P3 rgat one-hot vs 3D for cell few-shot
+
+    # df10_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_rgat_cell_10,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # df100_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_rgat_cell_100,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # df250_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_rgat_cell_250,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+
+
+    # P3 E3FP388 vs shuffle E3FP388
+    # model_names = ["RGAT-one-hot","RGAT-E3FP", "RGAT-E3FP-shuffle"]
+    # df_drug_shuffle_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p3_e3fp_shuffle,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+
+    # P2 modality vs one-hot
+    # model_names = ["RGAT-modality", "RGAT-one-hot"]
+    # df_modal_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p2_modal_onehot,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+
+    #p2 few-shot modality without one-hot drug to account for dim
+    # model_names = ['RGAT-one-hot','RGAT-het-no-one-hot']
+    # df10_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p2_few_shot_10_het_no_one_hot,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # df100_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p2_few_shot_100_het_no_one_hot,
+    #     alpha,
+    #     perform_residual_analysis,
+    #     plot_residuals,
+    # )
+    #
+    # df250_results = run_pairwise_two_sided_ttests(
+    #     model_names,
+    #     p2_few_shot_250_het_no_one_hot,
     #     alpha,
     #     perform_residual_analysis,
     #     plot_residuals,

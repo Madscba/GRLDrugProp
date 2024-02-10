@@ -270,6 +270,7 @@ def generate_bar_plot(
     y_lim = plot_conf.get("y_lim",None)
     # y_lim = [0, 80]
     x_lim = plot_conf.get("x_lim",None)
+    conf_model_name = plot_conf.get("model_name",None)
 
     model_name = model_name.lower()
     plt_color = MODEL_COLORS[model_name] if model_name in MODEL_COLORS else "blue"
@@ -287,6 +288,9 @@ def generate_bar_plot(
     if y_lim:
         plt.ylim(y_lim)
     plt.title(f"{title}")
+    if conf_model_name:
+        model_name = conf_model_name
+
 
     df.reset_index(inplace=True)
     sns.barplot(x=df.index, y=df[metric_name], color=plt_color)
