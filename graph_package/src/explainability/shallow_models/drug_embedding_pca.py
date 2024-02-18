@@ -19,7 +19,7 @@ save_path.mkdir(parents=True, exist_ok=True)
 # train a distmultmodel 
 state_dict_fold_0 = torch.load(Directories.REPO_PATH /'checkpoints/explainability/distmult-16/fold_0/epoch=149-val_mse=11.4737.ckpt')['state_dict']
 state_dict_fold_1 = torch.load(Directories.REPO_PATH /'checkpoints/explainability/distmult-16/fold_1/epoch=149-val_mse=11.3706.ckpt')['state_dict']
-state_dict = state_dict_fold_0
+state_dict = state_dict_fold_1
 #state_dict = torch.load('checkpoints/distmult-256/fold_0/epoch=22-val_mse=8.0689.ckpt')['state_dict']
 color_metric = 'std'
 embedding_type='entity' # entity or relation
@@ -43,6 +43,8 @@ metric = data_df.groupby(['context_id' if embedding_type=='relation' else 'drug_
 # Create a plot grid
 fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 n_drugs = 25
+cm = plt.cm.get_cmap("tab20")
+colors = cm(np.linspace(0,1,n_drugs))
 # Plot the first four principal components
 l = [1,2,2,3]
 k=0
@@ -51,13 +53,13 @@ for i in range(2):
         x_component_index = i
         y_component_index = l[k]
         axs[i, j].scatter(principal_components[:n_drugs, x_component_index], principal_components[:n_drugs, y_component_index],
-                          c=metric['synergy_zip_mean'], cmap='viridis')
+                          c=colors)
         axs[i, j].set_xlabel(f"Principal Component {x_component_index + 1}")
         axs[i, j].set_ylabel(f"Principal Component {y_component_index + 1}")
         k+=1
 
 plt.tight_layout()
-fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 1), cmap='viridis'),
-             ax=axs, orientation='vertical', label=color_metric)
+# fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 1), cmap='viridis'),
+#              ax=axs, orientation='vertical', label=color_metric)
 plt.savefig(save_path)
 # %%
