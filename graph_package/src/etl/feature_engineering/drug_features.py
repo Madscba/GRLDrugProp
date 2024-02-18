@@ -1,7 +1,7 @@
 from graph_package.configs.directories import Directories
 from graph_package.src.etl.medallion.gold import get_drug_info
 import pandas as pd
-
+from sklearn.decomposition import PCA
 from rdkit import Chem
 from chemopy import Fingerprint
 from rdkit.Chem import Descriptors
@@ -10,14 +10,15 @@ from e3fp.conformer.util import smiles_to_dict
 from e3fp.config.params import default_params
 from e3fp.pipeline import params_to_dicts,fprints_from_smiles, fprints_from_mol, confs_from_smiles
 from python_utilities.parallel import Parallelizer
-
 from tqdm.notebook import tqdm
 from itertools import islice
 import os
 from python_utilities.parallel import Parallelizer
 import pickle
+import json
 from glob import glob
 import numpy as np
+
 def get_feature_path() -> Path:
     path_to_drug_feature_folder = Directories.DATA_PATH / "features" / "drug_features"
     path_to_drug_feature_folder.mkdir(parents=True, exist_ok=True)
@@ -207,6 +208,25 @@ def get_molecules_from_SMILES(drug_SMILES):
         mols.append(mol)
     return mols
 
+def make_e3fp_3d_pca():
+    file_path = Directories.DATA_PATH / "features" / "drug_features" / "drug_E3FP_fp_3D.csv"
+    drug_comb_drugs = json.load(open('data/gold/drugcomb_filtered/entity_vocab.json','r'))
+    drug_descriptors = pd.read_csv(file_path,index_col=0)
+    drug_descriptors = drug_descriptors.loc[list(drug_comb_drugs.keys())]  
+    components = len(drug_descriptors.index)
+    # Generate PCA feature vectors
+
+    drug_node_array = np.array(drug_descriptors)
+    pca = PCA(n_components=min(components, drug_node_array.shape[1]))
+    pca_feature_vectors = pca.fit_transform(drug_node_array)
+    # Get the explained variance ratio
+    explained_variance_ratio = pca.explained_variance_ratio_
+    # Calculate the accumulated explained variance
+    accumulated_explained_variance = np.cumsum(explained_variance_ratio)
+    print(f"Acc explained variance for {components} cell line pca features: {accumulated_explained_variance[-1]}"
+    )
+    pd.DataFrame(pca_feature_vectors,index=drug_descriptors.index).to_csv(file_path.parent / f"drug_E3FP_fp_3D_PCA_{components}.csv")
 
 if __name__ == "__main__":
-    make_drug_fingerprint_features()
+    #make_drug_fingerprint_features()
+    make_e3fp_3d_pca()

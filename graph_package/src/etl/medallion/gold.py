@@ -466,6 +466,7 @@ def make_filtered_drugcomb_dataset():
     
     new_study_name = study + "_filtered"
     save_path_new = save_path / (new_study_name)
+
     with open(save_path_new / 'entity_vocab.json', "w") as json_file:
                     json.dump(entity_vocab, json_file)
     with open(save_path_new / 'relation_vocab.json', "w") as json_file:
