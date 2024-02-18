@@ -131,7 +131,7 @@ class KnowledgeGraphDataset(Dataset):
             drug_features = pd.read_csv(drug_feature_path, index_col=0)
             for drug in drug_features.index:
                 node_feature_dict[drug] = drug_features.loc[drug].to_list()
-        else:
+        elif self.drug_representation == "onehot":
             for i, (drug, drug_id) in enumerate(drug_vocab.items()):
                 one_hot = np.zeros(len(drug_vocab))
                 one_hot[i] = 1
@@ -172,7 +172,10 @@ class KnowledgeGraphDataset(Dataset):
                 for relation, value in feature.items():
                     if relation in relations_to_include:
                         concatenated_pca_features.extend(value)
-                node_feature_dict[node].extend(concatenated_pca_features)
+                if self.drug_representation=="None":
+                    node_feature_dict[node] = concatenated_pca_features
+                else:
+                    node_feature_dict[node].extend(concatenated_pca_features)
 
         # Convert to a list in correct order determined by graph node ID
         node_features = [
